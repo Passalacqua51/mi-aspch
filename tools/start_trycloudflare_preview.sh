@@ -39,50 +39,12 @@ if [[ -z "$URL" ]]; then
   exit 1
 fi
 
-HOST="${URL#https://}"
-ENVFILE="${APP_DIR}/.env"
-python3 - "$ENVFILE" "$URL" "$HOST" <<'PY'
-from pathlib import Path
-import sys
-p=Path(sys.argv[1]); url=sys.argv[2]; host=sys.argv[3]
-s=p.read_text() if p.exists() else ''
-# Si Google todavía está apagado, DEMO_MODE debe quedar true para que Jenny reciba
-# el código de prueba en pantalla. Al activar Gmail API se puede volver a false.
-google_enabled=False
-for line in s.splitlines():
-    if line.strip().upper().startswith('GOOGLE_ENABLED='):
-        google_enabled=line.split('=',1)[1].strip().lower() in ('1','true','yes','on')
-vals={
- 'APP_ORIGIN':url,
- 'APP_ORIGINS':url,
- 'PUBLIC_APP_URL':url,
- 'WEBAUTHN_RP_ID':host,
- 'WEBAUTHN_ORIGINS':url,
- 'PUBLIC_PREVIEW_RESTRICT_EMAIL_ONLY':'true',
- 'EMAIL_ONLY_USERS':'jenny.pizarro@aspch.org',
-}
-if not google_enabled:
-    vals['DEMO_MODE']='true'
-lines=s.splitlines(); seen=set(); out=[]
-for line in lines:
-    if '=' in line and not line.lstrip().startswith('#'):
-        k=line.split('=',1)[0].strip()
-        if k in vals:
-            out.append(f'{k}={vals[k]}'); seen.add(k); continue
-    out.append(line)
-for k,v in vals.items():
-    if k not in seen: out.append(f'{k}={v}')
-p.write_text('\n'.join(out).rstrip()+'\n')
-PY
-
-cd "$APP_DIR"
-docker compose up -d --build >/dev/null
-
-# Espera a que la aplicación reiniciada y el túnel estén listos.
+# Espera a que la aplicación y el túnel estén listos. El script no modifica
+# configuración, autenticación ni contenedores; expone solamente la instancia existente.
 OK=""
 for _ in $(seq 1 40); do
-  if HEALTH="$(curl -fsS --max-time 8 "${URL}/api/health" 2>/dev/null)" && CONFIG="$(curl -fsS --max-time 8 "${URL}/api/config" 2>/dev/null)"; then
-    if grep -q '"version":"0.4.2"' <<<"$HEALTH" && grep -q '"emailOnlyPreview":true' <<<"$CONFIG"; then
+  if HEALTH="$(curl -fsS --max-time 8 "${URL}/api/health" 2>/dev/null)"; then
+    if grep -q '"version":"0.6.15"' <<<"$HEALTH"; then
       OK=1; break
     fi
   fi
@@ -90,12 +52,12 @@ for _ in $(seq 1 40); do
 done
 
 if [[ -z "$OK" ]]; then
-  echo "ERROR: el túnel existe pero Mi ASPCH v0.4.2 no pasó la verificación pública." >&2
+  echo "ERROR: el túnel existe pero Mi ASPCH v0.6.15 no pasó la verificación pública." >&2
   echo "Revisa: $LOG" >&2
   exit 1
 fi
 
 echo "$URL"
 echo "PUBLIC_PREVIEW_URL=$URL"
-echo "OK: Mi ASPCH v0.4.2 accesible públicamente y restringida al correo de Jenny."
+echo "OK: Mi ASPCH v0.6.15 accesible por el túnel con su autenticación normal intacta."
 echo "NOTA: Quick Tunnel temporal. Si cambia la URL, la passkey registrada en la URL anterior debe enrolarse nuevamente."

@@ -69,4 +69,12 @@ Configurar Google Drive mediante OAuth y decidir el repositorio Git privado.
 
 ### Notas para ChatGPT
 
-La configuración actual tiene Google habilitado y modo demo desactivado. No se copiaron ni inspeccionaron valores de credenciales. El endpoint productivo configurado usa actualmente un túnel temporal; el dominio final documentado es `app.aspch.org`.
+La configuración actual tiene Google habilitado. No se copiaron ni inspeccionaron valores de credenciales. El endpoint productivo configurado usa actualmente un túnel temporal; el dominio final documentado es `app.aspch.org`.
+
+## 2026-08-27 — Retiro de accesos alternativos
+
+En `fix/remove-presentation-login` se retiraron frontend, backend, sembrado,
+flags y helpers asociados a accesos demo, presentación, RUT directo y
+correo-only. El OTP deja de exponerse por API. Se agregó un self-check HTTP
+aislado que confirma 404 sin sesión en rutas antiguas y valida RUT+OTP, PIN y
+ADMIN. Passkeys/WebAuthn no se modificó. No hubo despliegue ni cambios de datos.

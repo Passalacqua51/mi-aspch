@@ -1,5 +1,28 @@
 # Decisiones
 
+## 2026-08-27 — Un único flujo de autenticación para socios
+
+### Decisión
+
+Todo socio debe iniciar sesión mediante RUT y OTP. El acceso posterior conserva
+PIN y Passkeys/WebAuthn. ADMIN conserva exclusivamente su login normal con PIN.
+
+Se retiran perfiles de presentación o demo, acceso directo por RUT, excepciones
+por correo, exposición de OTP y cualquier creación de sesión equivalente.
+
+### Consecuencias
+
+- Las rutas de autenticación desconocidas responden 404 antes de consultar o
+  crear sesiones.
+- Las variables antiguas dejan de afectar al código, aunque permanezcan en el
+  `.env` productivo hasta una limpieza separada.
+- No se eliminan usuarios, sesiones ni passkeys ya persistidos durante este
+  cambio de código.
+
+### Estado
+
+Preparada en `fix/remove-presentation-login`; no desplegada
+
 ## 2026-08-27 — Definición canónica de despliegue v0.6.15
 
 ### Decisión

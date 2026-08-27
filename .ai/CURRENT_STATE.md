@@ -1,6 +1,6 @@
 # Estado actual
 
-Última actualización: 2026-08-27 00:24 UTC
+Última actualización: 2026-08-27 UTC
 
 ## Fuentes canónicas
 
@@ -23,7 +23,17 @@ La ruta `/mnt/MediaCenter/aspch` es legado/runtime y no es fuente de código.
 
 - `.ai/` fue consolidado en la carpeta oficial de código.
 - La documentación histórica fue separada bajo `docs/history/`.
-- Git continúa sin inicializar por decisión explícita del usuario.
+- Git está inicializado con `main` y baseline anotado `v0.6.15-baseline`.
+
+## Cambio de autenticación preparado
+
+- La rama `fix/remove-presentation-login` elimina del código fuente los accesos
+  de presentación, demo, RUT directo, correo-only y exposición de OTP.
+- El login normal RUT+OTP, PIN, Passkeys/WebAuthn y ADMIN permanecen.
+- La rama no ha sido desplegada; el contenedor y los datos productivos no fueron
+  modificados.
+- Las variables obsoletas que aún puedan existir en `.env` se ignoran. Su
+  limpieza requiere una tarea posterior y no debe exponer valores.
 
 ## Definición de despliegue
 

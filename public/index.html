@@ -27,24 +27,7 @@
         <h1>Tu asociación, en un solo lugar.</h1>
         <p>Credencial, estacionamientos, simuladores, noticias y membresía.</p>
       </div>
-      <section id="presentation-access" class="presentation-access hidden" aria-labelledby="presentation-title">
-        <div class="presentation-heading">
-          <div><span class="eyebrow">PRESENTACIÓN</span><h2 id="presentation-title">Acceso rápido</h2></div>
-          <span class="presentation-badge">Demo Directorio</span>
-        </div>
-        <p>Elige una experiencia para entrar sin RUT, código ni PIN.</p>
-        <div id="presentation-profiles" class="presentation-grid"></div>
-        <p id="presentation-error" class="auth-error hidden" role="alert"></p>
-      </section>
       <form id="identity-form" class="auth-form">
-        <div id="demo-profile-wrap" class="demo-profile-box hidden">
-          <label>Perfil de prueba
-            <select id="demo-profile-select">
-              <option value="">Selecciona un perfil…</option>
-            </select>
-          </label>
-          <p class="hint">Solo aparece en modo demo. Completa automáticamente RUT y correo del perfil elegido.</p>
-        </div>
         <label id="login-rut-label">RUT
           <input id="login-rut" type="text" inputmode="text" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="12.345.678-5">
         </label>
@@ -54,7 +37,6 @@
         <button class="button primary" type="submit">Continuar</button>
         <p class="auth-error hidden" role="alert"></p>
         <p id="identity-help" class="hint">Si el correo es distinto al registrado, Mi ASPCH validará ambos correos antes de actualizar tu ficha ASPCH.</p>
-        <p id="demo-hint" class="hint">Modo demo activo: el código OTP se mostrará en pantalla para facilitar las pruebas.</p>
       </form>
       <form id="code-form" class="auth-form hidden">
         <button type="button" id="back-identity" class="link-button">← Cambiar RUT o correo</button>

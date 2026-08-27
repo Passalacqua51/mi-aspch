@@ -4,7 +4,7 @@ ID: mi-aspch
 Nombre: Mi ASPCH  
 Código oficial: `/home/casa/mi-aspch-source`  
 Contexto IA oficial: `/home/casa/mi-aspch-source/.ai`  
-Repositorio Git: no inicializado  
+Repositorio Git: inicializado, rama principal `main`, baseline `v0.6.15-baseline`
 Producción actual: `0.6.15`  
 Despliegue canónico: `/home/casa/mi-aspch-source/compose.yaml`  
 Estado: operativo
@@ -42,3 +42,6 @@ de código, no debe usarse como contexto de build y su `.ai/` ya no es canónico
 - No aplicar `compose.yaml` sin autorización explícita de despliegue.
 - No asumir que un Compose representa producción sin contrastarlo con Docker.
 - Ejecutar `npm run check` después de cambios JavaScript relevantes.
+- La autenticación de socios exige RUT y OTP; el acceso posterior usa PIN o
+  Passkey/WebAuthn. No se permiten perfiles demo, login de presentación ni
+  accesos directos que creen sesiones fuera de esos flujos.

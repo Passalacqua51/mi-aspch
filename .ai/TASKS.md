@@ -1,8 +1,10 @@
 # Pendientes
 
-- [ ] Inicializar o enlazar Git únicamente cuando el usuario lo autorice.
 - [ ] Definir una migración separada para runtime y backups, con rollback.
 - [ ] Aplicar `compose.yaml` únicamente mediante una futura tarea autorizada.
+- [ ] Revisar y desplegar por separado la rama `fix/remove-presentation-login`.
+- [ ] Retirar en una tarea autorizada las variables de autenticación obsoletas
+      del `.env` productivo, sin mostrar sus valores.
 
 # En curso
 
@@ -22,3 +24,5 @@
 - [x] Alinear `compose.yaml` con el contenedor productivo sin aplicarlo.
 - [x] Corregir metadatos de `package-lock.json` a v0.6.15 sin cambiar dependencias.
 - [x] Unificar el fallback visible de la PWA en v0.6.15.
+- [x] Inicializar Git y crear el baseline anotado `v0.6.15-baseline`.
+- [x] Eliminar del código los mecanismos de login de presentación/demo/directo.
