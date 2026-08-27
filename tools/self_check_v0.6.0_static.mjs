@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
 const read=f=>fs.readFileSync(path.join(root,f),'utf8');
 const server=read('server.mjs'),app=read('public/app.js'),index=read('public/index.html'),css=read('public/styles.css'),env=read('.env.example'),pkg=JSON.parse(read('package.json')),v060=read('lib/v060.mjs'),google=read('lib/google.mjs'),auth=read('lib/auth.mjs'),db=read('lib/db.mjs'),push=read('lib/push.mjs'),sw=read('public/sw.js');
-assert.equal(pkg.version,'0.6.15');
-assert.match(server,/const VERSION = '0\.6\.15'/);
+assert.equal(pkg.version,'0.6.16');
+assert.match(server,/const VERSION = '0\.6\.16'/);
 assert.match(env,/GOOGLE_SHEETS_READ=true/);assert.match(env,/GOOGLE_CALENDAR_WRITE=false/);assert.match(env,/GOOGLE_GMAIL_OTP_SEND=false/);assert.match(env,/GOOGLE_GMAIL_NOTIFICATION_SEND=false/);
 assert.match(google,/gmailOtpSendEnabled/);assert.match(google,/gmailNotificationSendEnabled/);
 for(const r of ['/api/votes','/api/votes/cast','/api/reservations','/api/history','/api/admin/modules','/api/admin/votes/update','/api/admin/votes/delete','/api/admin/backup','/api/admin/diagnostics','/api/admin/members','/api/admin/jobs/run','/api/admin/cache/clear'])assert.ok(server.includes(r),`Falta ${r}`);
@@ -28,4 +28,4 @@ for(const [name,source] of Object.entries({server,app,index,env,auth,db,google,p
 assert.ok(!server.includes('/api/auth/presentation-login'),'El endpoint de presentación no debe existir');
 assert.ok(!index.includes('entrar sin RUT'),'La UI no debe ofrecer acceso sin autenticación normal');
 assert.match(server,/p\.startsWith\('\/api\/auth\/'\).*404/,'Las rutas auth desconocidas deben terminar en 404 antes de crear sesión');
-console.log('SELF-CHECK STATIC v0.6.15 OK: navegación, reservas y ausencia de mecanismos de acceso alternativo.');
+console.log('SELF-CHECK STATIC v0.6.16 OK: navegación, reservas y ausencia de mecanismos de acceso alternativo.');

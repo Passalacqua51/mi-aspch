@@ -632,7 +632,7 @@ async function renderAdmin(){
     ['Votaciones abiertas',m.votes?.open||0,'🗳️'],['Push devices',m.push?.subscriptions||0,'🔔'],['Sesiones',m.sessions?.active||0,'🔐'],['Auditoría',m.audit?.rows||0,'🧾']
   ];
   $('#view').innerHTML=`
-  <div class="developer-hero card"><div><span class="eyebrow">🛠️ CONTROL CENTER</span><h2>Centro de control Mi ASPCH</h2><p>Operación, contenido, seguridad, mantenimiento, sincronización, auditoría y diagnóstico. Las herramientas de alto riesgo están deliberadamente limitadas a acciones predefinidas: no se expone shell, SQL libre ni secretos por web.</p></div><div class="dev-version"><strong>v${escapeHtml(state.config?.version||'0.6.15')}</strong><span>${escapeHtml(state.member.email||'ADMIN')}</span></div></div>
+  <div class="developer-hero card"><div><span class="eyebrow">🛠️ CONTROL CENTER</span><h2>Centro de control Mi ASPCH</h2><p>Operación, contenido, seguridad, mantenimiento, sincronización, auditoría y diagnóstico. Las herramientas de alto riesgo están deliberadamente limitadas a acciones predefinidas: no se expone shell, SQL libre ni secretos por web.</p></div><div class="dev-version"><strong>v${escapeHtml(state.config?.version||'0.6.16')}</strong><span>${escapeHtml(state.member.email||'ADMIN')}</span></div></div>
   <div class="dev-metric-grid">${metrics.map(x=>`<div class="card dev-metric"><span>${x[2]}</span><strong>${x[1]}</strong><small>${x[0]}</small></div>`).join('')}</div>
 
   <details class="dev-section card" open><summary>⚙️ Sistema, Google y mantenimiento</summary><div class="dev-section-body">

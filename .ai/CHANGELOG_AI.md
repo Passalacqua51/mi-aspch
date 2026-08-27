@@ -2,6 +2,10 @@
 
 ## 2026-08-27
 
+- Se preparó la release `0.6.16` con el retiro de accesos alternativos ya
+  integrado en `main`, sin cambios funcionales adicionales ni despliegue.
+- Backend, PWA, caché, paquetes y Compose quedaron referenciados en `0.6.16`;
+  el digest de imagen permanece pendiente hasta la construcción autorizada.
 - Se preparó `fix/remove-presentation-login` sin despliegue ni cambios de datos.
 - Se retiraron los accesos de presentación, demo, RUT directo, correo-only y la
   exposición de OTP; RUT+OTP, PIN, Passkeys/WebAuthn y ADMIN quedan preservados.

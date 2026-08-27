@@ -6,8 +6,9 @@ Código oficial: `/home/casa/mi-aspch-source`
 Contexto IA oficial: `/home/casa/mi-aspch-source/.ai`  
 Repositorio Git: inicializado, rama principal `main`, baseline `v0.6.15-baseline`
 Producción actual: `0.6.15`  
+Versión de código preparada: `0.6.16`
 Despliegue canónico: `/home/casa/mi-aspch-source/compose.yaml`  
-Estado: operativo
+Estado: release preparada, pendiente de build y despliegue
 
 ## Descripción
 
@@ -31,7 +32,8 @@ de código, no debe usarse como contexto de build y su `.ai/` ya no es canónico
 - Retratos SIPA montados en modo solo lectura y fotos de perfil en escritura.
 - Integraciones opcionales con Google Sheets, Calendar y Gmail.
 - Dependencias npm declaradas en `package.json`.
-- Imagen productiva fijada como `mi-aspch:v0.6.15` con digest explícito.
+- Compose preparado para `mi-aspch:v0.6.16`; digest pendiente de la futura
+  construcción autorizada.
 - Volumen persistente declarado como externo con nombre `aspch_mi_aspch_data`.
 
 ## Restricciones

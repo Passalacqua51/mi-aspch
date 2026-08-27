@@ -78,3 +78,10 @@ flags y helpers asociados a accesos demo, presentación, RUT directo y
 correo-only. El OTP deja de exponerse por API. Se agregó un self-check HTTP
 aislado que confirma 404 sin sesión en rutas antiguas y valida RUT+OTP, PIN y
 ADMIN. Passkeys/WebAuthn no se modificó. No hubo despliegue ni cambios de datos.
+
+## 2026-08-27 — Release 0.6.16
+
+El cambio de seguridad fue integrado en `main` y versionado como `0.6.16` sin
+modificaciones funcionales adicionales. Se actualizaron backend, PWA, caché,
+metadatos npm, pruebas y Compose. La imagen no fue construida ni desplegada;
+producción continúa en `0.6.15` y el digest de `0.6.16` queda pendiente.

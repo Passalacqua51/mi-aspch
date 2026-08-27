@@ -2,7 +2,8 @@ name: aspch
 
 services:
   mi-aspch:
-    image: "mi-aspch:v0.6.15@sha256:59882ed1e7eb3b60c8507c35e8daf90dd3e4cfa036ff18b39badef8d975d973b"
+    # El digest se fijará después de construir la imagen en una tarea de despliegue autorizada.
+    image: "mi-aspch:v0.6.16"
     pull_policy: never
     container_name: mi-aspch
     restart: unless-stopped

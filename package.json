@@ -1,9 +1,9 @@
 {
   "name": "mi-aspch",
-  "version": "0.6.15",
+  "version": "0.6.16",
   "private": true,
   "type": "module",
-  "description": "Mi ASPCH v0.6.15 - simulación de vista iPhone de alta fidelidad",
+  "description": "Mi ASPCH v0.6.16 - simulación de vista iPhone de alta fidelidad",
   "scripts": {
     "start": "node --no-warnings server.mjs",
     "dev": "node --no-warnings --watch server.mjs",

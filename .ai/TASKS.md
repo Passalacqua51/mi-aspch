@@ -1,8 +1,8 @@
 # Pendientes
 
 - [ ] Definir una migración separada para runtime y backups, con rollback.
-- [ ] Aplicar `compose.yaml` únicamente mediante una futura tarea autorizada.
-- [ ] Revisar y desplegar por separado la rama `fix/remove-presentation-login`.
+- [ ] Construir, fijar el digest y desplegar `mi-aspch:v0.6.16` únicamente
+      mediante una futura tarea autorizada.
 - [ ] Retirar en una tarea autorizada las variables de autenticación obsoletas
       del `.env` productivo, sin mostrar sus valores.
 
@@ -26,3 +26,5 @@
 - [x] Unificar el fallback visible de la PWA en v0.6.15.
 - [x] Inicializar Git y crear el baseline anotado `v0.6.15-baseline`.
 - [x] Eliminar del código los mecanismos de login de presentación/demo/directo.
+- [x] Integrar `fix/remove-presentation-login` en `main` mediante merge no-FF.
+- [x] Preparar la release `0.6.16` sin construir ni desplegar Docker.

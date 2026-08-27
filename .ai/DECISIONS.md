@@ -1,5 +1,23 @@
 # Decisiones
 
+## 2026-08-27 — Release 0.6.16 sin despliegue
+
+### Decisión
+
+Publicar como `0.6.16` el código de `main` que elimina los accesos alternativos,
+sin añadir cambios funcionales adicionales. Preparar Compose con la etiqueta
+`mi-aspch:v0.6.16` sin reutilizar el digest de producción `0.6.15`.
+
+### Consecuencias
+
+- Backend, PWA, caché, manifiestos npm y pruebas reportan `0.6.16`.
+- El digest quedará pendiente hasta construir la imagen en una tarea autorizada.
+- Producción continúa en `0.6.15` y no se aplica Compose durante esta release.
+
+### Estado
+
+Activa
+
 ## 2026-08-27 — Un único flujo de autenticación para socios
 
 ### Decisión
@@ -21,7 +39,7 @@ por correo, exposición de OTP y cualquier creación de sesión equivalente.
 
 ### Estado
 
-Preparada en `fix/remove-presentation-login`; no desplegada
+Integrada en `main` para `0.6.16`; no desplegada
 
 ## 2026-08-27 — Definición canónica de despliegue v0.6.15
 

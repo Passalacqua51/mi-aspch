@@ -1,7 +1,8 @@
 # Mi ASPCH
 
 Mi ASPCH es una aplicación Node.js/PWA para los socios de la Asociación de
-Pilotos de Chile. Producción ejecuta actualmente la versión `0.6.15`.
+Pilotos de Chile. El código oficial está preparado como `0.6.16`; producción
+continúa ejecutando `0.6.15` hasta un despliegue autorizado.
 
 ## Fuentes de verdad
 
@@ -16,10 +17,11 @@ ni como contexto de build. Los documentos antiguos conservados en
 
 ## Despliegue declarado
 
-La única definición canónica de despliegue es `compose.yaml`. Está alineada con
-producción `0.6.15`, fija la imagen por tag y digest, reutiliza explícitamente el
-volumen externo `aspch_mi_aspch_data` y conserva el puerto, entorno y bind mounts
-actuales. El archivo no debe aplicarse sin una tarea de despliegue autorizada.
+La única definición canónica de despliegue es `compose.yaml`. Está preparada
+para la imagen `mi-aspch:v0.6.16`, reutiliza explícitamente el volumen externo
+`aspch_mi_aspch_data` y conserva el puerto, entorno y bind mounts actuales. El
+digest se fijará después de construir la imagen en una tarea autorizada; el
+archivo no debe aplicarse antes.
 
 ## Desarrollo
 

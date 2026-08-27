@@ -15,7 +15,7 @@ import { initV060, audit, auditRows, moduleStates, moduleEnabled, setModuleState
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, '.env'));
 
-const VERSION = '0.6.15';
+const VERSION = '0.6.16';
 const WHATSAPP_NUMBER = normalizePhoneDigits(process.env.ASPCH_WHATSAPP || '56948825381');
 const PORT = Number(process.env.PORT || 8080);
 const BIND_ADDRESS = process.env.SERVER_BIND_ADDRESS || '0.0.0.0';

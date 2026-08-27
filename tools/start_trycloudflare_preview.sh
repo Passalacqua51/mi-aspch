@@ -44,7 +44,7 @@ fi
 OK=""
 for _ in $(seq 1 40); do
   if HEALTH="$(curl -fsS --max-time 8 "${URL}/api/health" 2>/dev/null)"; then
-    if grep -q '"version":"0.6.15"' <<<"$HEALTH"; then
+    if grep -q '"version":"0.6.16"' <<<"$HEALTH"; then
       OK=1; break
     fi
   fi
@@ -52,12 +52,12 @@ for _ in $(seq 1 40); do
 done
 
 if [[ -z "$OK" ]]; then
-  echo "ERROR: el túnel existe pero Mi ASPCH v0.6.15 no pasó la verificación pública." >&2
+  echo "ERROR: el túnel existe pero Mi ASPCH v0.6.16 no pasó la verificación pública." >&2
   echo "Revisa: $LOG" >&2
   exit 1
 fi
 
 echo "$URL"
 echo "PUBLIC_PREVIEW_URL=$URL"
-echo "OK: Mi ASPCH v0.6.15 accesible por el túnel con su autenticación normal intacta."
+echo "OK: Mi ASPCH v0.6.16 accesible por el túnel con su autenticación normal intacta."
 echo "NOTA: Quick Tunnel temporal. Si cambia la URL, la passkey registrada en la URL anterior debe enrolarse nuevamente."
