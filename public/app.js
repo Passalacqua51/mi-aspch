@@ -12,7 +12,6 @@ $('#login-rut').addEventListener('input',e=>{
   if(/[a-z@]/i.test(value)){activateAdminIdentityMode(value.trim().toLowerCase()===state.config?.adminEmail);return}
   e.target.value=formatRutDisplay(value);activateAdminIdentityMode(false);
 });
-$('#demo-profile-select')?.addEventListener('change',applyDemoProfile);
 $('#retry-code')?.addEventListener('click',()=>$('#identity-form').requestSubmit());
 $('#back-identity').addEventListener('click',()=>{clearAuthErrors();showAuthStep('identity')});
 $('#logout').addEventListener('click',doLogout); $('#logout-top').addEventListener('click',doLogout); $('#lock-logout').addEventListener('click',doLogout);
@@ -68,25 +67,9 @@ function toggleUiMode(){applyUiMode(state.uiMode==='iphone'?'desktop':'iphone')}
 async function boot(){
   try{
     state.config=await api('/api/config');
-    const demoHint=$('#demo-hint');
-    if(demoHint) demoHint.classList.toggle('hidden',!state.config.demo);
-    $('#login-rut-label')?.classList.toggle('hidden',!!state.config.emailOnlyPreview);
-    $('#login-email-label')?.classList.toggle('hidden',!!state.config.rutOnlyTrial);
-    if(state.config.rutOnlyTrial){
-      const email=$('#login-email');if(email){email.value='';email.disabled=true;email.required=false;}
-      const hint=$('#identity-help');if(hint)hint.textContent='Acceso temporal de prueba habilitado para el RUT autorizado.';
-    }
-    if(state.config.emailOnlyPreview){
-      const rutInput=$('#login-rut'); if(rutInput){rutInput.value='';rutInput.disabled=true;rutInput.removeAttribute('autocomplete');}
-      $('#back-identity').textContent='← Cambiar correo';
-      const email=$('#login-email'); if(email){email.placeholder='jenny.pizarro@aspch.org';email.value=email.value||'';}
-    }
-    setupDemoProfiles(state.config.demoProfiles || []);
-    setupPresentationProfiles(state.config.presentationProfiles || []);
     const waf=$('#whatsapp-fab');if(waf&&state.config?.contact?.whatsappUrl)waf.href=state.config.contact.whatsappUrl;
     const data=await api('/api/me');
     state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;
-    if(data.presentation){sessionStorage.setItem('miAspchUnlocked','1');return loginSuccess()}
     if(!data.security.pinSet)return showPinSetup();
     if((data.security.pinSet||data.security.passkeySet)&&(!data.security.unlocked||sessionStorage.getItem('miAspchUnlocked')!=='1'))return showLock();
     loginSuccess();
@@ -96,38 +79,10 @@ function showAuthStep(step='identity'){
   $('#identity-form').classList.toggle('hidden',step!=='identity');
   $('#code-form').classList.toggle('hidden',step!=='code');
   $('#pin-setup-form').classList.toggle('hidden',step!=='pin');
-  if(step==='identity')setTimeout(()=>state.config?.emailOnlyPreview?$('#login-email')?.focus():$('#login-rut')?.focus(),50);
+  if(step==='identity')setTimeout(()=>$('#login-rut')?.focus(),50);
   if(step==='code')setTimeout(()=>$('#login-code')?.focus(),50);
   if(step==='pin')setTimeout(()=>$('#setup-pin')?.focus(),50);
 }
-function setupDemoProfiles(profiles=[]){
-  const wrap=$('#demo-profile-wrap'),select=$('#demo-profile-select');
-  if(!wrap||!select)return;
-  wrap.classList.toggle('hidden',!state.config?.demo);
-  select.innerHTML='';
-  const first=document.createElement('option');first.value='';first.textContent='Selecciona un perfil…';select.appendChild(first);
-  if(!state.config?.demo)return;
-  const groups=new Map();
-  profiles.forEach((profile,index)=>{
-    const key=profile.group||'Perfiles';
-    if(!groups.has(key)){
-      const group=document.createElement('optgroup');group.label=key;groups.set(key,group);select.appendChild(group);
-    }
-    const option=document.createElement('option');option.value=String(index);
-    option.textContent=`${profile.name}${profile.isBoard?' · Directorio':''}`;
-    groups.get(key).appendChild(option);
-  });
-}
-function applyDemoProfile(e){
-  const index=Number(e.currentTarget.value);
-  if(!Number.isInteger(index)||index<0)return;
-  const profile=state.config?.demoProfiles?.[index];
-  if(!profile)return;
-  $('#login-rut').value=formatRutDisplay(profile.rut||'');
-  $('#login-email').value=profile.email||'';
-  toast(`Perfil de prueba: ${profile.name}${profile.isBoard?' · Directorio':''}`);
-}
-
 function activateAdminIdentityMode(active){
   const input=$('#login-email'),label=$('#login-email-label');if(!input||!label)return;
   const wasActive=input.dataset.adminSecret==='1';if(wasActive===active)return;
@@ -137,23 +92,9 @@ function activateAdminIdentityMode(active){
   if(active){input.setAttribute('pattern','[0-9]*');input.maxLength=6;$('#identity-help').textContent='Acceso seguro al Control Center.'}
   else{input.removeAttribute('pattern');input.removeAttribute('maxlength');$('#identity-help').textContent='Si el correo es distinto al registrado, Mi ASPCH validará ambos correos antes de actualizar tu ficha ASPCH.'}
 }
-function setupPresentationProfiles(profiles=[]){
-  const wrap=$('#presentation-access'),grid=$('#presentation-profiles');if(!wrap||!grid)return;
-  wrap.classList.toggle('hidden',!state.config?.presentationMode||!profiles.length);
-  grid.innerHTML=profiles.map(p=>`<button class="presentation-profile" type="button" data-presentation-profile="${escapeHtml(p.key)}"><span class="profile-icon">${escapeHtml(p.icon||'👤')}</span><span><strong>${escapeHtml(p.label)}</strong><small>${escapeHtml(p.description||'Entrar al perfil')}</small></span></button>`).join('');
-  $$('[data-presentation-profile]',grid).forEach(button=>button.addEventListener('click',()=>presentationLogin(button)));
-}
-async function presentationLogin(button){
-  const wrap=$('#presentation-access');clearPresentationError();setLoading(wrap,true);
-  try{
-    await api('/api/auth/presentation-login',{method:'POST',body:{profile:button.dataset.presentationProfile}});
-    const me=await api('/api/me');state.member=me.member;state.membership=me.membership;state.access=me.access;state.security=me.security;state.modules=me.modules||state.modules;sessionStorage.setItem('miAspchUnlocked','1');loginSuccess();
-  }catch(err){showPresentationError(err.message)}finally{setLoading(wrap,false)}
-}
-
 async function startRegistration(e){
   e.preventDefault();clearFormError(e.currentTarget);
-  const rut=state.config?.emailOnlyPreview?'':$('#login-rut').value.trim(),email=$('#login-email').value.trim();
+  const rut=$('#login-rut').value.trim(),email=$('#login-email').value.trim();
   setLoading(e.currentTarget,true);
   try{
     if(rut.toLowerCase()===state.config?.adminEmail){
@@ -161,30 +102,19 @@ async function startRegistration(e){
       const me=await api('/api/me');state.member=me.member;state.membership=me.membership;state.access=me.access;state.security=me.security;state.modules=me.modules||state.modules;sessionStorage.setItem('miAspchUnlocked','1');loginSuccess();return;
     }
     const r=await api('/api/auth/register/start',{method:'POST',body:{rut,email}});
-    if(r.directAccess){
-      const me=await api('/api/me');state.member=me.member;state.membership=me.membership;state.access=me.access;state.security=me.security;state.modules=me.modules||state.modules;sessionStorage.setItem('miAspchUnlocked','1');loginSuccess();return;
-    }
     state.registration={rut,email,emailChanged:!!r.emailChanged};
     $('#code-primary-label').childNodes[0].textContent=`Código enviado a ${r.targetEmailMasked||'tu correo'} `;
     $('#code-old-wrap').classList.toggle('hidden',!r.emailChanged);
     $('#login-old-code').required=!!r.emailChanged;
     if(r.emailChanged)$('#code-old-label').childNodes[0].textContent=`Código de autorización enviado a ${r.currentEmailMasked||'tu correo registrado'} `;
-    let help=r.emailChanged
+    const help=r.emailChanged
       ? 'Para cambiar el correo necesitamos verificar el nuevo y autorizar el cambio desde el correo actualmente registrado.'
       : 'Revisa tu correo. El código vence en 10 minutos.';
-    if(r.devCode){
-      help+=` · Modo demo: código nuevo ${r.devCode}`;
-      $('#login-code').value=r.devCode;
-    }
-    if(r.devOldCode){
-      help+=` · autorización actual ${r.devOldCode}`;
-      $('#login-old-code').value=r.devOldCode;
-    }
     $('#code-help').textContent=help;
     showAuthStep('code');
   }catch(err){
     const adminMode=rut.toLowerCase()===state.config?.adminEmail;if(adminMode)$('#login-email').value='';
-    showFormError(e.currentTarget,adminMode?`${err.message} Corrige la clave y vuelve a intentar.`:err.message,adminMode?'#login-email':(state.config?.emailOnlyPreview?'#login-email':'#login-rut'));toast(err.message,true);
+    showFormError(e.currentTarget,adminMode?`${err.message} Corrige la clave y vuelve a intentar.`:err.message,adminMode?'#login-email':'#login-rut');toast(err.message,true);
   }
   finally{setLoading(e.currentTarget,false)}
 }
@@ -873,10 +803,8 @@ function setLoading(el,on){
   });
 }
 function clearFormError(form){if(!form)return;const box=$('.auth-error',form);if(box){box.textContent='';box.classList.add('hidden')}$$('[aria-invalid="true"]',form).forEach(x=>x.removeAttribute('aria-invalid'))}
-function clearAuthErrors(){$$('.auth-form').forEach(clearFormError);clearPresentationError()}
+function clearAuthErrors(){$$('.auth-form').forEach(clearFormError)}
 function showFormError(form,message,selector){clearFormError(form);const box=$('.auth-error',form);if(box){box.textContent=message;box.classList.remove('hidden')}const input=$(selector);if(input){input.disabled=false;input.setAttribute('aria-invalid','true');focusEditableNumeric(selector)}}
-function clearPresentationError(){const box=$('#presentation-error');if(box){box.textContent='';box.classList.add('hidden')}}
-function showPresentationError(message){const box=$('#presentation-error');if(box){box.textContent=`${message} Puedes volver a intentarlo.`;box.classList.remove('hidden')}}
 function toast(msg,error=false){const t=$('#toast');t.textContent=msg;t.className=`toast show${error?' error':''}`;clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.className='toast',3200)}
 function stat(icon,label,value,color){return `<div class="card stat-card"><div class="stat-icon">${icon}</div><div class="stat-copy"><span>${label}</span><strong>${escapeHtml(value)}</strong><div><span class="badge ${color}"><i class="dot"></i>${color==='green'?'Activo':'Ver detalle'}</span></div></div></div>`}
 function quick(id,icon,title,desc){return `<div class="card quick-card" data-quick="${id}"><div class="quick-icon">${icon}</div><div><strong>${title}</strong><span>${desc}</span><em>Abrir →</em></div></div>`}

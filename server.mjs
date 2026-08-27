@@ -4,9 +4,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import QRCode from 'qrcode';
 import { fileURLToPath } from 'node:url';
-import { openDb, upsertMember, upsertParkingSpaces, setBoardMembersByRut, normalizeRut, isValidRut, updateMemberEmail, updatePreferredName, DEMO_PROFILES, PRESENTATION_PROFILES } from './lib/db.mjs';
+import { openDb, upsertMember, upsertParkingSpaces, setBoardMembersByRut, normalizeRut, isValidRut, updateMemberEmail, updatePreferredName } from './lib/db.mjs';
 import { requestOtp, verifyOtp, memberFromRequest, logout, normalizeEmail, isUnlocked, setPin, unlockWithPin, lockSession, issueOtp, verifyIssuedOtp, consumeOtp, createSession, createSessionWithPin } from './lib/auth.mjs';
-import { googleEnabled, googleCapabilities, sheetsReadEnabled, sheetsWriteEnabled, calendarReadEnabled, calendarWriteEnabled, gmailSendEnabled, gmailOtpSendEnabled, gmailNotificationSendEnabled, sheetsGet, sheetsAppend, sheetsUpdate, sheetsBatchUpdate, ensureSheet, listCalendarEvents, deleteCalendarEvent, sendWorkspaceEmail } from './lib/google.mjs';
+import { googleEnabled, googleCapabilities, sheetsReadEnabled, sheetsWriteEnabled, calendarReadEnabled, calendarWriteEnabled, gmailOtpSendEnabled, gmailNotificationSendEnabled, sheetsGet, sheetsAppend, sheetsUpdate, sheetsBatchUpdate, ensureSheet, listCalendarEvents, deleteCalendarEvent, sendWorkspaceEmail } from './lib/google.mjs';
 import { webauthnRequestInfo, webauthnSummary, registrationOptions, finishRegistration, authenticationOptions, finishAuthentication, removeAllPasskeys } from './lib/webauthn.mjs';
 import { initV050, financialSummary, benefitAccess, latestFinancialSync, syncFinancialWorkbook, studyRoomAvailability, reserveStudyRoom, cancelStudyRoom, createMarketplaceListing, publicMarketplace, marketplaceImage, marketplaceOwnerAction, marketplaceOwnerEdit, moderateMarketplace, expireMarketplace, listActivities, adminActivities, createActivity, setActivityStatus, dueNotificationText } from './lib/v050.mjs';
 import { pushEnabled, vapidPublicKey, upsertPushSubscription, removePushSubscription, sendMemberPush } from './lib/push.mjs';
@@ -31,7 +31,6 @@ const APP_ORIGINS = new Set([
   APP_ORIGIN,
   ...String(process.env.APP_ORIGINS || '').split(',').map(x => x.trim()).filter(Boolean)
 ].map(origin => { try { return new URL(origin).origin; } catch { return null; } }).filter(Boolean));
-const DEMO_MODE = bool(process.env.DEMO_MODE, true);
 const db = openDb(DATA_DIR);
 const MARKETPLACE_DIR = path.resolve(DATA_DIR, process.env.MARKETPLACE_DIR || 'marketplace');
 const FINANCIAL_DIR = path.resolve(DATA_DIR, process.env.FINANCIAL_DIR || 'financial');
@@ -39,7 +38,6 @@ const FINANCIAL_XLSM_PATH = path.resolve(process.env.FINANCIAL_XLSM_PATH || path
 fs.mkdirSync(MARKETPLACE_DIR,{recursive:true}); fs.mkdirSync(FINANCIAL_DIR,{recursive:true});
 const BACKUP_DIR=path.resolve(DATA_DIR,process.env.BACKUP_DIR||'backups');fs.mkdirSync(BACKUP_DIR,{recursive:true,mode:0o700});
 initV050(db,{adminEmail:process.env.ADMIN_EMAIL||'informatica@aspch.org',adminPinSalt:process.env.ADMIN_BOOTSTRAP_PIN_SALT||'',adminPinHash:process.env.ADMIN_BOOTSTRAP_PIN_HASH||''});
-ensureMorosoPresentationState();
 initV060(db);
 const ufCache = { key:null, date:null, value:null, fetchedAt:0, sourceUrl:null };
 const UF_CACHE_MS = 40 * 24 * 60 * 60 * 1000;
@@ -47,17 +45,6 @@ const PARKING_SYNC_CACHE_MS = 12_000;
 const parkingSyncCache = new Map();
 let parkingLedgerReady = false;
 fs.mkdirSync(PROFILE_PHOTOS_DIR, { recursive:true });
-
-function ensureMorosoPresentationState(){
-  const member=db.prepare('SELECT id,rut FROM members WHERE email=? COLLATE NOCASE').get('prueba.moroso@mi-aspch.invalid');
-  if(!member)return;
-  const now=new Date().toISOString();
-  db.prepare(`INSERT INTO member_financial_status
-    (member_id,rut,source_status,financial_status,months_due,amount_due,source_year,source_updated_at,synced_at,deactivated_by_financial)
-    VALUES (?,?,?,?,?,?,?,?,?,0)
-    ON CONFLICT(member_id) DO UPDATE SET rut=excluded.rut,source_status='MOROSO',financial_status='MOROSO',months_due=3,amount_due=180000,source_year=2026,source_updated_at=excluded.source_updated_at,synced_at=excluded.synced_at,deactivated_by_financial=0`)
-    .run(member.id,normalizeRut(member.rut),'MOROSO','MOROSO',3,180000,2026,now,now);
-}
 
 const config = {
   membersSheetId: process.env.MEMBERS_SHEET_ID || '1SrJi9TVKAklufiPvW-UOKbCFIuUOohdcrrDmRrCY-bo',
@@ -76,7 +63,6 @@ const config = {
   parkingLogTab: process.env.PARKING_LOG_TAB || 'APP_RESERVAS',
   parkingReservationsTab: process.env.PARKING_RESERVATIONS_TAB || 'RESERVAS_MI_ASPCH',
   simulators: parseSimulators(process.env.SIMULATORS_JSON),
-  emailOnlyUsers: new Set(String(process.env.EMAIL_ONLY_USERS || 'jenny.pizarro@aspch.org,informatica@aspch.org').split(',').map(x => normalizeEmail(x)).filter(Boolean)),
   adminEmail: normalizeEmail(process.env.ADMIN_EMAIL || 'informatica@aspch.org'),
   simulatorRequestUrl: process.env.SIMULATOR_REQUEST_A320_URL || 'https://forms.gle/qzXaCUJgmTyufdKQA',
   simulatorCancelCalendarSendUpdates: process.env.SIMULATOR_CANCEL_CALENDAR_SEND_UPDATES || 'none',
@@ -85,9 +71,6 @@ const config = {
   financialSyncMinutes: Math.max(1,Number(process.env.FINANCIAL_SYNC_MINUTES||5)),
   financialUpdateBdSocios: bool(process.env.FINANCIAL_UPDATE_BD_SOCIOS,true),
   financialUploadToken: String(process.env.FINANCIAL_UPLOAD_TOKEN||''),
-  previewEmailOnly: bool(process.env.PUBLIC_PREVIEW_RESTRICT_EMAIL_ONLY, false),
-  presentationMode: bool(process.env.PRESENTATION_MODE, false),
-  publicTrialRuts: new Set(String(process.env.PUBLIC_TRIAL_DIRECT_RUTS || '').split(',').map(x => normalizeRut(x)).filter(Boolean)),
   backupRetention:Math.max(3,Number(process.env.BACKUP_RETENTION||14)),
   dailyBackupHour:Math.max(0,Math.min(23,Number(process.env.DAILY_BACKUP_HOUR||3))),
   dailyBackupMinute:Math.max(0,Math.min(59,Number(process.env.DAILY_BACKUP_MINUTE||15)))
@@ -133,21 +116,8 @@ async function routeApi(req, res, url) {
   if (req.method === 'GET' && p === '/api/config') {
     const w = webauthnRequestInfo(effectiveRequestOrigin(req), isSecureRequest(req));
     return json(res, 200, {
-      appName: process.env.APP_NAME || 'Mi ASPCH', version:VERSION, demo: DEMO_MODE && !config.previewEmailOnly, emailOnlyPreview: config.previewEmailOnly,
-      rutOnlyTrial: config.publicTrialRuts.size > 0,
+      appName: process.env.APP_NAME || 'Mi ASPCH', version:VERSION,
       publicAppUrl: w.publicUrl,
-      demoProfiles: (DEMO_MODE && !config.previewEmailOnly) ? DEMO_PROFILES.map(profile => {
-        const member = findMemberByRut(profile.rut);
-        return {
-          group: profile.group,
-          name: profile.shortName,
-          rut: profile.rut,
-          email: member?.email || profile.email,
-          isBoard: !!member?.is_board
-        };
-      }) : [],
-      presentationMode:config.presentationMode,
-      presentationProfiles:config.presentationMode ? PRESENTATION_PROFILES.map(({key,label,description,icon}) => ({key,label,description,icon})) : [],
       contact: {
         whatsappNumber: WHATSAPP_NUMBER,
         whatsappUrl: whatsappUrl('', 'Hola ASPCH, necesito ayuda con Mi ASPCH.')
@@ -165,40 +135,22 @@ async function routeApi(req, res, url) {
     const body = await readJson(req);
     const rut = normalizeRut(body.rut);
     const email = normalizeEmail(body.email);
-
-    if (config.publicTrialRuts.size) {
-      if (!isValidRut(rut)) return json(res, 400, { error:'Ingresa un RUT chileno válido.' });
-      if (!config.publicTrialRuts.has(rut)) return json(res, 403, { error:'Este acceso temporal está habilitado solo para la persona autorizada.' });
-      let member = findMemberByRut(rut);
-      if (!member && sheetsReadEnabled()) {
-        await syncMembersFromGoogle(); await syncBoardFromGoogle();
-        member = findMemberByRut(rut);
-      }
-      if (!member || !member.active) return json(res, 403, { error:'El RUT no figura como socio habilitado en ASPCH.' });
-      const session = createSession(db, member, { unlockedMs:8*60*60_000 });
-      setSessionCookie(req, res, session.token);
-      audit(db,{actorId:member.id,subjectId:member.id,action:'PUBLIC_TRIAL_RUT_LOGIN',entityType:'session'});
-      return json(res, 200, { ok:true, directAccess:true });
-    }
-
-    const emailOnly = config.emailOnlyUsers.has(email);
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json(res, 400, { error: 'Ingresa un correo válido.' });
-    if (config.previewEmailOnly && !emailOnly) return json(res, 403, { error:'Este acceso público temporal está habilitado solo para usuarios de prueba autorizados.' });
-    if (!emailOnly && !isValidRut(rut)) return json(res, 400, { error: 'Ingresa un RUT chileno válido.' });
+    if (!isValidRut(rut)) return json(res, 400, { error: 'Ingresa un RUT chileno válido.' });
 
-    let member = emailOnly ? findMemberByEmail(email) : findMemberByRut(rut);
+    let member = findMemberByRut(rut);
     if (!member && sheetsReadEnabled()) {
       await syncMembersFromGoogle(); await syncBoardFromGoogle();
-      member = emailOnly ? findMemberByEmail(email) : findMemberByRut(rut);
+      member = findMemberByRut(rut);
     }
-    if (!member || !member.active) return json(res, 403, { error: emailOnly ? 'El correo no figura como usuario habilitado en Mi ASPCH.' : 'El RUT no figura como socio habilitado en ASPCH.' });
+    if (!member || !member.active) return json(res, 403, { error: 'El RUT no figura como socio habilitado en ASPCH.' });
 
     const owner = db.prepare('SELECT id FROM members WHERE email=? AND id<>?').get(email, member.id);
     if (owner) return json(res, 409, { error: 'Ese correo ya está asociado a otro socio. Contacta a ASPCH.' });
 
     const currentEmail = normalizeEmail(member.email);
     const emailChanged = currentEmail !== email;
-    if (emailChanged && !sheetsWriteEnabled() && !DEMO_MODE) {
+    if (emailChanged && !sheetsWriteEnabled()) {
       return json(res, 503, { error: 'La actualización de correo requiere conexión con BD SOCIOS. Intenta más tarde.' });
     }
 
@@ -224,9 +176,7 @@ async function routeApi(req, res, url) {
     return json(res, 200, {
       ok:true, emailChanged,
       targetEmailMasked:maskEmail(email),
-      currentEmailMasked:emailChanged ? maskEmail(currentEmail) : null,
-      devCode:primary.devCode,
-      devOldCode:old?.devCode
+      currentEmailMasked:emailChanged ? maskEmail(currentEmail) : null
     });
   }
 
@@ -234,9 +184,8 @@ async function routeApi(req, res, url) {
     const body = await readJson(req);
     const rut = normalizeRut(body.rut);
     const email = normalizeEmail(body.email);
-    const emailOnly = config.emailOnlyUsers.has(email);
-    if (!emailOnly && !isValidRut(rut)) return json(res, 400, { error:'RUT inválido.' });
-    let member = emailOnly ? findMemberByEmail(email) : findMemberByRut(rut);
+    if (!isValidRut(rut)) return json(res, 400, { error:'RUT inválido.' });
+    let member = findMemberByRut(rut);
     if (!member || !member.active) return json(res, 403, { error:'No fue posible validar al socio.' });
 
     const currentEmail = normalizeEmail(member.email);
@@ -254,7 +203,7 @@ async function routeApi(req, res, url) {
       if (owner) return json(res, 409, { error:'Ese correo ya quedó asociado a otro socio.' });
 
       if (sheetsWriteEnabled()) await updateMemberEmailInGoogle(rut, email);
-      else if (!DEMO_MODE) return json(res, 503, { error:'No pude actualizar BD SOCIOS en este momento.' });
+      else return json(res, 503, { error:'No pude actualizar BD SOCIOS en este momento.' });
 
       const changed = updateMemberEmail(db, member.id, email);
       if (!changed.ok) return json(res, 409, { error:'No fue posible actualizar el correo del socio.' });
@@ -289,7 +238,7 @@ async function routeApi(req, res, url) {
       if (result.reason === 'rate_limited') return json(res, 429, { error: 'Demasiados intentos. Intenta más tarde.' });
       return json(res, 403, { error: 'No fue posible autorizar ese correo.' });
     }
-    return json(res, 200, { ok: true, delivered: result.delivered, devCode: result.devCode });
+    return json(res, 200, { ok: true, delivered: result.delivered });
   }
 
   if (req.method === 'POST' && p === '/api/auth/verify-code') {
@@ -315,18 +264,9 @@ async function routeApi(req, res, url) {
     setSessionCookie(req,res,result.token);return json(res,200,{ok:true,member:publicMember(result.member)});
   }
 
-  if (req.method === 'POST' && p === '/api/auth/presentation-login') {
-    if (!config.presentationMode) return json(res, 404, { error:'Acceso de presentación no habilitado.' });
-    const body=await readJson(req);
-    const profile=PRESENTATION_PROFILES.find(x=>x.key===String(body.profile||''));
-    if(!profile)return json(res,400,{error:'Selecciona un perfil de presentación válido.'});
-    const presentationMember=findMemberByEmail(profile.email);
-    if(!presentationMember||!presentationMember.active)return json(res,503,{error:'El perfil de presentación no está disponible.'});
-    const session=createSession(db,presentationMember,{unlockedMs:8*60*60_000});
-    setSessionCookie(req,res,session.token);
-    audit(db,{actorId:presentationMember.id,subjectId:presentationMember.id,action:'PRESENTATION_QUICK_LOGIN',entityType:'session',details:{profile:profile.key}});
-    return json(res,200,{ok:true,member:publicMember(presentationMember),presentation:true});
-  }
+  // Toda ruta de autenticación no reconocida se rechaza antes de consultar o
+  // crear una sesión. Esto mantiene retirados de forma segura los endpoints antiguos.
+  if (p.startsWith('/api/auth/')) return json(res, 404, { error:'Ruta de autenticación no encontrada.' });
 
   if (req.method === 'PUT' && p === '/api/financial-source/upload') {
     const token=String(req.headers['x-mi-aspch-financial-token']||'');
@@ -342,7 +282,7 @@ async function routeApi(req, res, url) {
   if (req.method === 'GET' && p === '/api/me') {
     return json(res, 200, {
       member: publicMember(member), membership: await membershipSummary(member), access:benefitAccess(db,member),
-      security: securitySummary(member, req), modules:moduleStates(db), presentation:isPresentationMember(member)
+      security: securitySummary(member, req), modules:moduleStates(db)
     });
   }
 
@@ -357,9 +297,8 @@ async function routeApi(req, res, url) {
     return json(res, 200, { ok:true, security: securitySummary(member, req) });
   }
 
-  // El PIN es obligatorio al terminar la activación inicial, excepto para
-  // perfiles temporales de presentación, cuya sesión ya nace desbloqueada.
-  if (!member.pin_hash && !isPresentationMember(member)) return json(res, 428, { error:'Crea tu PIN personal para terminar de activar Mi ASPCH.', code:'PIN_REQUIRED' });
+  // El PIN es obligatorio al terminar la activación inicial.
+  if (!member.pin_hash) return json(res, 428, { error:'Crea tu PIN personal para terminar de activar Mi ASPCH.', code:'PIN_REQUIRED' });
 
   if (req.method === 'POST' && p === '/api/security/unlock') {
     const body = await readJson(req);
@@ -451,15 +390,15 @@ async function routeApi(req, res, url) {
     if (sheetsWriteEnabled()) {
       await updateMemberFieldsInGoogle(member.rut, { employer, phone });
       synced = true;
-    } else if (!DEMO_MODE) {
+    } else {
       return json(res, 503, { error:'La actualización de datos requiere conexión con BD SOCIOS.' });
     }
     const now = new Date().toISOString();
     db.prepare('UPDATE members SET employer=?, phone=?, updated_at=? WHERE id=?').run(employer, phone || previousPhone || null, now, member.id);
     db.prepare(`INSERT INTO airline_change_requests(member_id,previous_airline,new_airline,previous_phone,new_phone,status,created_at,sent_at)
-      VALUES (?,?,?,?,?,?,?,?)`).run(member.id, previousEmployer || null, employer, previousPhone || null, phone || previousPhone || null, synced?'SYNCED_BD_SOCIOS':'DEMO_LOCAL', now, synced?now:null);
+      VALUES (?,?,?,?,?,?,?,?)`).run(member.id, previousEmployer || null, employer, previousPhone || null, phone || previousPhone || null, 'SYNCED_BD_SOCIOS', now, now);
     member = memberFromRequest(db, req);
-    return json(res, 200, { ok:true, synced, member:publicMember(member), message:synced?'Datos actualizados en BD SOCIOS.':'Datos actualizados solo en el entorno demo.' });
+    return json(res, 200, { ok:true, synced, member:publicMember(member), message:'Datos actualizados en BD SOCIOS.' });
   }
 
   if (req.method === 'GET' && p === '/api/news') {
@@ -597,7 +536,7 @@ async function routeApi(req, res, url) {
     if(!access.simulatorView)return json(res,403,{error:'Tu cuenta no está activa como socio ASPCH.'});
     const from = validDate(url.searchParams.get('from')) || mondayOf(todayChile());
     const to = validDate(url.searchParams.get('to')) || addDays(from, 4);
-    const occupancies = calendarReadEnabled() ? await calendarPrivacyView(member, from, to) : demoCalendar(member, from, to);
+    const occupancies = calendarReadEnabled() ? await calendarPrivacyView(member, from, to) : [];
     return json(res, 200, { simulators: config.simulators.map(({ id,label }) => ({ id,label })), from, to, occupancies,
       cancellationEnabled:config.simulatorCancelEnabled && calendarWriteEnabled(), requestAllowed:access.simulatorRequest,
       restrictionReason:access.reason, a320RequestUrl:access.simulatorRequest?config.simulatorRequestUrl:null });
@@ -1048,12 +987,6 @@ function findMemberByRut(rut) {
   rut = normalizeRut(rut);
   if (!rut) return null;
   return db.prepare("SELECT * FROM members WHERE REPLACE(REPLACE(UPPER(COALESCE(rut,'')),'.',''),' ','')=?").get(rut) || null;
-}
-
-function findMemberByEmail(email) {
-  email = normalizeEmail(email);
-  if (!email) return null;
-  return db.prepare('SELECT * FROM members WHERE email=? COLLATE NOCASE').get(email) || null;
 }
 
 function maskEmail(email) {
@@ -1631,22 +1564,6 @@ function matchSimulator(summary) {
   return null;
 }
 
-function demoCalendar(member, from, to) {
-  const out=[]; const dates=[];
-  for(let i=0;i<=daysBetween(from,to);i++){ const d=addDays(from,i); const wd=weekdayIndex(d); if(wd>=1&&wd<=5)dates.push(d); }
-  dates.forEach((d,di)=>config.simulators.forEach((s,si)=>['AM','PM'].forEach((period,pi)=>{
-    if((di+si+pi)%4!==0)return;
-    const [start,end]=slotTimes(d,period);
-    out.push({id:`demo-${di}-${si}-${pi}`,simulatorId:s.id,simulator:s.label,start:`${d}T${start}:00-04:00`,end:`${d}T${end}:00-04:00`,period,occupied:true,mine:member.email==='demo@aspch.org'&&di===1&&si===0&&pi===0,canCancel:false});
-  })));
-  return out;
-}
-
-function slotTimes(date, period) {
-  const friday=weekdayIndex(date)===5;
-  if(period==='AM')return friday?['09:00','12:30']:['09:00','13:00'];
-  return friday?['12:30','16:00']:['13:00','17:00'];
-}
 function parkingPublicReservation(r) {
   const reminderDue = r.checked_in_at ? new Date(new Date(r.checked_in_at).getTime()+4*3600_000).toISOString() : null;
   return { id:r.id,spaceId:r.space_id,label:r.label,building:r.building,checkedInAt:r.checked_in_at||null,reminderHours:4,reminderDue };
@@ -1833,18 +1750,15 @@ function securitySummary(m,req){
   const w=webauthnSummary(db,m,effectiveRequestOrigin(req),isSecureRequest(req));
   return {pinSet:!!m.pin_hash,unlocked:isUnlocked(m),unlockedUntil:m.unlocked_until||null,...w};
 }
-function visibleMemberRut(m){return config.emailOnlyUsers.has(normalizeEmail(m?.email))?null:(m?.rut||null)}
+function visibleMemberRut(m){return m?.rut||null}
 function publicMember(m){ return {id:m.id,email:m.email,name:m.name,preferredName:m.preferred_name||null,rut:visibleMemberRut(m),phone:m.phone,employer:m.employer,category:m.category,position:m.position,role:m.role,active:!!m.active,isBoard:!!m.is_board,birthDate:m.birth_date||null}; }
-function isPresentationMember(m){return config.presentationMode&&PRESENTATION_PROFILES.some(x=>x.email===normalizeEmail(m?.email))}
 
 function credentialCode(memberId) {
   return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev').update(`member:${memberId}`).digest('base64url').slice(0,18).toUpperCase();
 }
 function credentialVerifyUrl(req, code) {
-  // En desarrollo/demo el QR apunta al origen desde el que realmente se abrió
-  // Mi ASPCH (LAN/Tailscale). En producción usa exclusivamente PUBLIC_APP_URL.
-  let origin=DEMO_MODE?(effectiveRequestOrigin(req)||APP_ORIGIN):'';
-  if(!origin){const configured=String(process.env.PUBLIC_APP_URL||'').trim();if(configured){try{origin=new URL(configured).origin}catch{}}}
+  let origin='';
+  const configured=String(process.env.PUBLIC_APP_URL||'').trim();if(configured){try{origin=new URL(configured).origin}catch{}}
   if(!origin)origin=effectiveRequestOrigin(req)||APP_ORIGIN;
   return `${origin}/verify/${encodeURIComponent(code)}`;
 }
@@ -1957,4 +1871,3 @@ function addDays(date,days){const d=new Date(`${date}T12:00:00Z`);d.setUTCDate(d
 function todayChile(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
 function weekdayIndex(date){return new Date(`${date}T12:00:00Z`).getUTCDay()}
 function mondayOf(date){const wd=weekdayIndex(date);return addDays(date,wd===0?-6:1-wd)}
-function daysBetween(a,b){return Math.max(0,Math.round((new Date(`${b}T12:00:00Z`)-new Date(`${a}T12:00:00Z`))/86400000))}

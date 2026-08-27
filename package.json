@@ -6,9 +6,9 @@
   "description": "Mi ASPCH v0.6.15 - simulación de vista iPhone de alta fidelidad",
   "scripts": {
     "start": "node --no-warnings server.mjs",
-    "dev": "DEMO_MODE=true node --no-warnings --watch server.mjs",
-    "check": "node --check server.mjs && node --check lib/db.mjs && node --check lib/google.mjs && node --check lib/auth.mjs && node --check lib/webauthn.mjs && node --check lib/push.mjs && node --check lib/v050.mjs && node --check lib/v060.mjs && node --check public/app.js && node --check public/sw.js",
-    "selfcheck": "npm run corecheck && DEMO_MODE=true node --no-warnings tools/self_check_v0.6.0.mjs",
+    "dev": "node --no-warnings --watch server.mjs",
+    "check": "node --check server.mjs && node --check lib/db.mjs && node --check lib/google.mjs && node --check lib/auth.mjs && node --check lib/webauthn.mjs && node --check lib/push.mjs && node --check lib/v050.mjs && node --check lib/v060.mjs && node --check public/app.js && node --check public/sw.js && node --check tools/self_check_auth.mjs",
+    "selfcheck": "npm run corecheck && node --no-warnings tools/self_check_v0.6.0.mjs && node --no-warnings tools/self_check_auth.mjs",
     "staticcheck": "node tools/self_check_v0.6.0_static.mjs",
     "corecheck": "node --no-warnings tools/self_check_v0.6.0_core.mjs"
   },
