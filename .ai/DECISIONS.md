@@ -1,5 +1,27 @@
 # Decisiones
 
+## 2026-08-27 — Socios ADMIN usa detalle bajo demanda
+
+### Decisión
+
+Exponer Socios mediante dos GET ADMIN-only: un listado paginado con RUT y email
+enmascarados, y una ficha completa cargada únicamente cuando el ADMIN la abre.
+Usar el SQLite sincronizado existente sin leer ni escribir fuentes externas en
+cada consulta.
+
+### Consecuencias
+
+- MOROSO, CONGELADO y DESAFILIADO proceden exclusivamente del estado financiero
+  existente; ACTIVO exige el indicador real `members.active`.
+- Un inactivo sin estado financiero autoritativo se muestra como no disponible.
+- Las reservas mostradas se limitan a estacionamiento y sala de estudios activas
+  en SQLite; los turnos de simulador no se presentan sin una fuente local fiable.
+- No se incorporan edición, revocación, sincronización ni notificaciones.
+
+### Estado
+
+Preparada en `feat/admin-members-readonly`; no desplegada
+
 ## 2026-08-27 — Primera separación del Control Informática
 
 ### Decisión

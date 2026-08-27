@@ -49,11 +49,12 @@ La ruta `/mnt/MediaCenter/aspch` es legado/runtime y no es fuente de código.
 
 ## Control Informática en preparación
 
-- La rama `feat/admin-dashboard-structure` separa Dashboard y Developer sin
-  desplegar cambios en producción.
+- `main` ya separa Dashboard y Developer; no hay despliegue posterior a esa
+  integración.
 - Dashboard usa un endpoint GET ADMIN-only con métricas reales resumidas y no
   contiene controles de escritura.
 - El Control Center existente conserva sus capacidades bajo Developer.
-- Socios, Finanzas, Reservas, Contenido, Votaciones, Notificaciones,
-  Integraciones, Seguridad, Auditoría y Sistema aparecen como estructura
-  pendiente, sin funciones ni datos inventados.
+- La rama `feat/admin-members-readonly` convierte Socios en búsqueda, listado
+  paginado y ficha de solo lectura usando el SQLite sincronizado existente.
+- Finanzas, Reservas, Contenido, Votaciones, Notificaciones, Integraciones,
+  Seguridad, Auditoría y Sistema permanecen como estructura pendiente.
