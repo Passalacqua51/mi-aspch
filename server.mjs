@@ -695,6 +695,12 @@ async function routeApi(req, res, url) {
 
   if (p.startsWith('/api/admin/')) {
     if (member.role !== 'ADMIN') return json(res, 403, { error: 'Acceso de administrador requerido.' });
+    if(req.method==='GET'&&p==='/api/admin/dashboard'){
+      const metrics=systemMetrics(db),lastSync=latestFinancialSync(db),modules=moduleStates(db);
+      const counts=Object.fromEntries(db.prepare('SELECT financial_status,COUNT(*) n FROM member_financial_status GROUP BY financial_status').all().map(x=>[x.financial_status,Number(x.n)]));
+      const events=auditRows(db,{limit:8}).map(x=>({id:x.id,action:x.action,entityType:x.entity_type||null,actorName:x.actor_name||'Sistema',createdAt:x.created_at}));
+      return json(res,200,{generatedAt:new Date().toISOString(),health:{ok:true,version:VERSION},metrics,finance:{sourceReady:fs.existsSync(FINANCIAL_XLSM_PATH),lastSync,counts},integrations:{google:googleCapabilities(),push:{enabled:pushEnabled()}},modules,audit:events});
+    }
     if (req.method === 'POST' && p === '/api/admin/sync-members') {
       if (!sheetsReadEnabled()) return json(res, 400, { error: 'Google Sheets READ no está habilitado.' });
       const count = await syncMembersFromGoogle(); const board = await syncBoardFromGoogle(); const financial=await syncFinancialSafe({force:true});

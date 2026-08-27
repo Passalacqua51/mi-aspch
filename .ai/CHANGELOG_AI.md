@@ -2,6 +2,12 @@
 
 ## 2026-08-27
 
+- Se preparó `feat/admin-dashboard-structure` con una navegación ADMIN dividida
+  en doce áreas objetivo.
+- Dashboard quedó ADMIN-only, de solo lectura y alimentado por métricas reales
+  resumidas; Developer conserva el Control Center existente.
+- Las diez áreas restantes quedaron como placeholders explícitos sin datos ni
+  capacidades nuevas. No se desplegó ni se ejecutaron efectos externos.
 - Se sanearon 28 copias textuales de la credencial Google revocada: 1 archivo
   canónico ignorado por Git, 4 fuentes históricas, 2 archivos de runtime legado
   y 21 archivos dentro de backups. Cada secreto fue reemplazado sin eliminar el

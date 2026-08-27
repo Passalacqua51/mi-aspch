@@ -1,5 +1,27 @@
 # Decisiones
 
+## 2026-08-27 — Primera separación del Control Informática
+
+### Decisión
+
+Separar la navegación ADMIN en un Dashboard exclusivamente de lectura y un
+Developer que conserva el Control Center existente. Mantener por ahora el mismo
+rol y autorización backend, y representar las demás áreas objetivo únicamente
+como placeholders explícitos.
+
+### Consecuencias
+
+- Dashboard consume un GET bajo `/api/admin/` y no contiene botones ni rutas de
+  mutación.
+- Developer no incorpora capacidades nuevas ni expone shell, SQL libre,
+  secretos, `.env`, comandos o filesystem.
+- La separación de permisos queda fuera de esta primera etapa.
+- Producción no se despliega como parte de esta decisión.
+
+### Estado
+
+Preparada en `feat/admin-dashboard-structure`
+
 ## 2026-08-27 — Cierre de rotación de credencial Google
 
 ### Decisión

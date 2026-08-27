@@ -1,6 +1,20 @@
 const $=(q,r=document)=>r.querySelector(q); const $$=(q,r=document)=>[...r.querySelectorAll(q)];
 const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING'};
 const NAV=[['home','🏠','Inicio'],['parking','🚗','Estacionamiento'],['simulators','✈️','Simuladores'],['profile','👤','Mi perfil'],['credential','🪪','Credencial'],['reservations','🗓️','Mi agenda'],['studyroom','📖','Sala de estudios'],['convenios','🤝','Convenios'],['library','📚','Biblioteca'],['marketplace','🛒','Mercado ASPCH'],['activities','🎓','Cursos y charlas'],['votes','🗳️','Votaciones'],['advisors','⚖️','Asesorías'],['news','📰','Noticias']];
+const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥','Socios'],['admin-finance','💳','Finanzas'],['admin-reservations','🗓️','Reservas'],['admin-content','📰','Contenido'],['admin-votes','🗳️','Votaciones'],['admin-notifications','🔔','Notificaciones'],['admin-integrations','🔗','Integraciones'],['admin-security','🛡️','Seguridad'],['admin-audit','🧾','Auditoría'],['admin-system','⚙️','Sistema'],['developer','🛠️','Developer']];
+const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
+const ADMIN_PLACEHOLDERS={
+  'admin-members':['👥','Socios','La administración de socios se incorporará en una próxima etapa.'],
+  'admin-finance':['💳','Finanzas','La gestión financiera dedicada se incorporará en una próxima etapa.'],
+  'admin-reservations':['🗓️','Reservas','La gestión unificada de reservas se incorporará en una próxima etapa.'],
+  'admin-content':['📰','Contenido','La gestión de contenido se separará en una próxima etapa.'],
+  'admin-votes':['🗳️','Votaciones','La administración dedicada de votaciones se incorporará en una próxima etapa.'],
+  'admin-notifications':['🔔','Notificaciones','La administración separada de notificaciones se incorporará en una próxima etapa.'],
+  'admin-integrations':['🔗','Integraciones','La administración dedicada de integraciones se incorporará en una próxima etapa.'],
+  'admin-security':['🛡️','Seguridad','La administración dedicada de seguridad se incorporará en una próxima etapa.'],
+  'admin-audit':['🧾','Auditoría','La vista completa de auditoría se incorporará en una próxima etapa.'],
+  'admin-system':['⚙️','Sistema','La administración separada del sistema se incorporará en una próxima etapa.']
+};
 
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.installPrompt=e;$('#install-app')?.classList.remove('hidden')});
 $('#install-app').addEventListener('click',async()=>{if(state.installPrompt){await state.installPrompt.prompt();state.installPrompt=null;$('#install-app').classList.add('hidden')}});
@@ -200,19 +214,19 @@ function loginSuccess(){
 
 
 function renderNav(){
-  const items=NAV.map(x=>[...x]);if(state.member?.role==='ADMIN')items.push(['admin','⚙','Control Center']);
+  const items=NAV.map(x=>[...x]),adminItems=state.member?.role==='ADMIN'?ADMIN_NAV.map(x=>[...x]):[];
   const primaryIds=['home','parking','simulators','profile'];
   const primary=items.filter(x=>primaryIds.includes(x[0]));
-  const secondary=items.filter(x=>!primaryIds.includes(x[0])&&x[0]!=='admin');
-  const admin=items.find(x=>x[0]==='admin');
-  $('#desktop-nav').innerHTML=`<div class="nav-section-label">Principal</div>${primary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}<details class="sidebar-more" open><summary>Más servicios</summary><div class="sidebar-more-items">${secondary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}</div></details>${admin?`<div class="nav-section-label admin-label">Sistema</div>${navItem(...admin)}`:''}`;
+  const secondary=items.filter(x=>!primaryIds.includes(x[0]));
+  const admin=adminItems.length?`<details class="sidebar-more admin-navigation" open><summary>Administración</summary><div class="sidebar-more-items">${adminItems.map(x=>navItem(...x)).join('')}</div></details>`:'';
+  $('#desktop-nav').innerHTML=`<div class="nav-section-label">Principal</div>${primary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}<details class="sidebar-more" open><summary>Más servicios</summary><div class="sidebar-more-items">${secondary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}</div></details>${admin}`;
   const mobileLabel={home:'Inicio',parking:'Estac.',simulators:'Sim.',profile:'Perfil'};
   $('#mobile-nav').innerHTML=primary.map(([id,icon,label])=>navItem(id,icon,mobileLabel[id]||label)).join('');
-  renderMobileMore(items);
+  renderMobileMore(items,adminItems);
   $$('[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
   $('#more-menu-toggle')?.classList.toggle('active',!primaryIds.includes(state.view));
 }
-function renderMobileMore(items){
+function renderMobileMore(items,adminItems=[]){
   const byId=Object.fromEntries(items.map(x=>[x[0],x]));
   const groups=[
     ['Tu cuenta',['credential','reservations']],
@@ -221,7 +235,7 @@ function renderMobileMore(items){
     ['Ayuda',['advisors']]
   ];
   const html=groups.map(([label,ids])=>`<section class="mobile-menu-group"><span>${label}</span>${ids.map(id=>byId[id]?navItem(...byId[id]):'').join('')}</section>`).join('');
-  const admin=byId.admin?`<section class="mobile-menu-group"><span>Administración</span>${navItem(...byId.admin)}</section>`:'';
+  const admin=adminItems.length?`<section class="mobile-menu-group"><span>Administración</span>${adminItems.map(x=>navItem(...x)).join('')}</section>`:'';
   $('#mobile-more-nav').innerHTML=html+admin;
 }
 function openMobileMenu(){
@@ -233,10 +247,13 @@ function closeMobileMenu(){
 
 function navItem(id,icon,label){return `<button class="nav-item ${state.view===id?'active':''}" data-view="${id}"><span class="nav-icon">${icon}</span><span>${label}</span></button>`}
 async function go(view){
-  clearTimeout(state.parkingPollTimer);closeMobileMenu();state.view=view;renderNav();
-  const titles={home:'Inicio',reservations:'Mi agenda',credential:'Credencial digital',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Asesorías',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil',admin:'Administración'};
+  clearTimeout(state.parkingPollTimer);closeMobileMenu();
+  if(view==='admin')view='developer';
+  if(ADMIN_VIEWS.has(view)&&state.member?.role!=='ADMIN')view='home';
+  state.view=view;renderNav();
+  const titles={home:'Inicio',reservations:'Mi agenda',credential:'Credencial digital',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Asesorías',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
   $('#page-title').textContent=titles[view]||'Mi ASPCH';const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
-  const routes={home:renderHome,reservations:renderReservations,credential:renderCredential,parking:()=>renderParking(),simulators:renderSimulators,studyroom:renderStudyRoom,marketplace:renderMarketplace,activities:renderActivities,votes:renderVotes,advisors:renderAdvisors,convenios:renderConvenios,library:renderLibrary,news:renderNews,profile:renderProfile,admin:renderAdmin};
+  const routes={home:renderHome,reservations:renderReservations,credential:renderCredential,parking:()=>renderParking(),simulators:renderSimulators,studyroom:renderStudyRoom,marketplace:renderMarketplace,activities:renderActivities,votes:renderVotes,advisors:renderAdvisors,convenios:renderConvenios,library:renderLibrary,news:renderNews,profile:renderProfile,'admin-dashboard':renderAdminDashboard,developer:renderDeveloper,...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
   try{if(!routes[view])return go('home');await routes[view]()}catch(err){if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message)}</div>`}
 }
 
@@ -620,7 +637,41 @@ async function removePasskeys(){
   try{const r=await api('/api/security/passkeys',{method:'DELETE',body:{}});state.security=r.security;toast('Passkeys eliminadas');renderProfile()}catch(err){toast(err.message,true)}
 }
 async function savePin(e){e.preventDefault();try{const r=await api('/api/security/pin',{method:'POST',body:{pin:$('#new-pin').value,currentPin:$('#current-pin')?.value||''}});state.security=r.security;sessionStorage.setItem('miAspchUnlocked','1');toast('PIN guardado correctamente');renderProfile()}catch(err){toast(err.message,true);focusEditableNumeric(state.security?.pinSet?'#current-pin':'#new-pin')}}
-async function renderAdmin(){
+async function renderAdminDashboard(){
+  if(state.member.role!=='ADMIN')return go('home');
+  const d=await api('/api/admin/dashboard'),m=d.metrics||{},finance=d.finance||{},caps=d.integrations?.google||{},disabled=Object.entries(d.modules||{}).filter(([,v])=>!v.enabled).map(([k])=>k);
+  const alerts=[];
+  if(!finance.sourceReady)alerts.push(['amber','Fuente financiera local no disponible.']);
+  if(!finance.lastSync||finance.lastSync.status!=='OK')alerts.push(['amber','No existe una sincronización financiera local válida reportada.']);
+  if(!caps.sheets?.read)alerts.push(['amber','Google Sheets READ no está habilitado.']);
+  if(!caps.calendar?.read)alerts.push(['amber','Google Calendar READ no está habilitado.']);
+  if(disabled.length)alerts.push(['amber',`Módulos desactivados: ${disabled.join(', ')}.`]);
+  $('#view').innerHTML=`
+  <section class="admin-dashboard-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA</span><h2>Estado general de Mi ASPCH</h2><p>Resumen de solo lectura generado con datos operativos existentes.</p></div><div class="admin-health"><span class="badge green"><i class="dot"></i>${d.health?.ok?'Operativo':'Con alertas'}</span><strong>v${escapeHtml(d.health?.version||state.config?.version||'0.6.16')}</strong><small>${formatLocalDateTime(d.generatedAt)}</small></div></section>
+  <div class="admin-summary-grid">
+    ${adminSummaryCard('👥','Socios activos',m.members?.active||0,`${m.members?.total||0} registrados`)}
+    ${adminSummaryCard('💳','Estado financiero',Object.values(finance.counts||{}).reduce((a,b)=>a+Number(b||0),0),'socios con estado')}
+    ${adminSummaryCard('🚗','Estacionamientos',m.parking?.active||0,`${m.parking?.today||0} reservas activas hoy`)}
+    ${adminSummaryCard('📖','Sala de estudios',m.study?.active||0,`${m.study?.waitlist||0} en lista de espera`)}
+  </div>
+  <section class="section grid two">
+    <div class="card"><span class="eyebrow">FINANZAS</span><h3>Resumen por estado</h3><div class="finance-counts">${Object.entries(finance.counts||{}).map(([k,v])=>`<span><strong>${v}</strong>${escapeHtml(k)}</span>`).join('')||'<div class="empty compact-empty">Sin estados financieros sincronizados.</div>'}</div><p class="hint">${finance.lastSync?.status==='OK'?`Última sincronización: ${formatLocalDateTime(finance.lastSync.created_at)}`:'Sin sincronización local válida reportada.'}</p></div>
+    <div class="card"><span class="eyebrow">INTEGRACIONES</span><h3>Disponibilidad configurada</h3><div class="capability-grid">${cap('Sheets READ',caps.sheets?.read)}${cap('Sheets WRITE',caps.sheets?.write)}${cap('Calendar READ',caps.calendar?.read)}${cap('Calendar WRITE',caps.calendar?.write)}${cap('Gmail OTP',caps.gmail?.otp)}${cap('Gmail NOTIF',caps.gmail?.notifications)}${cap('Web Push',d.integrations?.push?.enabled)}</div><p class="hint">Los indicadores muestran capacidades configuradas; no ejecutan escrituras ni pruebas externas.</p></div>
+  </section>
+  <section class="section grid two">
+    <div class="card"><span class="eyebrow">ALERTAS</span><h3>Condiciones relevantes</h3><div class="admin-alert-list">${alerts.length?alerts.map(([tone,text])=>`<div class="admin-alert ${tone}"><span>⚠</span><p>${escapeHtml(text)}</p></div>`).join(''):'<div class="admin-alert green"><span>✓</span><p>Sin alertas de configuración detectadas.</p></div>'}</div></div>
+    <div class="card"><span class="eyebrow">AUDITORÍA</span><h3>Últimos eventos</h3><div class="admin-event-list">${(d.audit||[]).map(adminDashboardEvent).join('')||'<div class="empty compact-empty">Sin eventos registrados.</div>'}</div></div>
+  </section>`;
+}
+function adminSummaryCard(icon,label,value,detail){return `<div class="card admin-summary-card"><span>${icon}</span><div><small>${escapeHtml(label)}</small><strong>${Number(value||0)}</strong><p>${escapeHtml(detail)}</p></div></div>`}
+function adminDashboardEvent(e){return `<div class="admin-dashboard-event"><div><strong>${escapeHtml(e.action||'Evento')}</strong><span>${escapeHtml(e.actorName||'Sistema')}${e.entityType?` · ${escapeHtml(e.entityType)}`:''}</span></div><time>${formatLocalDateTime(e.createdAt)}</time></div>`}
+function renderAdminPlaceholder(id){
+  if(state.member.role!=='ADMIN')return go('home');
+  const [icon,title,description]=ADMIN_PLACEHOLDERS[id];
+  $('#view').innerHTML=`<div class="card admin-placeholder"><span>${icon}</span><span class="eyebrow">ESTRUCTURA ADMIN</span><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p><strong>Pendiente · sin funciones ni datos adicionales</strong></div>`;
+}
+async function renderAdmin(){return renderDeveloper()}
+async function renderDeveloper(){
   if(state.member.role!=='ADMIN')return go('home');
   const o=await api('/api/admin/overview'),caps=o.google||{},m=o.metrics||{};
   const pending=(o.marketplace||[]).filter(x=>x.status==='PENDING');
@@ -632,7 +683,7 @@ async function renderAdmin(){
     ['Votaciones abiertas',m.votes?.open||0,'🗳️'],['Push devices',m.push?.subscriptions||0,'🔔'],['Sesiones',m.sessions?.active||0,'🔐'],['Auditoría',m.audit?.rows||0,'🧾']
   ];
   $('#view').innerHTML=`
-  <div class="developer-hero card"><div><span class="eyebrow">🛠️ CONTROL CENTER</span><h2>Centro de control Mi ASPCH</h2><p>Operación, contenido, seguridad, mantenimiento, sincronización, auditoría y diagnóstico. Las herramientas de alto riesgo están deliberadamente limitadas a acciones predefinidas: no se expone shell, SQL libre ni secretos por web.</p></div><div class="dev-version"><strong>v${escapeHtml(state.config?.version||'0.6.16')}</strong><span>${escapeHtml(state.member.email||'ADMIN')}</span></div></div>
+  <div class="developer-hero card"><div><span class="eyebrow">🛠️ DEVELOPER</span><h2>Developer Center</h2><p>Control Center existente para operación, contenido, seguridad, mantenimiento, sincronización, auditoría y diagnóstico. Las herramientas de alto riesgo permanecen limitadas a acciones predefinidas: no se expone shell, SQL libre ni secretos por web.</p></div><div class="dev-version"><strong>v${escapeHtml(state.config?.version||'0.6.16')}</strong><span>${escapeHtml(state.member.email||'ADMIN')}</span></div></div>
   <div class="dev-metric-grid">${metrics.map(x=>`<div class="card dev-metric"><span>${x[2]}</span><strong>${x[1]}</strong><small>${x[0]}</small></div>`).join('')}</div>
 
   <details class="dev-section card" open><summary>⚙️ Sistema, Google y mantenimiento</summary><div class="dev-section-body">
