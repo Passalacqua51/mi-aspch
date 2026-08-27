@@ -2,6 +2,16 @@
 
 ## 2026-08-27
 
+- Se sanearon 28 copias textuales de la credencial Google revocada: 1 archivo
+  canónico ignorado por Git, 4 fuentes históricas, 2 archivos de runtime legado
+  y 21 archivos dentro de backups. Cada secreto fue reemplazado sin eliminar el
+  archivo ni alterar el resto de su contenido.
+- La búsqueda posterior confirmó cero apariciones de la credencial revocada y
+  mantuvo la credencial vigente únicamente en el `.env` canónico y su JSON
+  protegido. Archivos SQLite y el archivo comprimido revisado no contenían la
+  credencial afectada.
+- `npm run check` aprobó y producción continuó en `0.6.16`, saludable y sin
+  recreación del contenedor.
 - Se cerró la rotación de la credencial Google de Mi ASPCH: la clave nueva fue
   validada con fuentes reales y la clave anterior quedó eliminada en Google.
 - Se confirmaron `/api/health`, BD SOCIOS, Sheet financiero, estacionamientos,
