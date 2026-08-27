@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mi ASPCH">
+  <title>Mi ASPCH</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/styles.css?v=0.6.15">
+</head>
+<body>
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <button id="view-mode-toggle" class="view-mode-toggle" type="button" title="Cambiar vista">📱 <span>Vista iPhone</span></button>
+
+  <main id="auth-screen" class="auth-screen">
+    <section class="auth-panel">
+      <div class="login-logo-wrap"><img class="login-logo" src="/logo-aspch-full.png" alt="Asociación de Pilotos de Chile"></div>
+      <div class="auth-copy">
+        <span class="eyebrow">MI ASPCH</span>
+        <h1>Tu asociación, en un solo lugar.</h1>
+        <p>Credencial, estacionamientos, simuladores, noticias y membresía.</p>
+      </div>
+      <section id="presentation-access" class="presentation-access hidden" aria-labelledby="presentation-title">
+        <div class="presentation-heading">
+          <div><span class="eyebrow">PRESENTACIÓN</span><h2 id="presentation-title">Acceso rápido</h2></div>
+          <span class="presentation-badge">Demo Directorio</span>
+        </div>
+        <p>Elige una experiencia para entrar sin RUT, código ni PIN.</p>
+        <div id="presentation-profiles" class="presentation-grid"></div>
+        <p id="presentation-error" class="auth-error hidden" role="alert"></p>
+      </section>
+      <form id="identity-form" class="auth-form">
+        <div id="demo-profile-wrap" class="demo-profile-box hidden">
+          <label>Perfil de prueba
+            <select id="demo-profile-select">
+              <option value="">Selecciona un perfil…</option>
+            </select>
+          </label>
+          <p class="hint">Solo aparece en modo demo. Completa automáticamente RUT y correo del perfil elegido.</p>
+        </div>
+        <label id="login-rut-label">RUT
+          <input id="login-rut" type="text" inputmode="text" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="12.345.678-5">
+        </label>
+        <label id="login-email-label">Correo que quieres usar en Mi ASPCH
+          <input id="login-email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="nombre@correo.cl" required>
+        </label>
+        <button class="button primary" type="submit">Continuar</button>
+        <p class="auth-error hidden" role="alert"></p>
+        <p id="identity-help" class="hint">Si el correo es distinto al registrado, Mi ASPCH validará ambos correos antes de actualizar tu ficha ASPCH.</p>
+        <p id="demo-hint" class="hint">Modo demo activo: el código OTP se mostrará en pantalla para facilitar las pruebas.</p>
+      </form>
+      <form id="code-form" class="auth-form hidden">
+        <button type="button" id="back-identity" class="link-button">← Cambiar RUT o correo</button>
+        <div id="code-primary-wrap">
+          <label id="code-primary-label">Código enviado a tu correo
+            <input id="login-code" class="otp-input" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" placeholder="000000" required>
+          </label>
+        </div>
+        <div id="code-old-wrap" class="hidden">
+          <label id="code-old-label">Código enviado al correo actualmente registrado
+            <input id="login-old-code" class="otp-input" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+          </label>
+        </div>
+        <button class="button primary" type="submit">Verificar identidad</button>
+        <button id="retry-code" class="button ghost" type="button">Reenviar código</button>
+        <p class="auth-error hidden" role="alert"></p>
+        <p id="code-help" class="hint"></p>
+      </form>
+      <form id="pin-setup-form" class="auth-form hidden">
+        <span class="eyebrow">ÚLTIMO PASO</span>
+        <h2>Crea tu PIN</h2>
+        <p class="hint">Será tu respaldo para entrar cuando no uses Face ID, Touch ID, huella o passkey.</p>
+        <label>PIN de 4 a 6 dígitos
+          <input id="setup-pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" minlength="4" maxlength="6" placeholder="••••" required>
+        </label>
+        <label>Repite el PIN
+          <input id="setup-pin-confirm" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" minlength="4" maxlength="6" placeholder="••••" required>
+        </label>
+        <button class="button primary" type="submit">Activar Mi ASPCH</button>
+        <p class="auth-error hidden" role="alert"></p>
+      </form>
+      <div class="auth-security">🔒 Acceso exclusivo para socios habilitados.</div>
+    </section>
+    <section class="auth-visual" aria-hidden="true">
+      <img class="auth-logo-watermark" src="/logo-aspch-mark.png" alt="">
+      <div class="visual-flightline"></div>
+      <div class="plane">✈</div>
+      <div class="visual-label"><span>ASPCH</span><strong>Conectando a nuestros socios</strong></div>
+    </section>
+  </main>
+
+  <main id="lock-screen" class="lock-screen hidden">
+    <section class="lock-card">
+      <img class="lock-logo" src="/logo-aspch-mark.png" alt="ASPCH">
+      <span class="eyebrow">MI ASPCH</span>
+      <h1 id="lock-greeting">Hola.</h1>
+      <p>Desbloquea tu espacio personal para continuar.</p>
+      <button id="biometric-button" class="button primary lock-access hidden" type="button" disabled>Acceder</button>
+      <button id="show-pin-button" class="button ghost hidden" type="button">Usar PIN</button>
+      <form id="unlock-form" class="auth-form">
+        <label>PIN
+          <input id="unlock-pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" placeholder="••••" required>
+        </label>
+        <button class="button primary" type="submit">Acceder</button>
+        <p class="auth-error hidden" role="alert"></p>
+      </form>
+      <p id="biometric-help" class="hint">Puedes usar Face ID, Touch ID, huella o tu PIN personal.</p>
+      <button id="lock-logout" class="link-button" type="button">Usar otra cuenta</button>
+    </section>
+  </main>
+
+  <div id="app-shell" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand sidebar-brand">
+        <img class="sidebar-logo" src="/logo-aspch-mark.png" alt="ASPCH">
+        <div><strong>Mi ASPCH</strong><span>Portal de asociados</span></div>
+      </div>
+      <nav id="desktop-nav" class="nav-list"></nav>
+      <div class="sidebar-profile">
+        <div id="sidebar-avatar" class="avatar">A</div>
+        <div class="sidebar-user"><strong id="sidebar-name">Socio</strong><span id="sidebar-role">Asociado</span></div>
+        <button id="logout" class="icon-button" title="Cerrar sesión">↪</button>
+      </div>
+    </aside>
+
+    <section class="main-area">
+      <header class="topbar">
+        <div class="topbar-title-wrap"><button id="more-menu-toggle" class="icon-button mobile-more-button" title="Más servicios" aria-label="Abrir más servicios">☰</button><div><span class="eyebrow">MI ASPCH</span><h2 id="page-title">Inicio</h2></div></div>
+        <div class="top-actions">
+          <button id="install-app" class="button ghost hidden">Instalar app</button>
+          <button id="lock-now" class="icon-button" title="Bloquear app">🔒</button>
+          <div id="top-avatar" class="avatar">A</div>
+          <button id="logout-top" class="button ghost topbar-logout" type="button" title="Cerrar sesión">↪ <span>Salir</span></button>
+        </div>
+      </header>
+      <div id="view" class="view"></div>
+    </section>
+
+    <nav id="mobile-nav" class="mobile-nav"></nav>
+    <div id="mobile-more-backdrop" class="mobile-drawer-backdrop hidden"></div>
+    <aside id="mobile-more-drawer" class="mobile-drawer hidden" aria-label="Más servicios de Mi ASPCH">
+      <div class="mobile-drawer-head"><div><span class="eyebrow">MI ASPCH</span><h3>Más servicios</h3></div><button id="mobile-more-close" class="icon-button" aria-label="Cerrar menú">✕</button></div>
+      <nav id="mobile-more-nav" class="mobile-more-nav"></nav>
+    </aside>
+    <a id="whatsapp-fab" class="whatsapp-fab" href="https://wa.me/56948825381" target="_blank" rel="noopener" aria-label="Contactar a ASPCH por WhatsApp"><img src="/whatsapp.svg" alt=""><span>WhatsApp</span></a>
+  </div>
+
+  <script src="/app.js?v=0.6.15" defer></script>
+</body>
+</html>

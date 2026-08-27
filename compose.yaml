@@ -1,0 +1,41 @@
+name: aspch
+
+services:
+  mi-aspch:
+    image: "mi-aspch:v0.6.15@sha256:59882ed1e7eb3b60c8507c35e8daf90dd3e4cfa036ff18b39badef8d975d973b"
+    pull_policy: never
+    container_name: mi-aspch
+    restart: unless-stopped
+    network_mode: bridge
+    user: node
+    working_dir: /app
+    entrypoint:
+      - docker-entrypoint.sh
+    command:
+      - node
+      - --no-warnings
+      - server.mjs
+    env_file:
+      - ./.env
+    ports:
+      - "0.0.0.0:8085:8080"
+    volumes:
+      - mi_aspch_data:/data:z
+      - /mnt/MediaCenter/aspch/sipa-fotos:/data/sipa-fotos:ro
+      - /mnt/MediaCenter/aspch/sipa-retratos:/data/sipa-retratos:ro
+      - /mnt/MediaCenter/aspch/profile-fotos:/data/profile-fotos:rw
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:8080/api/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mi_aspch_data:
+    external: true
+    name: aspch_mi_aspch_data

@@ -1,0 +1,72 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+.financial-upload-token
+
+# Secrets and credentials
+secrets/
+**/secrets/
+*credentials*.json
+*service-account*.json
+*service_account*.json
+*google-key*.json
+mi-aspch-google.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Databases and runtime state
+data/
+runtime/
+tmp/
+temp/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.wal
+*.shm
+*.journal
+*.pid
+*.sock
+
+# Operational photos and uploads
+sipa-fotos/
+sipa-retratos/
+profile-fotos/
+uploads/
+
+# Backups and migration snapshots
+backups/
+backup*/
+docs/history/pre-*/
+*.bak
+*.backup
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary and editor files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

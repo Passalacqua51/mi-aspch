@@ -1,0 +1,24 @@
+{
+  "name": "mi-aspch",
+  "version": "0.6.15",
+  "private": true,
+  "type": "module",
+  "description": "Mi ASPCH v0.6.15 - simulación de vista iPhone de alta fidelidad",
+  "scripts": {
+    "start": "node --no-warnings server.mjs",
+    "dev": "DEMO_MODE=true node --no-warnings --watch server.mjs",
+    "check": "node --check server.mjs && node --check lib/db.mjs && node --check lib/google.mjs && node --check lib/auth.mjs && node --check lib/webauthn.mjs && node --check lib/push.mjs && node --check lib/v050.mjs && node --check lib/v060.mjs && node --check public/app.js && node --check public/sw.js",
+    "selfcheck": "npm run corecheck && DEMO_MODE=true node --no-warnings tools/self_check_v0.6.0.mjs",
+    "staticcheck": "node tools/self_check_v0.6.0_static.mjs",
+    "corecheck": "node --no-warnings tools/self_check_v0.6.0_core.mjs"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "13.3.2",
+    "qrcode": "1.5.4",
+    "web-push": "3.6.7",
+    "xlsx": "0.18.5"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
