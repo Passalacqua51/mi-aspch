@@ -1,8 +1,6 @@
 # Pendientes
 
 - [ ] Definir una migración separada para runtime y backups, con rollback.
-- [ ] Construir, fijar el digest y desplegar `mi-aspch:v0.6.16` únicamente
-      mediante una futura tarea autorizada.
 - [ ] Retirar en una tarea autorizada las variables de autenticación obsoletas
       del `.env` productivo, sin mostrar sus valores.
 
@@ -28,3 +26,4 @@
 - [x] Eliminar del código los mecanismos de login de presentación/demo/directo.
 - [x] Integrar `fix/remove-presentation-login` en `main` mediante merge no-FF.
 - [x] Preparar la release `0.6.16` sin construir ni desplegar Docker.
+- [x] Construir, fijar el digest SHA-256 inmutable y desplegar `mi-aspch:v0.6.16` en producción con healthcheck.
