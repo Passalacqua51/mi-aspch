@@ -14,6 +14,8 @@
 
 # Completadas recientemente
 
+- [x] Preparar en `feat/admin-dashboard-structure` la separación inicial de
+      Dashboard ADMIN de solo lectura y Developer, sin despliegue.
 - [x] Identificar `/home/casa/mi-aspch-source` como código de producción v0.6.15.
 - [x] Copiar el contexto `.ai/` legado a la carpeta oficial.
 - [x] Adoptar `/home/casa/mi-aspch-source/.ai/` como contexto compartido canónico.

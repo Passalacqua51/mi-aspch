@@ -1,5 +1,20 @@
 # Notas de Codex para ChatGPT
 
+## 2026-08-27 — Dashboard ADMIN y Developer
+
+Se creó `feat/admin-dashboard-structure`. La navegación ADMIN ahora presenta
+Dashboard, Socios, Finanzas, Reservas, Contenido, Votaciones, Notificaciones,
+Integraciones, Seguridad, Auditoría, Sistema y Developer. Solo Dashboard y
+Developer tienen funcionalidad: Dashboard es de solo lectura y usa datos reales
+resumidos; Developer contiene el Control Center anterior sin ampliar capacidades.
+
+Se agregó un GET ADMIN-only para el resumen y verificaciones que confirman 403
+para socios, acceso ADMIN, rechazo de POST al Dashboard y conservación del
+overview usado por Developer. `npm run check`, `npm run staticcheck` y
+`npm run selfcheck` aprobaron; este último se ejecutó con Node 22 en un contenedor
+efímero sin red ni mounts productivos. No hubo despliegue ni acceso de escritura
+a datos o integraciones externas.
+
 ## 2026-08-27 00:24 UTC
 
 ### Trabajo realizado

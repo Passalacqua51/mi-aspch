@@ -46,3 +46,14 @@ La ruta `/mnt/MediaCenter/aspch` es legado/runtime y no es fuente de código.
 
 - Queda pendiente retirar en una tarea autorizada las variables de autenticación
   obsoletas del `.env` productivo, sin mostrar sus valores.
+
+## Control Informática en preparación
+
+- La rama `feat/admin-dashboard-structure` separa Dashboard y Developer sin
+  desplegar cambios en producción.
+- Dashboard usa un endpoint GET ADMIN-only con métricas reales resumidas y no
+  contiene controles de escritura.
+- El Control Center existente conserva sus capacidades bajo Developer.
+- Socios, Finanzas, Reservas, Contenido, Votaciones, Notificaciones,
+  Integraciones, Seguridad, Auditoría y Sistema aparecen como estructura
+  pendiente, sin funciones ni datos inventados.

@@ -135,12 +135,27 @@ try{
   assert.equal(locked.response.status,200,'Debe poder bloquearse la sesión');
   const unlocked=await request(base,'/api/security/unlock',{body:{pin:memberPin},cookie:verified.cookie});
   assert.equal(unlocked.response.status,200,'El PIN normal debe desbloquear la sesión');
+  const memberDashboard=await request(base,'/api/admin/dashboard',{cookie:verified.cookie});
+  assert.equal(memberDashboard.response.status,403,'Un socio normal no puede leer el Dashboard ADMIN');
+  const memberDeveloper=await request(base,'/api/admin/overview',{cookie:verified.cookie});
+  assert.equal(memberDeveloper.response.status,403,'Un socio normal no puede acceder a los datos de Developer');
 
   const adminLogin=await request(base,'/api/auth/admin-login',{body:{email:adminEmail,pin:adminPin}});
   assert.equal(adminLogin.response.status,200,'El login ADMIN normal debe funcionar');
   assert.ok(adminLogin.cookie,'El login ADMIN normal debe emitir sesión');
+  const adminDashboard=await request(base,'/api/admin/dashboard',{cookie:adminLogin.cookie});
+  assert.equal(adminDashboard.response.status,200,'ADMIN debe poder leer el Dashboard');
+  assert.equal(adminDashboard.json.health?.ok,true,'Dashboard debe informar health operativo');
+  assert.equal(adminDashboard.json.health?.version,'0.6.16','Dashboard debe informar la versión real');
+  assert.ok(Number(adminDashboard.json.metrics?.members?.total)>=2,'Dashboard debe usar socios existentes');
+  assert.ok(Array.isArray(adminDashboard.json.audit),'Dashboard debe entregar auditoría resumida');
+  assert.equal(adminDashboard.json.audit.some(x=>'detail_json' in x),false,'Dashboard no debe exponer detalle de auditoría');
+  const adminDeveloper=await request(base,'/api/admin/overview',{cookie:adminLogin.cookie});
+  assert.equal(adminDeveloper.response.status,200,'ADMIN debe conservar el acceso de lectura usado por Developer');
+  const dashboardMutation=await request(base,'/api/admin/dashboard',{body:{},cookie:adminLogin.cookie});
+  assert.equal(dashboardMutation.response.status,404,'Dashboard no debe aceptar mutaciones');
 
-  console.log('SELF-CHECK AUTH OK: rutas retiradas 404 sin sesión; RUT+OTP, PIN y ADMIN normales aprobados.');
+  console.log('SELF-CHECK AUTH OK: rutas retiradas 404; RUT+OTP, PIN y ADMIN aprobados; Dashboard protegido y de solo lectura.');
 }finally{
   if(child&&child.exitCode===null){child.kill('SIGTERM');await new Promise(resolve=>child.once('exit',resolve))}
   fs.rmSync(tmp,{recursive:true,force:true});
