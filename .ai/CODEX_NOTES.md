@@ -1,5 +1,23 @@
 # Notas de Codex para ChatGPT
 
+## 2026-08-27 — Socios ADMIN de solo lectura
+
+Se creó `feat/admin-members-readonly` sin commit ni despliegue. Socios ahora usa
+endpoints GET dedicados para un listado paginado y un detalle bajo demanda. El
+listado expone nombre, estado y RUT/email enmascarados; la ficha entrega PII
+completa solo al abrirla, junto con estado financiero real disponible, meses
+impagos, sesiones, passkeys, reservas SQLite y timestamps de actualización.
+
+Los estados no se infieren con lógica financiera nueva: MOROSO, CONGELADO y
+DESAFILIADO provienen de `member_financial_status`; ACTIVO requiere `members.active`.
+Un inactivo sin estado autoritativo se informa como no disponible. Producción
+contiene realmente 1026 socios no ADMIN: 1025 activos, un MOROSO, un CONGELADO
+y un DESAFILIADO; 1023 no tienen resumen financiero local sincronizado.
+
+Las verificaciones aisladas cubren búsqueda por nombre/RUT/email, paginación,
+detalle, reservas, los cuatro estados, 403 para socios y 404/405 para
+POST/PUT/PATCH/DELETE. No se escribieron fuentes ni se enviaron notificaciones.
+
 ## 2026-08-27 — Dashboard ADMIN y Developer
 
 Se creó `feat/admin-dashboard-structure`. La navegación ADMIN ahora presenta

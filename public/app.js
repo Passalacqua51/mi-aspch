@@ -1,10 +1,9 @@
 const $=(q,r=document)=>r.querySelector(q); const $$=(q,r=document)=>[...r.querySelectorAll(q)];
-const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING'};
+const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
 const NAV=[['home','🏠','Inicio'],['parking','🚗','Estacionamiento'],['simulators','✈️','Simuladores'],['profile','👤','Mi perfil'],['credential','🪪','Credencial'],['reservations','🗓️','Mi agenda'],['studyroom','📖','Sala de estudios'],['convenios','🤝','Convenios'],['library','📚','Biblioteca'],['marketplace','🛒','Mercado ASPCH'],['activities','🎓','Cursos y charlas'],['votes','🗳️','Votaciones'],['advisors','⚖️','Asesorías'],['news','📰','Noticias']];
 const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥','Socios'],['admin-finance','💳','Finanzas'],['admin-reservations','🗓️','Reservas'],['admin-content','📰','Contenido'],['admin-votes','🗳️','Votaciones'],['admin-notifications','🔔','Notificaciones'],['admin-integrations','🔗','Integraciones'],['admin-security','🛡️','Seguridad'],['admin-audit','🧾','Auditoría'],['admin-system','⚙️','Sistema'],['developer','🛠️','Developer']];
 const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
 const ADMIN_PLACEHOLDERS={
-  'admin-members':['👥','Socios','La administración de socios se incorporará en una próxima etapa.'],
   'admin-finance':['💳','Finanzas','La gestión financiera dedicada se incorporará en una próxima etapa.'],
   'admin-reservations':['🗓️','Reservas','La gestión unificada de reservas se incorporará en una próxima etapa.'],
   'admin-content':['📰','Contenido','La gestión de contenido se separará en una próxima etapa.'],
@@ -253,7 +252,7 @@ async function go(view){
   state.view=view;renderNav();
   const titles={home:'Inicio',reservations:'Mi agenda',credential:'Credencial digital',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Asesorías',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
   $('#page-title').textContent=titles[view]||'Mi ASPCH';const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
-  const routes={home:renderHome,reservations:renderReservations,credential:renderCredential,parking:()=>renderParking(),simulators:renderSimulators,studyroom:renderStudyRoom,marketplace:renderMarketplace,activities:renderActivities,votes:renderVotes,advisors:renderAdvisors,convenios:renderConvenios,library:renderLibrary,news:renderNews,profile:renderProfile,'admin-dashboard':renderAdminDashboard,developer:renderDeveloper,...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
+  const routes={home:renderHome,reservations:renderReservations,credential:renderCredential,parking:()=>renderParking(),simulators:renderSimulators,studyroom:renderStudyRoom,marketplace:renderMarketplace,activities:renderActivities,votes:renderVotes,advisors:renderAdvisors,convenios:renderConvenios,library:renderLibrary,news:renderNews,profile:renderProfile,'admin-dashboard':renderAdminDashboard,'admin-members':renderAdminMembers,developer:renderDeveloper,...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
   try{if(!routes[view])return go('home');await routes[view]()}catch(err){if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message)}</div>`}
 }
 
@@ -665,6 +664,47 @@ async function renderAdminDashboard(){
 }
 function adminSummaryCard(icon,label,value,detail){return `<div class="card admin-summary-card"><span>${icon}</span><div><small>${escapeHtml(label)}</small><strong>${Number(value||0)}</strong><p>${escapeHtml(detail)}</p></div></div>`}
 function adminDashboardEvent(e){return `<div class="admin-dashboard-event"><div><strong>${escapeHtml(e.action||'Evento')}</strong><span>${escapeHtml(e.actorName||'Sistema')}${e.entityType?` · ${escapeHtml(e.entityType)}`:''}</span></div><time>${formatLocalDateTime(e.createdAt)}</time></div>`}
+async function renderAdminMembers(){
+  if(state.member.role!=='ADMIN')return go('home');
+  const viewState=state.adminMembers={query:'',page:1,limit:20,selectedId:null};
+  $('#view').innerHTML=`
+  <section class="admin-members-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · SOLO LECTURA</span><h2>Socios</h2><p>Consulta datos reales sincronizados sin modificar cuentas, sesiones, reservas ni fuentes externas.</p></div><span class="badge blue"><i class="dot"></i>ADMIN-only</span></section>
+  <form id="admin-members-search" class="admin-members-search card" role="search"><label for="admin-members-query">Buscar por nombre, RUT o email</label><div><input id="admin-members-query" type="search" maxlength="120" autocomplete="off" placeholder="Nombre, RUT o email"><button class="button secondary" type="submit">Buscar</button></div></form>
+  <section class="admin-members-layout section"><div id="admin-members-list" class="card"><div class="empty compact-empty">Cargando socios…</div></div><aside id="admin-member-detail" class="card admin-member-detail"><div class="admin-member-detail-empty"><span>👤</span><strong>Selecciona un socio</strong><p>La información personal completa se carga únicamente al abrir una ficha.</p></div></aside></section>`;
+  $('#admin-members-search').onsubmit=async e=>{e.preventDefault();viewState.query=$('#admin-members-query').value.trim();viewState.page=1;viewState.selectedId=null;showAdminMemberDetailEmpty();await loadAdminMembersList()};
+  await loadAdminMembersList();
+}
+async function loadAdminMembersList(){
+  const s=state.adminMembers,box=$('#admin-members-list');if(!box)return;
+  box.innerHTML='<div class="empty compact-empty">Cargando socios…</div>';
+  try{
+    const data=await api(`/api/admin/members/list?q=${encodeURIComponent(s.query)}&page=${s.page}&limit=${s.limit}`);s.page=data.page||1;
+    box.innerHTML=`<div class="section-head admin-members-list-head"><div><h3>Listado de socios</h3><p>${Number(data.total||0)} resultado${Number(data.total||0)===1?'':'s'} · datos de contacto enmascarados</p></div><span class="badge blue">Página ${data.page||1} de ${data.pages||1}</span></div>${adminMembersTable(data.members||[])}<div class="admin-members-pagination"><button class="button ghost" id="admin-members-prev" type="button" ${data.page<=1?'disabled':''}>← Anterior</button><span>${data.total?`${(data.page-1)*data.limit+1}–${Math.min(data.page*data.limit,data.total)} de ${data.total}`:'Sin resultados'}</span><button class="button ghost" id="admin-members-next" type="button" ${data.page>=data.pages?'disabled':''}>Siguiente →</button></div>`;
+    $('#admin-members-prev').onclick=async()=>{s.page=Math.max(1,s.page-1);await loadAdminMembersList()};$('#admin-members-next').onclick=async()=>{s.page+=1;await loadAdminMembersList()};
+    $$('.admin-member-row',box).forEach(row=>row.onclick=()=>loadAdminMemberDetail(Number(row.dataset.id)));
+  }catch(err){box.innerHTML=`<div class="empty">${escapeHtml(err.message)}</div>`}
+}
+function adminMembersTable(rows){
+  if(!rows.length)return '<div class="empty">No se encontraron socios.</div>';
+  return `<div class="admin-members-table" role="table" aria-label="Socios"><div class="admin-members-table-head" role="row"><span>Socio</span><span>RUT</span><span>Email</span><span>Estado</span></div>${rows.map(m=>`<button class="admin-member-row" type="button" role="row" data-id="${m.id}"><strong>${escapeHtml(m.name||'No disponible')}</strong><span data-label="RUT">${escapeHtml(m.rutMasked||'No disponible')}</span><span data-label="Email">${escapeHtml(m.emailMasked||'No disponible')}</span>${adminMemberStateBadge(m.membershipState)}</button>`).join('')}</div>`;
+}
+async function loadAdminMemberDetail(id){
+  const box=$('#admin-member-detail');if(!box)return;state.adminMembers.selectedId=id;box.innerHTML='<div class="empty compact-empty">Cargando ficha…</div>';
+  try{const detail=await api(`/api/admin/members/${id}`);if(state.adminMembers.selectedId!==id)return;box.innerHTML=adminMemberDetailHtml(detail)}catch(err){box.innerHTML=`<div class="empty">${escapeHtml(err.message)}</div>`}
+}
+function showAdminMemberDetailEmpty(){const box=$('#admin-member-detail');if(box)box.innerHTML='<div class="admin-member-detail-empty"><span>👤</span><strong>Selecciona un socio</strong><p>La información personal completa se carga únicamente al abrir una ficha.</p></div>'}
+function adminMemberStateBadge(status){const label=status||'No disponible',tone=status==='ACTIVO'?'green':status==='MOROSO'?'amber':status==='CONGELADO'?'blue':status==='DESAFILIADO'?'red':'';return `<span class="badge ${tone}"><i class="dot"></i>${escapeHtml(label)}</span>`}
+function availableAdminValue(value){return value===null||value===undefined||String(value).trim()===''?'No disponible':String(value)}
+function adminMemberDetailHtml(d){
+  const m=d.member||{},f=d.financial||{},security=d.security||{},updates=d.lastUpdate||{},reservations=d.reservations||[];
+  const financialStatus=f.status?membershipStatusLabel(f.status):'No disponible',months=f.monthsDue===null||f.monthsDue===undefined?'No disponible':`${f.monthsDue} ${Number(f.monthsDue)===1?'mes':'meses'}`,amount=f.amountDue===null||f.amountDue===undefined?'No disponible':formatClpClient(f.amountDue);
+  return `<div class="admin-member-detail-head"><div><span class="eyebrow">FICHA DE SOCIO</span><h3>${escapeHtml(availableAdminValue(m.name))}</h3></div>${adminMemberStateBadge(m.membershipState)}</div>
+  <div class="admin-member-detail-fields">${field('RUT',availableAdminValue(m.rut))}${field('Email',availableAdminValue(m.email))}${field('Teléfono',availableAdminValue(m.phone))}${field('Empresa / empleador',availableAdminValue(m.employer))}</div>
+  <div class="admin-member-detail-section"><h4>Estado y seguridad</h4><div class="admin-member-detail-fields">${field('Membresía',availableAdminValue(m.membershipState))}${field('Estado financiero',financialStatus)}${field('Meses impagos',months)}${field('Monto resumido',amount)}${field('Sesiones activas',Number(security.activeSessions||0))}${field('Passkeys',Number(security.passkeys||0))}</div>${f.sourceStatus?`<p class="hint">Estado fuente: ${escapeHtml(f.sourceStatus)}${f.sourceYear?` · período ${escapeHtml(f.sourceYear)}`:''}</p>`:'<p class="hint">Estado financiero: No disponible en la fuente local sincronizada.</p>'}</div>
+  <div class="admin-member-detail-section"><h4>Reservas activas relevantes</h4><div class="admin-member-reservations">${reservations.map(adminMemberReservationHtml).join('')||'<div class="empty compact-empty">Sin reservas activas relevantes en SQLite.</div>'}</div><p class="hint">Turnos de simulador: No disponible en esta vista porque no existe una fuente local confiable.</p></div>
+  <div class="admin-member-detail-section"><h4>Última actualización disponible</h4><div class="admin-member-detail-fields">${field('Registro',updates.memberUpdatedAt?formatLocalDateTime(updates.memberUpdatedAt):'No disponible')}${field('Sync financiera',updates.financialSyncedAt?formatLocalDateTime(updates.financialSyncedAt):'No disponible')}${field('Fuente financiera',updates.financialSourceUpdatedAt?formatLocalDateTime(updates.financialSourceUpdatedAt):'No disponible')}</div><p class="hint">Más reciente: ${updates.latestAvailable?formatLocalDateTime(updates.latestAvailable):'No disponible'}</p></div>`;
+}
+function adminMemberReservationHtml(r){if(r.type==='PARKING')return `<div><span>🚗</span><div><strong>Estacionamiento ${escapeHtml(r.label||'No disponible')}</strong><small>${escapeHtml(r.date||'No disponible')}${r.building?` · Padre Mariano ${escapeHtml(r.building)}`:''}</small></div></div>`;return `<div><span>📖</span><div><strong>${escapeHtml(r.label||'Sala de estudios')}</strong><small>${r.start?formatLocalDateTime(r.start):'No disponible'}${r.end?` → ${formatLocalDateTime(r.end)}`:''}</small></div></div>`}
 function renderAdminPlaceholder(id){
   if(state.member.role!=='ADMIN')return go('home');
   const [icon,title,description]=ADMIN_PLACEHOLDERS[id];

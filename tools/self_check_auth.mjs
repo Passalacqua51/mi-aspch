@@ -34,6 +34,11 @@ function countSessions(){
   check.close();
   return n;
 }
+function readOnlySnapshot(){
+  const check=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'),{readOnly:true});
+  const counts=Object.fromEntries(['members','member_financial_status','sessions','passkeys','parking_reservations','study_room_reservations','notification_deliveries','audit_log'].map(table=>[table,Number(check.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n)]));
+  check.close();return counts;
+}
 function otpHash(email,code){
   return crypto.createHash('sha256').update(`${otpSecret}|${email.toLowerCase()}|${code}`).digest('hex');
 }
@@ -44,9 +49,9 @@ async function freePort(){
   await new Promise(resolve=>socket.close(resolve));
   return port;
 }
-async function request(base,route,{body,cookie}={}){
+async function request(base,route,{body,cookie,method}={}){
   const response=await fetch(`${base}${route}`,{
-    method:body===undefined?'GET':'POST',
+    method:method||(body===undefined?'GET':'POST'),
     headers:{...(body===undefined?{}:{'content-type':'application/json'}),...(cookie?{cookie}:{})},
     body:body===undefined?undefined:JSON.stringify(body)
   });
@@ -69,6 +74,21 @@ try{
   const now=new Date().toISOString();
   db.prepare(`INSERT INTO members(email,name,rut,role,active,is_board,updated_at)
     VALUES (?,?,?,?,1,0,?)`).run(memberEmail,'SOCIO AUTH QA',memberRut,'MEMBER',now);
+  db.prepare('UPDATE members SET phone=?,employer=? WHERE email=?').run('+56 9 1111 2222','Aerolínea QA',memberEmail);
+  const statusFixtures=[
+    ['moroso@example.test','SOCIO MOROSO QA','11.111.111-1',1,'MOROSO',3,180000],
+    ['congelado@example.test','SOCIO CONGELADO QA','22.222.222-2',1,'CONGELADO',0,0],
+    ['desafiliado@example.test','SOCIO DESAFILIADO QA','33.333.333-3',0,'DESAFILIADO',6,360000]
+  ];
+  for(const [email,name,rut,active,status,months,amount] of statusFixtures){
+    const inserted=db.prepare(`INSERT INTO members(email,name,rut,phone,employer,role,active,is_board,updated_at) VALUES (?,?,?,?,?,'MEMBER',?,0,?)`).run(email,name,rut,'+56 9 0000 0000','Empleador QA',active,now);
+    db.prepare(`INSERT INTO member_financial_status(member_id,rut,source_status,financial_status,months_due,amount_due,source_year,source_updated_at,synced_at,deactivated_by_financial) VALUES (?,?,?,?,?,?,2026,?,?,?)`).run(Number(inserted.lastInsertRowid),rut,status,status,months,amount,now,now,status==='DESAFILIADO'?1:0);
+  }
+  const morosoFixture=db.prepare('SELECT id FROM members WHERE email=?').get('moroso@example.test'),futureDate=new Date(Date.now()+86400_000).toISOString().slice(0,10),studyStart=new Date(Date.now()+90000_000),studyEnd=new Date(studyStart.getTime()+3600_000);
+  db.prepare(`INSERT INTO parking_spaces(id,label,building,board_only,active,sort_order,updated_at) VALUES ('QA-1','QA 1','87',0,1,1,?)`).run(now);
+  db.prepare(`INSERT INTO parking_reservations(reservation_date,space_id,member_id,status,created_at) VALUES (?,'QA-1',?,'ACTIVE',?)`).run(futureDate,morosoFixture.id,now);
+  const studyRoom=db.prepare('SELECT id FROM study_rooms ORDER BY id LIMIT 1').get();db.prepare(`INSERT INTO study_room_reservations(room_id,member_id,start_at,end_at,status,created_at) VALUES (?,?,?,?,'ACTIVE',?)`).run(studyRoom.id,morosoFixture.id,studyStart.toISOString(),studyEnd.toISOString(),now);
+  db.prepare(`INSERT INTO passkeys(credential_id,member_id,webauthn_user_id,public_key,counter,created_at) VALUES ('qa-credential',?,'qa-user',?,0,?)`).run(morosoFixture.id,Buffer.from('qa-public-key'),now);
   const admin=db.prepare('SELECT * FROM members WHERE email=?').get(adminEmail);
   assert.equal(setPin(db,sessionMember(db,admin),adminPin).ok,true,'El PIN ADMIN debe poder configurarse');
   db.prepare('DELETE FROM sessions').run();
@@ -139,6 +159,10 @@ try{
   assert.equal(memberDashboard.response.status,403,'Un socio normal no puede leer el Dashboard ADMIN');
   const memberDeveloper=await request(base,'/api/admin/overview',{cookie:verified.cookie});
   assert.equal(memberDeveloper.response.status,403,'Un socio normal no puede acceder a los datos de Developer');
+  const memberListForbidden=await request(base,'/api/admin/members/list',{cookie:verified.cookie});
+  assert.equal(memberListForbidden.response.status,403,'Un socio normal no puede listar socios');
+  const memberDetailForbidden=await request(base,'/api/admin/members/1',{cookie:verified.cookie});
+  assert.equal(memberDetailForbidden.response.status,403,'Un socio normal no puede abrir fichas de socios');
 
   const adminLogin=await request(base,'/api/auth/admin-login',{body:{email:adminEmail,pin:adminPin}});
   assert.equal(adminLogin.response.status,200,'El login ADMIN normal debe funcionar');
@@ -155,7 +179,27 @@ try{
   const dashboardMutation=await request(base,'/api/admin/dashboard',{body:{},cookie:adminLogin.cookie});
   assert.equal(dashboardMutation.response.status,404,'Dashboard no debe aceptar mutaciones');
 
-  console.log('SELF-CHECK AUTH OK: rutas retiradas 404; RUT+OTP, PIN y ADMIN aprobados; Dashboard protegido y de solo lectura.');
+  const beforeMemberReads=readOnlySnapshot();
+  const pagedMembers=await request(base,'/api/admin/members/list?page=1&limit=2',{cookie:adminLogin.cookie});
+  assert.equal(pagedMembers.response.status,200,'ADMIN debe poder listar socios');
+  assert.equal(pagedMembers.json.limit,2,'El listado debe respetar el límite solicitado');
+  assert.ok(pagedMembers.json.pages>=2,'El listado debe estar paginado');
+  assert.equal('email' in pagedMembers.json.members[0],false,'El listado no debe exponer el email completo');
+  assert.equal('rut' in pagedMembers.json.members[0],false,'El listado no debe exponer el RUT completo');
+  assert.ok(pagedMembers.json.members[0].emailMasked&&pagedMembers.json.members[0].rutMasked,'El listado debe entregar identificadores enmascarados');
+  for(const [query,expected] of [['SOCIO MOROSO','MOROSO'],['11111111','MOROSO'],['moroso@example.test','MOROSO'],['SOCIO AUTH','ACTIVO'],['SOCIO CONGELADO','CONGELADO'],['SOCIO DESAFILIADO','DESAFILIADO']]){
+    const result=await request(base,`/api/admin/members/list?q=${encodeURIComponent(query)}`,{cookie:adminLogin.cookie});
+    assert.equal(result.response.status,200,`La búsqueda ADMIN debe funcionar para ${query}`);assert.equal(result.json.members[0]?.membershipState,expected,`Estado real esperado para ${query}`);
+  }
+  const morosoList=await request(base,'/api/admin/members/list?q=moroso%40example.test',{cookie:adminLogin.cookie});const morosoId=morosoList.json.members[0].id;
+  const morosoDetail=await request(base,`/api/admin/members/${morosoId}`,{cookie:adminLogin.cookie});
+  assert.equal(morosoDetail.response.status,200,'ADMIN debe poder abrir la ficha completa');
+  assert.equal(morosoDetail.json.member.email,'moroso@example.test','El detalle debe entregar el email completo solo al abrir la ficha');
+  assert.equal(morosoDetail.json.member.membershipState,'MOROSO');assert.equal(morosoDetail.json.financial.monthsDue,3);assert.deepEqual(morosoDetail.json.reservations.map(x=>x.type).sort(),['PARKING','STUDY_ROOM']);assert.equal(typeof morosoDetail.json.security.activeSessions,'number');assert.equal(morosoDetail.json.security.passkeys,1);
+  for(const method of ['POST','PUT','PATCH','DELETE'])for(const route of ['/api/admin/members/list',`/api/admin/members/${morosoId}`]){const denied=await request(base,route,{method,body:{},cookie:adminLogin.cookie});assert.ok([404,405].includes(denied.response.status),`${method} ${route} debe responder 404/405`)}
+  assert.deepEqual(readOnlySnapshot(),beforeMemberReads,'Las búsquedas, fichas y métodos rechazados no deben escribir ni notificar');
+
+  console.log('SELF-CHECK AUTH OK: rutas retiradas 404; RUT+OTP, PIN y ADMIN aprobados; Dashboard y Socios protegidos y de solo lectura.');
 }finally{
   if(child&&child.exitCode===null){child.kill('SIGTERM');await new Promise(resolve=>child.once('exit',resolve))}
   fs.rmSync(tmp,{recursive:true,force:true});

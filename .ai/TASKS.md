@@ -14,6 +14,8 @@
 
 # Completadas recientemente
 
+- [x] Preparar en `feat/admin-members-readonly` la vista ADMIN de Socios de solo
+      lectura, con listado minimizado, ficha real y pruebas sin efectos externos.
 - [x] Preparar en `feat/admin-dashboard-structure` la separación inicial de
       Dashboard ADMIN de solo lectura y Developer, sin despliegue.
 - [x] Identificar `/home/casa/mi-aspch-source` como código de producción v0.6.15.

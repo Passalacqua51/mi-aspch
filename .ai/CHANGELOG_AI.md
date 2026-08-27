@@ -2,6 +2,12 @@
 
 ## 2026-08-27
 
+- Se preparó `feat/admin-members-readonly`: Socios dejó de ser placeholder y
+  ahora ofrece búsqueda, listado paginado con PII enmascarada y ficha ADMIN-only.
+- La ficha usa únicamente SQLite sincronizado para identidad, estado financiero,
+  sesiones, passkeys y reservas activas de estacionamiento y sala de estudios.
+- Los endpoints dedicados aceptan solo GET; las pruebas HTTP confirmaron 403 para
+  socios, 404 para mutaciones y ausencia de escrituras/notificaciones.
 - Se preparó `feat/admin-dashboard-structure` con una navegación ADMIN dividida
   en doce áreas objetivo.
 - Dashboard quedó ADMIN-only, de solo lectura y alimentado por métricas reales
