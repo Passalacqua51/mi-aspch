@@ -2,6 +2,12 @@
 
 ## 2026-08-27
 
+- Se cerró la rotación de la credencial Google de Mi ASPCH: la clave nueva fue
+  validada con fuentes reales y la clave anterior quedó eliminada en Google.
+- Se confirmaron `/api/health`, BD SOCIOS, Sheet financiero, estacionamientos,
+  Calendar READ y sincronización de socios sin errores OAuth nuevos.
+- Se preservaron 109 sesiones activas y 2 passkeys; Gmail, OTP y notificaciones
+  Gmail permanecen desactivados.
 - Se preparó la release `0.6.16` con el retiro de accesos alternativos ya
   integrado en `main`, sin cambios funcionales adicionales ni despliegue.
 - Backend, PWA, caché, paquetes y Compose quedaron referenciados en `0.6.16`;

@@ -1,5 +1,28 @@
 # Decisiones
 
+## 2026-08-27 — Cierre de rotación de credencial Google
+
+### Decisión
+
+Dar por cerrada la rotación de la clave USER_MANAGED de la Service Account de
+Mi ASPCH. La credencial nueva quedó instalada y validada contra las fuentes
+reales antes de retirar definitivamente la clave anterior.
+
+### Consecuencias
+
+- Producción autentica con la clave nueva y la clave anterior ya no está
+  publicada por Google.
+- Se verificaron BD SOCIOS, el Sheet financiero, estacionamientos y Calendar
+  READ reales, sin errores OAuth ni de Google API.
+- Las 109 sesiones activas y las 2 passkeys permanecieron preservadas.
+- Gmail, OTP y notificaciones Gmail continúan desactivados.
+- La ausencia previa del XLSM financiero local permanece como una condición
+  independiente de esta rotación; el Sheet financiero real continúa accesible.
+
+### Estado
+
+Completada
+
 ## 2026-08-27 — Release 0.6.16 sin despliegue
 
 ### Decisión
