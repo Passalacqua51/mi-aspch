@@ -69,7 +69,22 @@ async function boot(){
   }catch{await loadPresets();showAuth()}
 }
 async function loadPresets(){
-  try{const r=await api('/api/preview/members');if(r?.members?.length>0){const presets=$('#preview-presets'),list=$('#presets-list');list.innerHTML='';r.members.forEach(m=>{const btn=document.createElement('button');btn.className='button secondary clean-btn';btn.type='button';btn.textContent=`${m.name||m.email} (${m.rut||'?'})`;btn.addEventListener('click',()=>presetLogin(m.id));list.appendChild(btn)});presets.classList.remove('hidden')}}catch{}}
+  try{
+    const r=await api('/api/preview/members');
+    if(r?.members?.length>0){
+      const presets=$('#preview-presets'),list=$('#presets-list');
+      list.innerHTML='';
+      r.members.forEach(m=>{
+        const btn=document.createElement('button');
+        btn.className='button secondary clean-btn';
+        btn.type='button';
+        btn.textContent=`${m.name||m.email} (${m.rut||'?'})`;
+        btn.addEventListener('click',()=>presetLogin(m.id));
+        list.appendChild(btn);
+      });
+      presets.classList.remove('hidden');
+    }
+  }catch{}
 }
 async function presetLogin(memberId){
   const presets=$('#preview-presets');
@@ -77,7 +92,16 @@ async function presetLogin(memberId){
     setLoading(presets,true);
     const r=await api('/api/preview/login',{method:'POST',body:{memberId}});
     if(r?.ok){
-      state.member=r.member;sessionStorage.setItem('miAspchUnlocked','1');await boot();
+      state.member=r.member;sessionStorage.setItem('miAspchUnlocked','1');
+      // Cargar datos completos
+      const data=await api('/api/me');
+      state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
+      // Ir directo al perfil
+      $('#auth-screen').classList.add('hidden');
+      $('#lock-screen').classList.add('hidden');
+      $('#app-shell').classList.remove('hidden');
+      state.view='profile';
+      renderView();
     }else{
       toast(r?.error||'Error al iniciar sesión.',true);
     }
