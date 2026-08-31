@@ -90,16 +90,18 @@ async function presetLogin(memberId){
   try{
     const r=await api('/api/preview/login',{method:'POST',body:{memberId}});
     if(r?.ok){
+      state.member=r.member;
+      // Recarga los datos post-login
       const data=await api('/api/me');
-      state.member=data.member;
-      state.membership=data.membership;
-      state.access=data.access;
-      state.security=data.security;
-      state.modules=data.modules||null;
-      state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
+      if(data?.member){
+        state.member=data.member;
+        state.membership=data.membership;
+        state.access=data.access;
+        state.security=data.security;
+        state.modules=data.modules||null;
+        state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
+      }
       sessionStorage.setItem('miAspchUnlocked','1');
-      
-      // Setup UI como loginSuccess() pero yendo a profile
       const m=state.member;
       applyMemberTheme(m);
       $('#auth-screen').classList.add('hidden');
@@ -112,9 +114,11 @@ async function presetLogin(memberId){
       renderNav();
       go('profile');
     }else{
+      console.error('Error preset login:',r?.error);
       toast(r?.error||'Error al iniciar sesión.',true);
     }
   }catch(err){
+    console.error('Error preset login catch:',err);
     toast(err.message||'Error al iniciar sesión.',true);
   }
 }
