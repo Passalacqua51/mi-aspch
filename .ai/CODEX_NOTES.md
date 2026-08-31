@@ -1,5 +1,139 @@
 # Notas de Codex para ChatGPT
 
+## 2026-08-31 — Resumen dinámico compacto en Inicio
+
+Se ajustó la vista Inicio de Mi ASPCH para cumplir el flujo ordenado y sin rellenos:
+1. Saludo compacto
+2. Credencial vigente
+3. Próximo simulador (solo si existe -> abre `simulators`)
+4. Estacionamiento activo (solo si existe -> abre `parking`)
+5. Aviso ASPCH importante (solo si existe)
+6. Estado mensualidad compacto (LATAM Airlines / Grupo / Cargo => "Descuento por planilla"; resto => estado correspondiente)
+7. Contactar ASPCH (acceso discreto al final -> abre `contact`)
+
+Sin Biblioteca, Convenios, Noticias, Sala, etc. en Inicio; todos conservados en el menú desplegable. Preview 8086 reconstruido y validado healthy; sincronizado con MediaCenter; producción 8085 no fue tocada.
+
+## 2026-08-31 — Login light, Reservas y personalización
+
+Se corrigió únicamente el tema light del login: fondo blanco, PNG oficial sin
+filtros y textos contrastados. Dark conserva el mismo PNG y su placa clara. En
+390x844 ambos temas mantienen la proporción natural 2481x603.
+
+Inicio contiene una sola entrada Reservas y la vista hija ofrece Simuladores y
+Sala de estudios. La selección de ocho servicios se persiste por socio en
+`member_ui_preferences`; omitir mantiene todos visibles y Perfil permite editar.
+Las pruebas HTTP verifican primer guardado y cambio posterior sin modificar
+permisos. Preview fue actualizado; producción no se recreó.
+
+## 2026-08-31 — Logo institucional oficial
+
+El PNG recibido se copió sin transformación a `public/logo-aspch-original.png`;
+origen, worktree, respuesta HTTP de Preview y copia MediaCenter conservan el
+mismo SHA-256. Login/desbloqueo usan ese archivo con proporción natural y dark
+mode añade una placa clara. El hero interno quedó solo con `Hola, Informática`.
+
+Se retiraron las referencias frontend/PWA a los logos e iconos anteriores y se
+añadió una regresión estática por hash. Playwright confirmó 2481×603 natural,
+`object-fit: contain`, `filter: none` y render 280×68 light / 252×61 dark.
+Preview 8086 fue reconstruido healthy; producción 8085 permaneció intacta.
+
+## 2026-08-31 — Operación de Preview
+
+- La definición canónica es `compose.preview.yaml`; operar únicamente mediante
+  `tools/preview_ctl.sh` y consultar `docs/PREVIEW.md`.
+- Nunca montar `aspch_mi_aspch_data` en el servicio `preview`. Solo
+  `preview-seed`, sin red y con `/production:ro`, puede leerlo para generar una
+  copia sanitizada bajo `runtime/preview`.
+- Mantener `PREVIEW_MODE=true` y el bind exclusivo a la IP Tailscale. No añadir
+  `0.0.0.0`, loopback, Tailscale Funnel ni un proxy público.
+- La unidad histórica Cloudflare debe retirarse cuando se renueve sudo; mientras
+  tanto no puede alcanzar el Preview porque `127.0.0.1:8086` está cerrado.
+
+## 2026-08-31 — Motor seguro y dry-run XLSM → SQLite
+
+Se añadió un planificador determinista con políticas explícitas para ACTIVO,
+MOROSO, CONGELADO, DESAFILIADO, JUBILADO y DIRECTORIO. Solo acepta matches 1:1
+por RUT con DV válido. Vacíos, texto libre, duplicados, RUT inválidos y no-match
+se omiten. El aplicador existe detrás de `planId` exacto y confirmación, verifica
+precondiciones y audita por corrida y socio, pero no fue conectado ni ejecutado.
+
+El importador legado quedó deshabilitado: ya no puede tocar nombres, empleador,
+cargo o `is_board`, inferir deuda desde fórmulas/celdas vacías ni convertir seis
+meses MOROSO en DESAFILIADO. Control Informática mantiene Estado XLSM, Estado
+aplicado por Mi ASPCH, Última sincronización, Causa y alertas de discrepancia.
+
+El dry-run real sobre un backup SQLite coherente produjo 977 matches seguros y
+182 cambios: 11 CONGELADO, 22 DESAFILIADO, 29 MOROSO, 113 JUBILADO y 7
+DIRECTORIO. Quedan 49 socios sin match seguro, 11 RUT inválidos entre fuentes y
+843 filas no clasificables. No hubo writes en producción ni en integraciones.
+
+## 2026-08-28 — Notificaciones, Seguridad y Auditoría
+
+Se retiraron los tres placeholders. Notificaciones informa estado y métricas de
+Push/Gmail OTP desde SQLite sin endpoints, códigos, claves o payloads. Seguridad
+resume sesiones, passkeys, PIN y configuración ADMIN, y reutiliza las acciones
+confirmadas existentes; intentos y bloqueos se declaran sin fuente persistida.
+
+Auditoría filtra por fecha, acción, socio y categoría, y nunca entrega
+`detail_json`: solo un resumen construido con campos operativos permitidos. El
+Dashboard recibió tres enlaces compactos. No se añadieron integraciones, probes,
+envíos ni mutaciones genéricas.
+
+El preview 8086 fue reiniciado sobre su SQLite ficticia y validó login ADMIN,
+las tres rutas y las integraciones OFF. Las cuatro pruebas solicitadas aprobaron;
+producción conservó contenedor, imagen, inicio, cero reinicios y health `healthy`.
+
+## 2026-08-28 — Reservas, Integraciones y Sistema
+
+Se retiraron los tres placeholders. Reservas consolida estacionamientos de hoy y
+activos, sala, lista de espera, simuladores sin fuente fiable y auditoría; liberar
+o cancelar reutiliza las acciones ADMIN locales existentes.
+
+Integraciones informa seis fuentes con estados controlados, última evidencia e
+impacto sin probes. Sistema expone versión, uptime, Node, quick_check, tamaño,
+tablas, backups y fallos; no inventa estado del contenedor ni añade herramientas
+genéricas. También se corrigió el orden de inicialización de la caché XLSM.
+
+El preview 8086 quedó actualizado con SQLite ficticia, `.env` enmascarado y todas
+las integraciones externas OFF. `check`, `selfcheck`, `staticcheck` y
+`git diff --check` aprobaron en Node 22 sin red. Producción no fue modificada.
+
+## 2026-08-28 — Primera versión útil de Control Informática maestro
+
+Se completó en el worktree el Dashboard maestro y la ficha diagnóstica de socio.
+El Dashboard es GET ADMIN-only y reúne salud, actividad, reservas, fuentes,
+backups, SQLite, alertas, errores y auditoría resumida. La ficha separa XLSM,
+estado aplicado y BD SOCIOS, muestra acceso operativo y no ofrece cambios de
+membresía.
+
+Funcionan refrescar diagnóstico, liberar estacionamiento, cancelar sala, cerrar
+sesiones, revocar passkeys, resetear PIN y emitir OTP solo cuando la entrega está
+habilitada. Las acciones exitosas quedan auditadas y las pruebas confirman las
+transiciones locales de reservas, la preservación de membresía y la ausencia de
+secretos en respuestas o auditoría.
+
+Se retiraron la UI y las dos rutas de carga XLSM; la única operación restante es
+relectura diagnóstica sin persistir estados. `npm run check`, `npm run selfcheck`,
+`npm run staticcheck` y `git diff --check` aprobaron con Node 22 en un contenedor
+efímero sin red ni mounts productivos. Producción conservó contenedor, imagen,
+inicio y health `healthy`. No hubo commit, merge ni deploy.
+
+## 2026-08-28 — Capa financiera read-only/dry-run
+
+Se añadió un parser financiero puro e independiente que valida estructura M:CR,
+RUT con DV, estados explícitos, evidencia mensual y errores de fórmula. Vacíos y
+textos libres quedan `NO_CLASIFICADO`; MOROSO no escala y solo un `Total` mensual
+positivo cuenta como monto directamente demostrable.
+
+El CLI leyó una copia SQLite con `-readonly`, `query_only` e `immutable=1`. Las
+huellas de SQLite/WAL/SHM no cambiaron. El XLSM real produjo 1.041 filas, 1.038
+válidas, 977 matches seguros, 843 no clasificadas, 121 meses demostrables,
+$506.120 directos y 5 errores de fórmula. El reporte protegido quedó fuera de
+Git en `financial-source-test` y conserva el detalle histórico 62/47.
+
+No se conectó el módulo al servidor, frontend ni sincronizador; no hubo cambios
+de producción, SQLite, Google, identidades, estados o notificaciones.
+
 ## 2026-08-27 — Socios ADMIN de solo lectura
 
 Se creó `feat/admin-members-readonly` sin commit ni despliegue. Socios ahora usa

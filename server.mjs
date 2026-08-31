@@ -6,16 +6,20 @@ import QRCode from 'qrcode';
 import { fileURLToPath } from 'node:url';
 import { openDb, upsertMember, upsertParkingSpaces, setBoardMembersByRut, normalizeRut, isValidRut, updateMemberEmail, updatePreferredName } from './lib/db.mjs';
 import { requestOtp, verifyOtp, memberFromRequest, logout, normalizeEmail, isUnlocked, setPin, unlockWithPin, lockSession, issueOtp, verifyIssuedOtp, consumeOtp, createSession, createSessionWithPin } from './lib/auth.mjs';
-import { googleEnabled, googleCapabilities, sheetsReadEnabled, sheetsWriteEnabled, calendarReadEnabled, calendarWriteEnabled, gmailOtpSendEnabled, gmailNotificationSendEnabled, sheetsGet, sheetsAppend, sheetsUpdate, sheetsBatchUpdate, ensureSheet, listCalendarEvents, deleteCalendarEvent, sendWorkspaceEmail } from './lib/google.mjs';
+import { googleEnabled, googleCapabilities, sheetsReadEnabled, sheetsWriteEnabled, calendarReadEnabled, calendarWriteEnabled, gmailOtpSendEnabled, gmailNotificationSendEnabled, sheetsGet, sheetsAppend, sheetsUpdate, ensureSheet, listCalendarEvents, deleteCalendarEvent, sendWorkspaceEmail } from './lib/google.mjs';
 import { webauthnRequestInfo, webauthnSummary, registrationOptions, finishRegistration, authenticationOptions, finishAuthentication, removeAllPasskeys } from './lib/webauthn.mjs';
-import { initV050, financialSummary, benefitAccess, latestFinancialSync, syncFinancialWorkbook, studyRoomAvailability, reserveStudyRoom, cancelStudyRoom, createMarketplaceListing, publicMarketplace, marketplaceImage, marketplaceOwnerAction, marketplaceOwnerEdit, moderateMarketplace, expireMarketplace, listActivities, adminActivities, createActivity, setActivityStatus, dueNotificationText } from './lib/v050.mjs';
+import { initV050, financialSummary, benefitAccess, latestFinancialSync, studyRoomAvailability, reserveStudyRoom, cancelStudyRoom, createMarketplaceListing, publicMarketplace, marketplaceImage, marketplaceOwnerAction, marketplaceOwnerEdit, moderateMarketplace, expireMarketplace, listActivities, adminActivities, createActivity, setActivityStatus, dueNotificationText } from './lib/v050.mjs';
 import { pushEnabled, vapidPublicKey, upsertPushSubscription, removePushSubscription, sendMemberPush } from './lib/push.mjs';
-import { initV060, audit, auditRows, moduleStates, moduleEnabled, setModuleState, addStudyWaitlist, cancelStudyWaitlist, memberStudyWaitlist, matchingStudyWaitlist, markStudyWaitlistNotified, reportMarketplace, marketplaceReports, resolveMarketplaceReport, agreements, upsertAgreement, setAgreementStatus, libraryItems, toggleLibraryFavorite, upsertLibraryItem, activityCenter, setActivityRegistration, credentialStatus, setCredentialRevoked, memberHistory, systemMetrics, dbStats, createBackup, backupRuns, invalidateOtherSessions, invalidateMemberSessions, adminMemberSearch, adminMembersList, adminMemberDetail, diagnostics, toIcs, createVote, updateVoteDraft, deleteVoteDraft, setVoteStatus, voteResults, adminVotes, memberVotes, castVote } from './lib/v060.mjs';
+import { initV060, audit, auditRows, moduleStates, moduleEnabled, setModuleState, memberUiPreferences, setMemberUiPreferences, addStudyWaitlist, cancelStudyWaitlist, memberStudyWaitlist, matchingStudyWaitlist, markStudyWaitlistNotified, reportMarketplace, marketplaceReports, resolveMarketplaceReport, agreements, upsertAgreement, setAgreementStatus, libraryItems, toggleLibraryFavorite, upsertLibraryItem, activityCenter, setActivityRegistration, credentialStatus, setCredentialRevoked, memberHistory, systemMetrics, adminMasterSnapshot, adminReservationsSnapshot, adminNotificationsSnapshot, adminSecuritySnapshot, adminAuditSnapshot, dbStats, createBackup, backupRuns, invalidateOtherSessions, invalidateMemberSessions, adminMemberSearch, adminMembersList, adminMemberDetail, diagnostics, toIcs, createVote, updateVoteDraft, deleteVoteDraft, setVoteStatus, voteResults, adminVotes, memberVotes, castVote } from './lib/v060.mjs';
+import { inspectRut, readFinancialWorkbook } from './lib/financial-reader.mjs';
+import { buildFinancialSyncPlan } from './lib/financial-sync.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, '.env'));
 
 const VERSION = '0.6.16';
+const PREVIEW_MODE = bool(process.env.PREVIEW_MODE, false);
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'mi_aspch_session';
 const WHATSAPP_NUMBER = normalizePhoneDigits(process.env.ASPCH_WHATSAPP || '56948825381');
 const PORT = Number(process.env.PORT || 8080);
 const BIND_ADDRESS = process.env.SERVER_BIND_ADDRESS || '0.0.0.0';
@@ -69,13 +73,12 @@ const config = {
   parkingReminderHours: 4,
   conveniosUrl: process.env.ASPCH_CONVENIOS_URL || 'https://aspch.org/convenios/',
   financialSyncMinutes: Math.max(1,Number(process.env.FINANCIAL_SYNC_MINUTES||5)),
-  financialUpdateBdSocios: bool(process.env.FINANCIAL_UPDATE_BD_SOCIOS,true),
-  financialUploadToken: String(process.env.FINANCIAL_UPLOAD_TOKEN||''),
   backupRetention:Math.max(3,Number(process.env.BACKUP_RETENTION||14)),
   dailyBackupHour:Math.max(0,Math.min(23,Number(process.env.DAILY_BACKUP_HOUR||3))),
   dailyBackupMinute:Math.max(0,Math.min(59,Number(process.env.DAILY_BACKUP_MINUTE||15)))
 };
 
+let financialReadCache={mtimeMs:null,public:null,recordsByRut:new Map(),duplicateRuts:new Set()};
 initializeExternalData().catch(err=>console.error('[Mi ASPCH] Inicialización externa:',err.message));
 startV060Schedulers();
 
@@ -83,26 +86,85 @@ async function initializeExternalData(){
   if(sheetsReadEnabled()){
     try{await syncGoogleStartup()}catch(err){console.error('[Mi ASPCH] Sync inicial Google:',err.message)}
   }
-  await syncFinancialSafe({force:true});
+  await readFinancialSafe({force:true});
 }
 
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req, res, isLabPort, isAdminPort) {
   try {
     setSecurityHeaders(res);
     const url = new URL(req.url, effectiveRequestOrigin(req) || APP_ORIGIN);
+
+
+    if (PREVIEW_MODE && req.method === 'GET') {
+      let p = url.pathname;
+      if (p === '/' || p === '/index.html' || p === '/login.html' || p === '/mobile') {
+        const sim = url.searchParams.get('sim');
+        if (isLabPort && sim) {
+           let targetEmail = null;
+           let targetUser = null;
+           try {
+             if (sim === 'ACTIVO') targetUser = db.prepare("SELECT * FROM members WHERE active=1 AND role='MEMBER' AND id NOT IN (SELECT member_id FROM member_financial_status) LIMIT 1").get();
+             else if (sim === 'MOROSO') targetUser = db.prepare("SELECT m.* FROM members m JOIN member_financial_status f ON m.id=f.member_id WHERE f.financial_status='MOROSO' LIMIT 1").get();
+             else if (sim === 'JUBILADO') targetUser = db.prepare("SELECT * FROM members WHERE (employer LIKE '%JUBILA%' OR position LIKE '%JUBILA%') AND active=1 LIMIT 1").get();
+             else if (sim === 'SIMPLE') {
+                targetUser = db.prepare("SELECT * FROM members WHERE active=1 AND role='MEMBER' AND id NOT IN (SELECT member_id FROM member_financial_status) LIMIT 1").get();
+                if (targetUser) db.prepare("INSERT INTO member_ui_preferences (member_id, simple_mode) VALUES (?, 1) ON CONFLICT(member_id) DO UPDATE SET simple_mode=1").run(targetUser.id);
+             }
+             else if (sim === 'FO CPT') targetUser = db.prepare("SELECT * FROM members WHERE position LIKE '%CPT%' AND active=1 LIMIT 1").get();
+             else if (sim === 'DIRECTORIO') targetUser = db.prepare("SELECT * FROM members WHERE is_board=1 AND active=1 LIMIT 1").get();
+             else if (sim === 'CONGELADO') targetUser = db.prepare("SELECT m.* FROM members m JOIN member_financial_status f ON m.id=f.member_id WHERE f.financial_status='CONGELADO' LIMIT 1").get();
+             else if (sim === 'DESAFILIADO') targetUser = db.prepare("SELECT * FROM members WHERE active=0 LIMIT 1").get();
+             else if (sim === 'INFORMÁTICA') targetEmail = 'informatica@aspch.org';
+             
+             if (targetEmail) {
+                targetUser = db.prepare("SELECT * FROM members WHERE email=? AND active=1").get(targetEmail);
+             }
+             if (targetUser) {
+                const { token } = createSession(db, targetUser, { unlockedMs: 24 * 60 * 60_000 });
+                setSessionCookie(req, res, token);
+                req.headers.cookie = `${SESSION_COOKIE_NAME}=${token}`; // update for this request
+             }
+           } catch(e) { console.error("Sim error:", e); }
+        }
+
+        const member = memberFromRequest(db, req);
+        if (isAdminPort && (!member || member.role !== 'ADMIN')) {
+          const admin = db.prepare("SELECT * FROM members WHERE email=? AND active=1").get(String(process.env.ADMIN_EMAIL || 'informatica@aspch.org').trim().toLowerCase());
+          if (admin) {
+            const { token } = createSession(db, admin, { unlockedMs: 24 * 60 * 60_000 });
+            setSessionCookie(req, res, token);
+            req.headers.cookie = `${SESSION_COOKIE_NAME}=${token}`;
+          }
+        }
+      }
+    }
+
+    req.isAdminPort = isAdminPort;
+    req.isLabPort = isLabPort;
+
     if (url.pathname.startsWith('/api/')) {
       if (['POST','PUT','PATCH','DELETE'].includes(req.method)) enforceOrigin(req);
       return await routeApi(req, res, url);
     }
     if (req.method === 'GET' && url.pathname.startsWith('/verify/')) return serveCredentialVerification(req, res, url.pathname);
+    if (PREVIEW_MODE && req.method === 'GET' && url.pathname === '/sw.js') {
+      res.statusCode = 200; res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.setHeader('Cache-Control', 'no-store');
+      return res.end("self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.map(c=>caches.delete(c)))).then(()=>self.clients.claim()).then(()=>self.registration.unregister())));");
+    }
     return serveStatic(req, res, url.pathname);
   } catch (err) {
     console.error(err);
     if (!res.headersSent) json(res, err.statusCode || 500, { error: err.expose ? err.message : 'Error interno del servidor' });
     else res.end();
   }
-});
+}
 
+const server = http.createServer((req, res) => handleRequest(req, res, true, false));
+
+const ADMIN_PORT = PORT + 2;
+const adminServer = http.createServer((req, res) => handleRequest(req, res, false, true));
+
+adminServer.listen(ADMIN_PORT, BIND_ADDRESS, () => console.log(`Admin Panel v${VERSION} → http://${BIND_ADDRESS}:${ADMIN_PORT}`));
 server.listen(PORT, BIND_ADDRESS, () => {
   console.log(`Mi ASPCH v${VERSION} → http://${BIND_ADDRESS}:${PORT}`);
   const caps=googleCapabilities();
@@ -112,7 +174,7 @@ server.listen(PORT, BIND_ADDRESS, () => {
 
 async function routeApi(req, res, url) {
   const p = url.pathname;
-  if (req.method === 'GET' && p === '/api/health') return json(res, 200, { ok:true, version:VERSION, google:googleCapabilities(), googleLegacy:googleEnabled(), push:{enabled:pushEnabled()}, financial:{sourceReady:fs.existsSync(FINANCIAL_XLSM_PATH),lastSync:latestFinancialSync(db)}, modules:moduleStates(db) });
+  if (req.method === 'GET' && p === '/api/health') return json(res, 200, { ok:true, version:VERSION, preview:{enabled:PREVIEW_MODE,sqlite:'ISOLATED',externalEffects:PREVIEW_MODE?'BLOCKED':'CONFIGURED'}, google:googleCapabilities(), googleLegacy:googleEnabled(), push:{enabled:pushEnabled()}, financial:{sourceReady:fs.existsSync(FINANCIAL_XLSM_PATH),lastSync:latestFinancialSync(db)}, modules:moduleStates(db) });
   if (req.method === 'GET' && p === '/api/config') {
     const w = webauthnRequestInfo(effectiveRequestOrigin(req), isSecureRequest(req));
     return json(res, 200, {
@@ -252,7 +314,7 @@ async function routeApi(req, res, url) {
   if (req.method === 'POST' && p === '/api/auth/logout') {
     logout(db, req);
     const secure = isSecureRequest(req);
-    res.setHeader('Set-Cookie', `mi_aspch_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? '; Secure' : ''}`);
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? '; Secure' : ''}`);
     return json(res, 200, { ok: true });
   }
 
@@ -264,25 +326,69 @@ async function routeApi(req, res, url) {
     setSessionCookie(req,res,result.token);return json(res,200,{ok:true,member:publicMember(result.member)});
   }
 
+  // Endpoints de Preview para acceso rápido a presets de socios
+  if (PREVIEW_MODE && req.method === 'GET' && p === '/api/preview/members') {
+    const members = db.prepare(`
+      SELECT id, rut, email, name, active, role 
+      FROM members 
+      WHERE active=1 
+      ORDER BY name ASC 
+      LIMIT 50
+    `).all();
+    return json(res, 200, { 
+      members: members.map(m => ({
+        id: m.id,
+        rut: m.rut,
+        email: m.email,
+        name: m.name,
+        role: m.role
+      }))
+    });
+  }
+
+  if (PREVIEW_MODE && req.method === 'POST' && p === '/api/preview/login') {
+    const body = await readJson(req);
+    const memberId = Number(body.memberId) || null;
+    if (!memberId) return json(res, 400, { error: 'memberId es requerido.' });
+    
+    const member = db.prepare('SELECT * FROM members WHERE id=? AND active=1').get(memberId);
+    if (!member) return json(res, 403, { error: 'Socio no encontrado o inactivo.' });
+    
+    // Crear sesión con desbloqueo automático en preview
+    const session = createSession(db, member, { unlockedMs: 24 * 60 * 60_000 });
+    setSessionCookie(req, res, session.token);
+    return json(res, 200, {
+      ok: true,
+      member: publicMember(member)
+    });
+  }
+
   // Toda ruta de autenticación no reconocida se rechaza antes de consultar o
   // crear una sesión. Esto mantiene retirados de forma segura los endpoints antiguos.
   if (p.startsWith('/api/auth/')) return json(res, 404, { error:'Ruta de autenticación no encontrada.' });
 
   if (req.method === 'PUT' && p === '/api/financial-source/upload') {
-    const token=String(req.headers['x-mi-aspch-financial-token']||'');
-    if(!config.financialUploadToken||!timingSafeTextEqual(token,config.financialUploadToken))return json(res,403,{error:'Token de sincronización inválido.'});
-    const buf=await readRaw(req,30_000_000);if(buf.length<1000||buf[0]!==0x50||buf[1]!==0x4b)return json(res,400,{error:'El archivo no parece ser un XLSM válido.'});
-    const temp=`${FINANCIAL_XLSM_PATH}.tmp-${process.pid}-${Date.now()}`;fs.mkdirSync(path.dirname(FINANCIAL_XLSM_PATH),{recursive:true});fs.writeFileSync(temp,buf,{mode:0o600});fs.renameSync(temp,FINANCIAL_XLSM_PATH);
-    const result=await syncFinancialSafe({force:true});return json(res,200,{ok:true,sync:result});
+    return json(res,403,{error:'Carga XLSM deshabilitada: la fuente se usa únicamente en lectura/diagnóstico.'});
   }
 
   let member = memberFromRequest(db, req);
+  if (!member && PREVIEW_MODE) {
+    const admin = db.prepare("SELECT * FROM members WHERE email=? AND active=1").get(String(process.env.ADMIN_EMAIL || 'informatica@aspch.org').trim().toLowerCase());
+    if (admin) {
+      const { token } = createSession(db, admin, { unlockedMs: 24 * 60 * 60_000 });
+      setSessionCookie(req, res, token);
+      member = db.prepare("SELECT m.*, s.id AS session_id, s.expires_at AS session_expires, s.unlocked_until, (SELECT COUNT(*) FROM passkeys p WHERE p.member_id=m.id) AS passkey_count FROM sessions s JOIN members m ON m.id=s.member_id WHERE s.token_hash=?").get(crypto.createHash('sha256').update(`${process.env.SESSION_SECRET || 'dev'}|${token}`).digest('hex'));
+    }
+  }
   if (!member) return json(res, 401, { error: 'Debes iniciar sesión.' });
+  // La autorización ADMIN se evalúa antes del estado de desbloqueo para que
+  // cualquier MEMBER reciba siempre 403 en toda la superficie maestra.
+  if (p.startsWith('/api/admin/') && member.role !== 'ADMIN') return json(res, 403, { error: 'Acceso de administrador requerido.' });
 
   if (req.method === 'GET' && p === '/api/me') {
     return json(res, 200, {
       member: publicMember(member), membership: await membershipSummary(member), access:benefitAccess(db,member),
-      security: securitySummary(member, req), modules:moduleStates(db)
+      security: securitySummary(member, req), modules:moduleStates(db), uiPreferences:memberUiPreferences(db,member.id)
     });
   }
 
@@ -375,6 +481,21 @@ async function routeApi(req, res, url) {
     }
     member = memberFromRequest(db, req);
     return json(res, 200, { ok:true, member:publicMember(member) });
+  }
+
+  if (req.method === 'PUT' && p === '/api/profile/services') {
+    const body = await readJson(req);
+    const uiPreferences=setMemberUiPreferences(db,{memberId:member.id,services:body.services,simpleMode:body.simpleMode});
+    return json(res,200,{ok:true,uiPreferences});
+  }
+
+  if(req.method==='GET'&&p==='/api/security/sessions'){
+    const rows=db.prepare('SELECT id,created_at,expires_at,unlocked_until FROM sessions WHERE member_id=? AND expires_at>? ORDER BY created_at DESC').all(member.id,new Date().toISOString());
+    return json(res,200,{sessions:rows.map(row=>({current:Number(row.id)===Number(member.session_id),createdAt:row.created_at,expiresAt:row.expires_at,unlocked:!!row.unlocked_until&&new Date(row.unlocked_until)>new Date()}))});
+  }
+  if(req.method==='DELETE'&&p==='/api/security/sessions'){
+    const removed=invalidateOtherSessions(db,{memberId:member.id,currentSessionId:member.session_id,actorId:member.id});
+    return json(res,200,{ok:true,removed});
   }
 
   if (req.method === 'POST' && p === '/api/profile/airline-data') {
@@ -635,7 +756,8 @@ async function routeApi(req, res, url) {
   }
 
   if (req.method === 'GET' && p === '/api/membership') {
-    return json(res, 200, { membership: await membershipSummary(member), payments: db.prepare('SELECT membership_year,membership_month,amount_clp,status,paid_at FROM membership_payments WHERE member_id=? ORDER BY membership_year DESC,membership_month DESC,id DESC').all(member.id), contact:{ whatsappNumber: WHATSAPP_NUMBER, whatsappUrl: whatsappUrl('', 'Hola ASPCH, necesito ayuda con Mi ASPCH.') }, transfer: transferSummary() });
+    const payroll=isLatamPayrollEmployer(member.employer);
+    return json(res, 200, { membership: await membershipSummary(member), payments: db.prepare('SELECT membership_year,membership_month,amount_clp,status,paid_at FROM membership_payments WHERE member_id=? ORDER BY membership_year DESC,membership_month DESC,id DESC').all(member.id), contact:{ whatsappNumber: WHATSAPP_NUMBER, whatsappUrl: whatsappUrl('', 'Hola ASPCH, necesito ayuda con Mi ASPCH.') }, transfer:payroll?null:transferSummary(), paymentMethod:payroll?'PAYROLL':'TRANSFER' });
   }
 
   if(req.method==='GET'&&p==='/api/history')return json(res,200,{history:memberHistory(db,member.id,{limit:Number(url.searchParams.get('limit')||100)})});
@@ -694,19 +816,66 @@ async function routeApi(req, res, url) {
   if(req.method==='POST'&&p==='/api/library/favorite'){const body=await readJson(req);if(!toggleLibraryFavorite(db,{memberId:member.id,itemId:Number(body.id),favorite:body.favorite!==false}))return json(res,404,{error:'Documento no encontrado.'});return json(res,200,{ok:true})}
 
   if (p.startsWith('/api/admin/')) {
-    if (member.role !== 'ADMIN') return json(res, 403, { error: 'Acceso de administrador requerido.' });
     if(req.method==='GET'&&p==='/api/admin/dashboard'){
-      const metrics=systemMetrics(db),lastSync=latestFinancialSync(db),modules=moduleStates(db);
-      const counts=Object.fromEntries(db.prepare('SELECT financial_status,COUNT(*) n FROM member_financial_status GROUP BY financial_status').all().map(x=>[x.financial_status,Number(x.n)]));
+      const modules=moduleStates(db),today=chileClock().date,operational=adminMasterSnapshot(db,{today,modules}),financial=await readFinancialSafe(),caps=googleCapabilities();
+      const sqliteFile=path.join(DATA_DIR,'mi-aspch.sqlite'),sqliteSize=fs.existsSync(sqliteFile)?fs.statSync(sqliteFile).size:null;
+      const alerts=masterAlerts({financial,operational,caps,pushReady:pushEnabled()});
       const events=auditRows(db,{limit:8}).map(x=>({id:x.id,action:x.action,entityType:x.entity_type||null,actorName:x.actor_name||'Sistema',createdAt:x.created_at}));
-      return json(res,200,{generatedAt:new Date().toISOString(),health:{ok:true,version:VERSION},metrics,finance:{sourceReady:fs.existsSync(FINANCIAL_XLSM_PATH),lastSync,counts},integrations:{google:googleCapabilities(),push:{enabled:pushEnabled()}},modules,audit:events});
+      return json(res,200,{generatedAt:new Date().toISOString(),health:{ok:!alerts.some(x=>x.severity==='critical'),status:alerts.some(x=>x.severity==='critical')?'CRITICAL':alerts.length?'WARNING':'OPERATIVE',version:VERSION,uptimeSeconds:Math.round(process.uptime())},operational,financial,integrations:{bdSocios:{status:operational.bdSocios.records?'LOCAL_SNAPSHOT_READY':'NO_LOCAL_DATA',...operational.bdSocios},googleSheets:{status:caps.sheets?.read?'CONFIGURED_NOT_PROBED':'DISABLED',read:!!caps.sheets?.read,write:!!caps.sheets?.write},googleCalendar:{status:caps.calendar?.read?'CONFIGURED_NOT_PROBED':'DISABLED',read:!!caps.calendar?.read,write:!!caps.calendar?.write},otp:{status:caps.gmail?.otp?'DELIVERY_ENABLED':'DELIVERY_DISABLED',...operational.otp},push:{status:pushEnabled()?'ENABLED':'DISABLED',enabled:pushEnabled(),...operational.push},simulators:{status:'NO_RELIABLE_LOCAL_SOURCE',available:false,impact:'Ocupación no mostrada; Calendar no se consulta automáticamente desde este dashboard.'}},sqlite:{...operational.sqlite,sizeBytes:sqliteSize},modules,alerts,audit:events});
     }
+    if(req.method==='GET'&&p==='/api/admin/reservations')return json(res,200,adminReservationsSnapshot(db,{today:chileClock().date}));
+    if(req.method==='GET'&&p==='/api/admin/integrations')return json(res,200,await adminIntegrationsSnapshot());
+    if(req.method==='GET'&&p==='/api/admin/system')return json(res,200,adminSystemSnapshot());
+    if(req.method==='GET'&&p==='/api/admin/notifications')return json(res,200,adminNotificationsSnapshot(db,{pushReady:pushEnabled(),gmailOtpReady:gmailOtpSendEnabled()}));
+    if(req.method==='GET'&&p==='/api/admin/security')return json(res,200,adminSecuritySnapshot(db,{adminEmail:config.adminEmail,gmailOtpReady:gmailOtpSendEnabled()}));
+    if(req.method==='GET'&&p==='/api/admin/audit')return json(res,200,adminAuditSnapshot(db,{from:url.searchParams.get('from')||'',to:url.searchParams.get('to')||'',action:url.searchParams.get('action')||'',memberId:url.searchParams.get('memberId'),category:url.searchParams.get('category')||'',limit:url.searchParams.get('limit')}));
     if(req.method==='GET'&&p==='/api/admin/members/list')return json(res,200,{generatedAt:new Date().toISOString(),...adminMembersList(db,{query:url.searchParams.get('q')||'',page:url.searchParams.get('page'),limit:url.searchParams.get('limit')})});
+    const memberActionMatch=p.match(/^\/api\/admin\/members\/(\d+)\/actions\/(refresh|release-parking|cancel-study|close-sessions|revoke-passkeys|issue-otp|reset-pin|set-pin)$/);
+    if(req.method==='POST'&&memberActionMatch){
+      const targetId=Number(memberActionMatch[1]),action=memberActionMatch[2],target=db.prepare("SELECT * FROM members WHERE id=? AND role!='ADMIN'").get(targetId);
+      if(!target)return json(res,404,{error:'Socio no encontrado.'});
+      const body=await readJson(req),confirmations={'release-parking':'LIBERAR RESERVA','cancel-study':'CANCELAR RESERVA','close-sessions':'CERRAR SESIONES','revoke-passkeys':'REVOCAR PASSKEYS','issue-otp':'GENERAR OTP'};
+      if(confirmations[action]&&String(body.confirm||'')!==confirmations[action])return json(res,400,{error:`Confirmación requerida: ${confirmations[action]}`});
+      let result={ok:true};
+      if(action==='refresh'){
+        const authority=await financialAuthorityForMember(target.rut,{force:true});
+        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_MEMBER_SOURCE_REFRESHED',entityType:'member',entityId:targetId,details:{source:'XLSM_READ_ONLY'}});
+        return json(res,200,{ok:true,...adminMemberDetail(db,targetId,{authority,modules:moduleStates(db),otpDeliveryEnabled:gmailOtpSendEnabled()})});
+      }
+      if(action==='release-parking'){
+        const id=Number(body.reservationId),prior=db.prepare("SELECT id,reservation_date,space_id FROM parking_reservations WHERE id=? AND member_id=? AND status='ACTIVE'").get(id,targetId);
+        if(!prior)return json(res,404,{error:'Reserva de estacionamiento activa no encontrada.'});
+        const changed=db.prepare("UPDATE parking_reservations SET status='CANCELLED',cancelled_at=? WHERE id=? AND member_id=? AND status='ACTIVE'").run(new Date().toISOString(),id,targetId);result={ok:true,changed:Number(changed.changes||0)};
+        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PARKING_RELEASED',entityType:'parking',entityId:id,details:{date:prior.reservation_date,spaceId:prior.space_id,externalWrites:false}});
+      }else if(action==='cancel-study'){
+        const id=Number(body.reservationId),prior=db.prepare("SELECT id,start_at,end_at FROM study_room_reservations WHERE id=? AND member_id=? AND status='ACTIVE'").get(id,targetId);
+        if(!prior)return json(res,404,{error:'Reserva de sala activa no encontrada.'});
+        const changed=db.prepare("UPDATE study_room_reservations SET status='CANCELLED',cancelled_at=? WHERE id=? AND member_id=? AND status='ACTIVE'").run(new Date().toISOString(),id,targetId);result={ok:true,changed:Number(changed.changes||0)};
+        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_STUDY_RESERVATION_CANCELLED',entityType:'study_reservation',entityId:id,details:{start:prior.start_at,end:prior.end_at,externalNotifications:false}});
+      }else if(action==='close-sessions')result={ok:true,removed:invalidateMemberSessions(db,{memberId:targetId,actorId:member.id})};
+      else if(action==='revoke-passkeys'){
+        db.exec('BEGIN IMMEDIATE');let removed=0;try{db.prepare('DELETE FROM webauthn_challenges WHERE session_id IN (SELECT id FROM sessions WHERE member_id=?)').run(targetId);removed=Number(db.prepare('DELETE FROM passkeys WHERE member_id=?').run(targetId).changes||0);db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
+        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PASSKEYS_REVOKED',entityType:'passkey',entityId:targetId,details:{removed}});result={ok:true,removed};
+      }else if(action==='issue-otp'){
+        if(!gmailOtpSendEnabled())return json(res,503,{error:'Entrega OTP deshabilitada; no se generó ningún código.'});
+        const issued=await issueOtp(db,{memberId:targetId,email:target.email,purpose:'login',mailKind:'login'});if(!issued.ok)return json(res,issued.reason==='rate_limited'?429:400,{error:'No fue posible generar y enviar un nuevo OTP.'});
+        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_OTP_REISSUED',entityType:'otp',entityId:targetId,details:{delivered:issued.delivered,expiresAt:issued.expiresAt}});result={ok:true,delivered:issued.delivered,expiresAt:issued.expiresAt};
+      }else if(action==='reset-pin'){
+        db.exec('BEGIN IMMEDIATE');let sessionsRemoved=0;try{db.prepare('UPDATE members SET pin_salt=NULL,pin_hash=NULL,pin_updated_at=NULL,updated_at=? WHERE id=?').run(new Date().toISOString(),targetId);sessionsRemoved=Number(db.prepare('DELETE FROM sessions WHERE member_id=?').run(targetId).changes||0);db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
+        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PIN_RESET',entityType:'security',entityId:targetId,details:{sessionsRemoved,secretsExposed:false}});result={ok:true,sessionsRemoved};
+      }else if(action==='set-pin'){
+        const pin=String(body.pin||'');if(!/^\d{4,6}$/.test(pin))return json(res,400,{error:'El PIN debe tener entre 4 y 6 dígitos.'});
+        const salt=crypto.randomBytes(16).toString('base64url'),hash=crypto.scryptSync(pin,salt,32).toString('base64url'),stamp=new Date().toISOString();
+        db.exec('BEGIN IMMEDIATE');let sessionsRemoved=0;try{db.prepare('UPDATE members SET pin_salt=?,pin_hash=?,pin_updated_at=?,updated_at=? WHERE id=?').run(salt,hash,stamp,stamp,targetId);sessionsRemoved=Number(db.prepare('DELETE FROM sessions WHERE member_id=?').run(targetId).changes||0);db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
+        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PIN_CHANGED',entityType:'security',entityId:targetId,details:{sessionsRemoved,secretsExposed:false}});result={ok:true,sessionsRemoved};
+      }
+      return json(res,200,result);
+    }
     const memberDetailMatch=p.match(/^\/api\/admin\/members\/(\d+)$/);
-    if(req.method==='GET'&&memberDetailMatch){const detail=adminMemberDetail(db,Number(memberDetailMatch[1]));return detail?json(res,200,{generatedAt:new Date().toISOString(),...detail}):json(res,404,{error:'Socio no encontrado.'})}
+    if(req.method==='GET'&&memberDetailMatch){const targetId=Number(memberDetailMatch[1]),target=db.prepare("SELECT rut FROM members WHERE id=? AND role!='ADMIN'").get(targetId);if(!target)return json(res,404,{error:'Socio no encontrado.'});const authority=await financialAuthorityForMember(target.rut);const detail=adminMemberDetail(db,targetId,{authority,modules:moduleStates(db),otpDeliveryEnabled:gmailOtpSendEnabled()});return json(res,200,{generatedAt:new Date().toISOString(),...detail})}
     if (req.method === 'POST' && p === '/api/admin/sync-members') {
       if (!sheetsReadEnabled()) return json(res, 400, { error: 'Google Sheets READ no está habilitado.' });
-      const count = await syncMembersFromGoogle(); const board = await syncBoardFromGoogle(); const financial=await syncFinancialSafe({force:true});
+      const count = await syncMembersFromGoogle(); const board = await syncBoardFromGoogle(); const financial=await readFinancialSafe({force:true});
       return json(res, 200, { ok:true,count,board,financial });
     }
     if (req.method === 'POST' && p === '/api/admin/sync-parking') {
@@ -723,8 +892,8 @@ async function routeApi(req, res, url) {
       return json(res, 201, { ok:true,id:Number(result.lastInsertRowid) });
     }
     if(req.method==='POST'&&p==='/api/admin/news/delete'){const body=await readJson(req);const id=Number(body.id);const prior=db.prepare('SELECT * FROM news WHERE id=?').get(id);if(!prior)return json(res,404,{error:'Noticia no encontrada.'});db.prepare('DELETE FROM news WHERE id=?').run(id);audit(db,{actorId:member.id,action:'ADMIN_NEWS_DELETED',entityType:'news',entityId:id,details:{title:prior.title}});return json(res,200,{ok:true})}
-    if(req.method==='POST'&&p==='/api/admin/sync-financial'){const result=await syncFinancialSafe({force:true});return json(res,200,{ok:true,result})}
-    if(req.method==='PUT'&&p==='/api/admin/financial-upload'){const buf=await readRaw(req,30_000_000);if(buf.length<1000||buf[0]!==0x50||buf[1]!==0x4b)return json(res,400,{error:'Archivo XLSM inválido.'});const temp=`${FINANCIAL_XLSM_PATH}.tmp-${process.pid}-${Date.now()}`;fs.mkdirSync(path.dirname(FINANCIAL_XLSM_PATH),{recursive:true});fs.writeFileSync(temp,buf,{mode:0o600});fs.renameSync(temp,FINANCIAL_XLSM_PATH);const result=await syncFinancialSafe({force:true});return json(res,200,{ok:true,result})}
+    if(req.method==='POST'&&p==='/api/admin/sync-financial'){const result=await readFinancialSafe({force:true});audit(db,{actorId:member.id,action:'ADMIN_XLSM_REREAD',entityType:'financial_source',details:{mode:'READ_ONLY_DIAGNOSTIC',status:result.status}});return json(res,200,{ok:result.sourceReady,result})}
+    if(req.method==='PUT'&&p==='/api/admin/financial-upload')return json(res,403,{error:'Carga XLSM deshabilitada en Control Maestro: la fuente se usa únicamente en lectura/diagnóstico.'});
     if(req.method==='GET'&&p==='/api/admin/overview'){
       const finance={lastSync:latestFinancialSync(db),counts:Object.fromEntries(db.prepare('SELECT financial_status,COUNT(*) n FROM member_financial_status GROUP BY financial_status').all().map(x=>[x.financial_status,Number(x.n)]))};
       const studyRows=db.prepare(`SELECT r.id,r.start_at AS start,r.end_at AS end,r.status,m.name AS member_name,m.email AS member_email FROM study_room_reservations r JOIN members m ON m.id=r.member_id WHERE r.status='ACTIVE' AND r.end_at>? ORDER BY r.start_at LIMIT 300`).all(new Date().toISOString());
@@ -766,8 +935,8 @@ async function routeApi(req, res, url) {
     if(req.method==='POST'&&p==='/api/admin/library/status'){const body=await readJson(req);const item=db.prepare('SELECT * FROM library_items WHERE id=?').get(Number(body.id));if(!item)return json(res,404,{error:'Documento no encontrado.'});const id=upsertLibraryItem(db,{...item,id:item.id,status:body.status,actorId:member.id});return json(res,200,{ok:true,id})}
     if(req.method==='POST'&&p==='/api/admin/jobs/run'){
       const body=await readJson(req),job=String(body.job||'');let result;
-      if(job==='sync_all')result={members:await syncMembersFromGoogle(),board:await syncBoardFromGoogle(),parking:await syncParkingSpacesFromGoogle(),finance:await syncFinancialSafe({force:true})};
-      else if(job==='financial_sync')result=await syncFinancialSafe({force:true});
+      if(job==='sync_all')result={members:await syncMembersFromGoogle(),board:await syncBoardFromGoogle(),parking:await syncParkingSpacesFromGoogle(),finance:await readFinancialSafe({force:true})};
+      else if(job==='financial_sync')result=await readFinancialSafe({force:true});
       else if(job==='members_sync')result={members:await syncMembersFromGoogle(),board:await syncBoardFromGoogle()};
       else if(job==='parking_sync')result={spaces:await syncParkingSpacesFromGoogle()};
       else if(job==='marketplace_expire')result={expired:expireMarketplace(db)};
@@ -805,35 +974,83 @@ async function routeApi(req, res, url) {
 }
 
 
-let lastFinancialMtime=0;
 let backgroundBusy=false;
-async function syncFinancialSafe({force=false}={}){
+async function readFinancialSafe({force=false}={}){
   try{
-    if(!fs.existsSync(FINANCIAL_XLSM_PATH))return{ok:false,reason:'source_missing',path:FINANCIAL_XLSM_PATH};
-    const st=fs.statSync(FINANCIAL_XLSM_PATH);if(!force&&st.mtimeMs===lastFinancialMtime)return{ok:true,skipped:true,sourceMtime:st.mtime.toISOString()};
-    const result=syncFinancialWorkbook(db,FINANCIAL_XLSM_PATH,{year:Number(process.env.FINANCIAL_YEAR||2026),sheetName:process.env.FINANCIAL_SHEET_NAME||'ESTADO PAGO 2026'});
-    lastFinancialMtime=st.mtimeMs;
-    if(config.financialUpdateBdSocios&&sheetsReadEnabled()&&sheetsWriteEnabled()){
-      try{result.bdSociosUpdated=await syncAuthorityFieldsToGoogle(result.authority||[])}catch(err){console.error('[Mi ASPCH] Autoridad XLSM → BD SOCIOS:',err.message);result.bdSociosWarning=err.message}
+    if(!fs.existsSync(FINANCIAL_XLSM_PATH)){
+      const result={mode:'READ_ONLY_DIAGNOSTIC',sourceReady:false,status:'MISSING',fileName:path.basename(FINANCIAL_XLSM_PATH),lastReadAt:new Date().toISOString(),error:'Fuente XLSM no encontrada.',safety:{writesSqlite:false,writesGoogle:false,changesMemberState:false}};
+      financialReadCache={mtimeMs:null,public:result,recordsByRut:new Map(),duplicateRuts:new Set()};return result;
     }
-    console.log(`[Mi ASPCH] Finanzas: ${result.matched}/${result.rowsSeen} socios · ${result.morosos} morosos · ${result.desafiliados} desafiliados`);
-    return result;
-  }catch(err){console.error('[Mi ASPCH] Sync financiero:',err.message);return{ok:false,error:err.message}}
-}
-async function syncAuthorityFieldsToGoogle(authority){
-  if(!authority.length)return 0;
-  const range=`'${config.membersTab.replace(/'/g,"''")}'!A1:L2500`;const data=await sheetsGet(config.membersSheetId,range);const rows=data.values||[];if(!rows.length)return 0;
-  const H=rows[0].map(v=>String(v||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
-  const ri=H.indexOf('RUT'),ni=H.indexOf('NOMBRE'),ei=H.indexOf('EMPLEADOR'),pi=H.indexOf('CARGO');if(ri<0)return 0;
-  const map=new Map(authority.map(a=>[normalizeRut(a.rut),a]));const changes=[];
-  for(let i=1;i<rows.length;i++){
-    const a=map.get(normalizeRut(rows[i]?.[ri]));if(!a)continue;
-    for(const [idx,val] of [[ri,a.rut],[ni,a.name],[ei,a.employer],[pi,a.position]]){
-      if(idx<0||!val)continue;if(String(rows[i]?.[idx]||'').trim()===String(val).trim())continue;
-      changes.push({range:`'${config.membersTab.replace(/'/g,"''")}'!${columnLetter(idx+1)}${i+1}`,values:[[val]]});
-    }
+    const st=fs.statSync(FINANCIAL_XLSM_PATH);if(!force&&financialReadCache.public&&st.mtimeMs===financialReadCache.mtimeMs)return financialReadCache.public;
+    const parsed=readFinancialWorkbook(FINANCIAL_XLSM_PATH,{year:Number(process.env.FINANCIAL_YEAR||2026)}),groups=new Map(),counts={};
+    for(const record of parsed.records){counts[record.status]=(counts[record.status]||0)+1;if(record.rutValid){if(!groups.has(record.rut))groups.set(record.rut,[]);groups.get(record.rut).push(record)}}
+    const duplicateRuts=new Set([...groups].filter(([,records])=>records.length>1).map(([rut])=>rut)),recordsByRut=new Map([...groups].filter(([rut,records])=>!duplicateRuts.has(rut)&&records.length===1).map(([rut,records])=>[rut,records[0]]));
+    const members=db.prepare(`SELECT m.id,m.rut,m.active,f.source_status,f.financial_status,f.months_due,f.amount_due,f.deactivated_by_financial
+      FROM members m LEFT JOIN member_financial_status f ON f.member_id=m.id WHERE m.role!='ADMIN' ORDER BY m.id`).all();
+    const dryRun=buildFinancialSyncPlan(parsed,members);
+    const result={mode:'READ_ONLY_DIAGNOSTIC',sourceReady:true,status:parsed.source.formulaErrors.length?'WARNING':'OK',fileName:path.basename(FINANCIAL_XLSM_PATH),sheet:parsed.source.sheet,lastReadAt:new Date().toISOString(),sourceModifiedAt:parsed.source.modifiedAt,rows:parsed.records.length,validRows:parsed.records.filter(record=>record.rutValid).length,uniqueMatchesAvailable:recordsByRut.size,duplicateRuts:duplicateRuts.size,formulaErrors:parsed.source.formulaErrors.length,counts,dryRun:{planId:dryRun.planId,summary:dryRun.summary,mapping:dryRun.mapping,safety:dryRun.safety},safety:{writesSqlite:false,writesGoogle:false,changesMemberState:false}};
+    financialReadCache={mtimeMs:st.mtimeMs,public:result,recordsByRut,duplicateRuts};
+    console.log(`[Mi ASPCH] XLSM diagnóstico read-only: ${result.validRows}/${result.rows} filas válidas · ${result.duplicateRuts} RUT duplicados`);return result;
+  }catch(err){
+    const result={mode:'READ_ONLY_DIAGNOSTIC',sourceReady:false,status:'ERROR',fileName:path.basename(FINANCIAL_XLSM_PATH),lastReadAt:new Date().toISOString(),error:String(err.message||err).slice(0,300),safety:{writesSqlite:false,writesGoogle:false,changesMemberState:false}};
+    financialReadCache={mtimeMs:null,public:result,recordsByRut:new Map(),duplicateRuts:new Set()};console.error('[Mi ASPCH] Lectura XLSM:',err.message);return result;
   }
-  for(let i=0;i<changes.length;i+=400)await sheetsBatchUpdate(config.membersSheetId,changes.slice(i,i+400));return changes.length;
+}
+async function financialAuthorityForMember(rut,{force=false}={}){
+  const source=await readFinancialSafe({force}),inspected=inspectRut(rut),base={sourceReady:source.sourceReady,lastReadAt:source.lastReadAt,sourceModifiedAt:source.sourceModifiedAt||null};
+  if(!source.sourceReady)return{...base,matchIssue:'XLSM_NO_DISPONIBLE'};
+  if(!inspected.valid)return{...base,matchIssue:'RUT_SOCIO_INVALIDO'};
+  if(financialReadCache.duplicateRuts.has(inspected.normalized))return{...base,matchIssue:'RUT_DUPLICADO'};
+  const record=financialReadCache.recordsByRut.get(inspected.normalized);if(!record)return{...base,matchIssue:'SIN_COINCIDENCIA_XLSM'};
+  return{...base,status:record.status,originalComment:record.originalComment,sourceName:record.sourceName,sourceRow:record.sourceRow,matchIssue:null};
+}
+function masterAlerts({financial,operational,caps,pushReady}){
+  const alerts=[];
+  if(!operational.sqlite.ok)alerts.push({severity:'critical',what:'SQLite no supera quick_check',since:null,impact:'Estado operativo de toda Mi ASPCH.'});
+  if(!financial.sourceReady)alerts.push({severity:'critical',what:'XLSM Arianna no disponible',since:financial.lastReadAt,impact:'No se puede verificar el estado real de membresía.'});
+  else if(financial.status==='WARNING')alerts.push({severity:'warning',what:`XLSM con ${financial.formulaErrors} errores de fórmula`,since:financial.sourceModifiedAt,impact:'Algunos diagnósticos financieros pueden requerir revisión.'});
+  const pendingMembershipChanges=Number(financial.dryRun?.summary?.membersWithChanges||0);
+  if(pendingMembershipChanges)alerts.push({severity:'warning',what:`${pendingMembershipChanges} estados XLSM difieren de SQLite`,since:financial.lastReadAt,impact:'Mi ASPCH conserva el estado operativo actual hasta que se autorice y audite una sincronización.'});
+  if(!caps.sheets?.read)alerts.push({severity:'warning',what:'Google Sheets READ deshabilitado',since:null,impact:'BD SOCIOS y estacionamientos no pueden refrescarse desde Google.'});
+  if(!caps.calendar?.read)alerts.push({severity:'warning',what:'Google Calendar READ deshabilitado',since:null,impact:'No hay fuente fiable para ocupación de simuladores.'});
+  if(!caps.gmail?.otp)alerts.push({severity:'warning',what:'Entrega OTP deshabilitada',since:null,impact:'No se pueden generar y enviar OTP administrativos.'});
+  if(!pushReady)alerts.push({severity:'warning',what:'Push deshabilitado',since:null,impact:'Los avisos push no se entregarán.'});
+  if(operational.push.devicesWithError)alerts.push({severity:'warning',what:`${operational.push.devicesWithError} dispositivo(s) Push con error`,since:operational.recentErrors.find(row=>row.source==='PUSH')?.createdAt||null,impact:'Parte de las notificaciones puede no llegar.'});
+  if(operational.failedJobs24h)alerts.push({severity:'warning',what:`${operational.failedJobs24h} fallo(s) reciente(s)`,since:operational.recentErrors[0]?.createdAt||null,impact:'Revisar fuentes, sincronizaciones o backups afectados.'});
+  if(!operational.backups.some(backup=>backup.status==='OK'))alerts.push({severity:'warning',what:'Sin backup SQLite exitoso registrado',since:null,impact:'No hay una copia reciente confirmada desde la app.'});
+  for(const disabled of operational.modules.disabled)alerts.push({severity:'warning',what:`Módulo ${disabled.name} desactivado`,since:null,impact:disabled.message||'Funcionalidad no disponible para socios.'});
+  return alerts.slice(0,12);
+}
+async function adminIntegrationsSnapshot(){
+  const caps=googleCapabilities(),financial=await readFinancialSafe(),lastFinancialSync=latestFinancialSync(db);
+  const bd=db.prepare("SELECT COUNT(*) records,SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) active,MAX(updated_at) last_update FROM members WHERE role!='ADMIN'").get();
+  const otp=db.prepare("SELECT SUM(CASE WHEN used_at IS NULL AND expires_at>? THEN 1 ELSE 0 END) pending,MAX(created_at) last_issued FROM otp_codes").get(new Date().toISOString());
+  const push=db.prepare("SELECT COUNT(*) subscriptions,SUM(CASE WHEN last_error IS NOT NULL AND TRIM(last_error)<>'' THEN 1 ELSE 0 END) errors,MAX(updated_at) last_update FROM push_subscriptions").get();
+  const lastPush=db.prepare("SELECT MAX(COALESCE(sent_at,created_at)) last_delivery FROM notification_deliveries").get();
+  const configuredState=enabled=>enabled?'ADVERTENCIA':'DESHABILITADO';
+  const xlsmStatus=!financial.sourceReady||financial.status==='ERROR'?'ERROR':financial.status==='WARNING'?'ADVERTENCIA':'OK';
+  const items=[
+    {id:'xlsm',label:'XLSM Arianna',status:xlsmStatus,summary:financial.sourceReady?`${Number(financial.validRows||0)} RUT válidos de ${Number(financial.rows||0)} filas; lectura diagnóstica.`:(financial.error||'Fuente no disponible.'),lastKnownAt:financial.lastReadAt||lastFinancialSync?.created_at||null,lastKnownLabel:'Última lectura local',affects:'Diagnóstico del estado real de membresía y comparación financiera.',probe:'Lectura local con caché por modificación; sin escrituras.'},
+    {id:'bd-socios',label:'BD SOCIOS',status:Number(bd.records||0)>0?'OK':'ADVERTENCIA',summary:`${Number(bd.records||0)} socios en snapshot SQLite; ${Number(bd.active||0)} activos.`,lastKnownAt:bd.last_update||null,lastKnownLabel:'Última actualización local conocida',affects:'Identidad, datos personales, búsqueda de socios y elegibilidad local.',probe:'Snapshot local; no consulta Google en esta carga.'},
+    {id:'google-sheets',label:'Google Sheets',status:configuredState(!!caps.sheets?.read||!!caps.sheets?.write),summary:`READ ${caps.sheets?.read?'habilitado':'deshabilitado'} · WRITE ${caps.sheets?.write?'habilitado':'deshabilitado'}.`,lastKnownAt:bd.last_update||null,lastKnownLabel:'Última evidencia local; no prueba conectividad',affects:'Actualización de BD SOCIOS, Directorio y estacionamientos.',probe:'Sin probe de red en esta carga.'},
+    {id:'calendar',label:'Google Calendar',status:configuredState(!!caps.calendar?.read||!!caps.calendar?.write),summary:`READ ${caps.calendar?.read?'habilitado':'deshabilitado'} · WRITE ${caps.calendar?.write?'habilitado':'deshabilitado'}.`,lastKnownAt:null,lastKnownLabel:'Sin sync local fiable registrado',affects:'Ocupación y cancelación de turnos de simulador.',probe:'Sin probe de red en esta carga.'},
+    {id:'gmail-otp',label:'Gmail OTP',status:configuredState(!!caps.gmail?.otp),summary:caps.gmail?.otp?'Entrega configurada; conectividad no probada en esta carga.':'Entrega de OTP deshabilitada.',lastKnownAt:otp.last_issued||null,lastKnownLabel:'Último OTP registrado localmente',affects:'Primer acceso, verificación de correo y reemisión administrativa de OTP.',probe:'No envía correos ni genera OTP al abrir esta vista.',metrics:{pending:Number(otp.pending||0)}},
+    {id:'push',label:'Push',status:pushEnabled()?(Number(push.errors||0)>0?'ADVERTENCIA':'OK'):'DESHABILITADO',summary:pushEnabled()?`${Number(push.subscriptions||0)} suscripciones; ${Number(push.errors||0)} con error.`:'Web Push deshabilitado.',lastKnownAt:lastPush.last_delivery||push.last_update||null,lastKnownLabel:'Última entrega o actualización local',affects:'Recordatorios, avisos y difusión a dispositivos.',probe:'No envía notificaciones al abrir esta vista.'}
+  ];
+  return{generatedAt:new Date().toISOString(),externalProbePerformed:false,items};
+}
+function adminSystemSnapshot(){
+  const modules=moduleStates(db),operational=adminMasterSnapshot(db,{today:chileClock().date,modules});
+  const sqliteFile=path.join(DATA_DIR,'mi-aspch.sqlite'),sqliteSize=fs.existsSync(sqliteFile)?fs.statSync(sqliteFile).size:null;
+  return{
+    generatedAt:new Date().toISOString(),
+    runtime:{version:VERSION,uptimeSeconds:Math.round(process.uptime()),node:process.version},
+    sqlite:{...operational.sqlite,sizeBytes:sqliteSize,tables:dbStats(db)},
+    backups:operational.backups,
+    recentErrors:operational.recentErrors,
+    failedJobs:operational.recentErrors.filter(row=>['XLSM_SYNC','BACKUP','PUSH'].includes(row.source)),
+    container:{sourceAvailable:false,status:'NO_DISPONIBLE',detail:'La aplicación no dispone de una fuente local segura para consultar el runtime del contenedor.'}
+  };
 }
 function chileLocalIso(dateIso,timeHm){
   const m=String(dateIso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/),t=String(timeHm||'').match(/^(\d{1,2}):(\d{2})$/);if(!m||!t)throw friendlyError(400,'Fecha u hora inválida.');
@@ -974,7 +1191,7 @@ async function findMemberCalendarEventByRef(member,eventRef,date){
 
 let lastDailyBackupDate='';
 function startV060Schedulers(){
-  const syncMs=config.financialSyncMinutes*60_000;setInterval(()=>syncFinancialSafe().catch(()=>{}),syncMs).unref?.();
+  const syncMs=config.financialSyncMinutes*60_000;setInterval(()=>readFinancialSafe().catch(()=>{}),syncMs).unref?.();
   setInterval(()=>runBackgroundJobs().catch(()=>{}),60_000).unref?.();setTimeout(()=>runBackgroundJobs().catch(()=>{}),8_000).unref?.();
 }
 
@@ -1049,7 +1266,7 @@ async function updateMemberEmailInGoogle(rut, newEmail) {
 
 function setSessionCookie(req, res, token) {
   const secure = isSecureRequest(req);
-  res.setHeader('Set-Cookie', `mi_aspch_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${30*24*3600}${secure ? '; Secure' : ''}`);
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${30*24*3600}${secure ? '; Secure' : ''}`);
 }
 
 function friendlyError(statusCode, message) {
@@ -1590,16 +1807,21 @@ async function membershipSummary(member) {
   if(financial?.status==='MOROSO')status='MOROSO';
   if(financial?.status==='CONGELADO')status='EXENTO';
   if(financial?.status==='DESAFILIADO')status='DESAFILIADO';
-  let message=exempt?'Esta categoría está exenta de mensualidad.':(paid?'Mensualidad del mes registrada como pagada.':'Puedes pagar mediante transferencia bancaria usando los datos de ASPCH.');
+  const payroll=isLatamPayrollEmployer(member.employer);
+  let message=exempt?'Esta categoría está exenta de mensualidad.':(paid?'Mensualidad del mes registrada como pagada.':payroll?'Pago mediante descuento por planilla':'Puedes pagar mediante transferencia bancaria usando los datos de ASPCH.');
   if(financial?.status==='MOROSO')message=`Tienes ${financial.monthsDue} ${financial.monthsDue===1?'mes pendiente':'meses pendientes'}. Por favor regulariza lo antes posible o comunícate con nosotros.`;
   if(financial?.status==='CONGELADO')message='Tu membresía está congelada y exenta de pago durante el período informado por ASPCH.';
   if(financial?.status==='DESAFILIADO')message='Tu registro figura como desafiliado. Comunícate con ASPCH si necesitas revisar tu situación.';
   return {
     year,month,
     periodLabel:new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',month:'long',year:'numeric'}).format(new Date()),
-    status,paymentEnabled:false,periodicity:'MENSUAL',message,quote:plan,uf,financial,
+    status,paymentEnabled:false,paymentMethod:payroll?'PAYROLL':'TRANSFER',periodicity:'MENSUAL',message,quote:plan,uf,financial,
     lastPaymentAt:paid?.paid_at||null
   };
+}
+function isLatamPayrollEmployer(value=''){
+  const employer=String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+  return ['LATAM AIRLINES','LATAM GRUPO','LATAM CARGO'].some(name=>employer===name||employer.startsWith(`${name} `));
 }
 function normalizePhoneDigits(value=''){return String(value||'').replace(/\D+/g,'')}
 function whatsappUrl(topic='', text=''){
@@ -1757,7 +1979,7 @@ function transferSummary(){
 }
 function securitySummary(m,req){
   const w=webauthnSummary(db,m,effectiveRequestOrigin(req),isSecureRequest(req));
-  return {pinSet:!!m.pin_hash,unlocked:isUnlocked(m),unlockedUntil:m.unlocked_until||null,...w};
+  return {pinSet:PREVIEW_MODE||!!m.pin_hash,unlocked:isUnlocked(m),unlockedUntil:m.unlocked_until||null,...w};
 }
 function visibleMemberRut(m){return m?.rut||null}
 function publicMember(m){ return {id:m.id,email:m.email,name:m.name,preferredName:m.preferred_name||null,rut:visibleMemberRut(m),phone:m.phone,employer:m.employer,category:m.category,position:m.position,role:m.role,active:!!m.active,isBoard:!!m.is_board,birthDate:m.birth_date||null}; }
@@ -1823,16 +2045,20 @@ function sendFile(res,file,cache='no-store') {
 }
 function serveStatic(req,res,pathname){
   if(req.method!=='GET'&&req.method!=='HEAD')return json(res,405,{error:'Método no permitido.'});
-  if(pathname==='/')pathname='/index.html';
+  if(req.isAdminPort && pathname==='/') pathname='/admin.html';
+  else if(req.isLabPort && PREVIEW_MODE && pathname==='/') pathname='/lab.html';
+  else if(pathname==='/' || pathname==='/mobile') pathname='/index.html';
   let target=path.normalize(path.join(PUBLIC_DIR,pathname)); if(!target.startsWith(PUBLIC_DIR))return json(res,403,{error:'Ruta inválida.'});
   if(!fs.existsSync(target)||fs.statSync(target).isDirectory())target=path.join(PUBLIC_DIR,'index.html');
   const ext=path.extname(target).toLowerCase(); const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.ico':'image/x-icon'}[ext]||'application/octet-stream';
-  res.statusCode=200;res.setHeader('Content-Type',mime);res.setHeader('Cache-Control',ext==='.html'?'no-store':'public, max-age=3600'); if(req.method==='HEAD')return res.end(); fs.createReadStream(target).pipe(res);
+  res.statusCode=200;res.setHeader('Content-Type',mime);res.setHeader('Cache-Control',ext==='.html'||target.includes('lab-interceptor.js')?'no-store':'public, max-age=3600'); if(req.method==='HEAD')return res.end();
+  if(PREVIEW_MODE && target.endsWith('index.html')){let html=fs.readFileSync(target,'utf8');html=html.replace('<head>','<head><script src="/lab-interceptor.js?v=8"></script><script>if(!new URLSearchParams(window.location.search).get("sim")) sessionStorage.setItem("miAspchUnlocked","1");if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(w){w.unregister()})});if(window.caches)caches.keys().then(function(k){k.forEach(function(c){caches.delete(c)})});</script>');res.setHeader('Content-Security-Policy', PREVIEW_MODE ? "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" : "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");return res.end(html);}
+  fs.createReadStream(target).pipe(res);
 }
 function setSecurityHeaders(res){
-  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
+  res.setHeader('X-Content-Type-Options','nosniff');if (!PREVIEW_MODE) res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)');res.setHeader('Cross-Origin-Resource-Policy','same-origin');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  res.setHeader('Content-Security-Policy', PREVIEW_MODE ? "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" : "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
 }
 function effectiveRequestOrigin(req){const host=String(req.headers.host||'').trim();if(!host)return null;const fp=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase();const proto=fp==='https'||fp==='http'?fp:(req.socket?.encrypted?'https':'http');try{return new URL(`${proto}://${host}`).origin}catch{return null}}
 function isSecureRequest(req){return effectiveRequestOrigin(req)?.startsWith('https://')||false}
@@ -1850,7 +2076,6 @@ function passkeyError(result){
   if(result?.reason==='verification_failed')return 'No fue posible verificar la biometría/passkey.';
   return 'No fue posible completar la autenticación biométrica.';
 }
-function timingSafeTextEqual(a,b){const aa=Buffer.from(String(a||'')),bb=Buffer.from(String(b||''));return aa.length===bb.length&&aa.length>0&&crypto.timingSafeEqual(aa,bb)}
 async function readRaw(req,max=30_000_000){let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>max){const e=new Error('Solicitud demasiado grande');e.statusCode=413;e.expose=true;throw e}chunks.push(chunk)}return Buffer.concat(chunks)}
 async function readJson(req,max=100_000){let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>max){const e=new Error('Solicitud demasiado grande');e.statusCode=413;e.expose=true;throw e}chunks.push(chunk)}if(!chunks.length)return{};try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{const e=new Error('JSON inválido');e.statusCode=400;e.expose=true;throw e}}
 function sendCsv(res,fileName,rows){const list=Array.isArray(rows)?rows:[];const cols=[...new Set(list.flatMap(r=>Object.keys(r||{})))];const esc=v=>{if(v==null)return '';const s=typeof v==='object'?JSON.stringify(v):String(v);return /[",\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s};const out='\uFEFF'+[cols.join(','),...list.map(r=>cols.map(c=>esc(r?.[c])).join(','))].join('\r\n');res.statusCode=200;res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition',`attachment; filename="${String(fileName).replace(/[^a-zA-Z0-9._-]/g,'_')}"`);res.setHeader('Cache-Control','no-store');res.end(out)}
