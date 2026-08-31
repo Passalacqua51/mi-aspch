@@ -87,24 +87,35 @@ async function loadPresets(){
   }catch{}
 }
 async function presetLogin(memberId){
-  const presets=$('#preview-presets');
   try{
-    setLoading(presets,true);
     const r=await api('/api/preview/login',{method:'POST',body:{memberId}});
     if(r?.ok){
-      state.member=r.member;sessionStorage.setItem('miAspchUnlocked','1');
       const data=await api('/api/me');
-      state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
-      // Usar loginSuccess() para setup completo, luego ir al perfil
-      loginSuccess();
-      setTimeout(()=>go('profile'),100);
+      state.member=data.member;
+      state.membership=data.membership;
+      state.access=data.access;
+      state.security=data.security;
+      state.modules=data.modules||null;
+      state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
+      sessionStorage.setItem('miAspchUnlocked','1');
+      
+      // Setup UI como loginSuccess() pero yendo a profile
+      const m=state.member;
+      applyMemberTheme(m);
+      $('#auth-screen').classList.add('hidden');
+      $('#lock-screen').classList.add('hidden');
+      $('#app-shell').classList.remove('hidden');
+      $('#sidebar-name').textContent=firstLast(m.name);
+      $('#sidebar-role').textContent=m.role==='ADMIN'?'Administrador':(m.isBoard?'Directorio':(isHelicopterMember(m)?'Helicópteros':'Asociado'));
+      $('#sidebar-avatar').textContent=initials(m.name);
+      $('#top-avatar').textContent=initials(m.name);
+      renderNav();
+      go('profile');
     }else{
       toast(r?.error||'Error al iniciar sesión.',true);
     }
   }catch(err){
     toast(err.message||'Error al iniciar sesión.',true);
-  }finally{
-    setLoading(presets,false);
   }
 }
 
