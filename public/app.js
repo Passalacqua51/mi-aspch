@@ -93,15 +93,11 @@ async function presetLogin(memberId){
     const r=await api('/api/preview/login',{method:'POST',body:{memberId}});
     if(r?.ok){
       state.member=r.member;sessionStorage.setItem('miAspchUnlocked','1');
-      // Cargar datos completos
       const data=await api('/api/me');
       state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
-      // Ir directo al perfil
-      $('#auth-screen').classList.add('hidden');
-      $('#lock-screen').classList.add('hidden');
-      $('#app-shell').classList.remove('hidden');
-      state.view='profile';
-      renderView();
+      // Usar loginSuccess() para setup completo, luego ir al perfil
+      loginSuccess();
+      setTimeout(()=>go('profile'),100);
     }else{
       toast(r?.error||'Error al iniciar sesión.',true);
     }
