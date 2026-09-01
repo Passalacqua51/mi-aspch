@@ -6,8 +6,7 @@ const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥',
 const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
 const ADMIN_PLACEHOLDERS={
   'admin-finance':['💳','Finanzas','La gestión financiera dedicada se incorporará en una próxima etapa.'],
-  'admin-content':['📰','Contenido','La gestión de contenido se separará en una próxima etapa.'],
-  'admin-votes':['🗳️','Votaciones','La administración dedicada de votaciones se incorporará en una próxima etapa.']
+  'admin-content':['📰','Contenido','La gestión de contenido se separará en una próxima etapa.']
 };
 
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.installPrompt=e;$('#install-app')?.classList.remove('hidden')});
@@ -263,7 +262,7 @@ async function go(view){
   state.view=view;renderNav();
   const titles={home:'Inicio',booking:'Reservas',reservations:'Mi agenda',credential:'Credencial digital',security:'Seguridad',membership:'Mensualidad',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Contacto y asesorías',contact:'Contacto',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
   $('#page-title').textContent=titles[view]||'Mi ASPCH';const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
-  const routes={home:()=>renderHome(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-reservations':()=>renderAdminReservations(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
+  const routes={home:()=>renderHome(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-reservations':()=>renderAdminReservations(),'admin-votes':()=>renderAdminVotes(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
   try{if(!routes[view])return go('home');await routes[view]()}catch(err){console.error(`[Mi ASPCH] No se pudo renderizar ${view}:`,err);if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message||'No fue posible cargar esta sección.')}</div>`}
 }
 
@@ -372,6 +371,29 @@ async function renderHome(){
     <span class="badge ${state.member?.active?'green':'amber'}">${state.member?.active?'Vigente':'Revisar'} →</span>
   </div>`;
 
+  // 2.1 Votación oficial activa, si existe
+  let voteCard = '';
+  if (state.modules?.votes?.enabled) {
+    try {
+      const vData = await api('/api/votes');
+      const openVotes = (vData.votes || []).filter(v => v.status === 'OPEN' && v.eligible);
+      if (openVotes.length) {
+        const v = openVotes[0];
+        voteCard = `<div class="card home-row-card home-vote-row" data-go="votes" style="border-color:var(--primary,#1976d2);">
+          <div class="home-row-left">
+            <span class="home-row-icon">🗳️</span>
+            <div class="home-row-copy">
+              <span class="eyebrow" style="color:var(--primary,#1976d2);">VOTACIÓN OFICIAL ACTIVA</span>
+              <strong>${escapeHtml(v.title)}</strong>
+              <span>${v.voted ? '✓ Voto registrado' : 'Participa en esta votación habilitada'}</span>
+            </div>
+          </div>
+          <span class="badge ${v.voted ? 'green' : 'blue'}">${v.voted ? '✓ Registrado' : 'Votar →'}</span>
+        </div>`;
+      }
+    } catch {}
+  }
+
   // 3. Próximo simulador, solo si existe
   const myTurn=(sims.occupancies||[]).filter(o=>o.mine&&o.start.slice(0,10)>=today()).sort((a,b)=>a.start.localeCompare(b.start))[0];
   const simulatorCard=myTurn?`<div class="card home-row-card home-active-row" data-go="simulators">
@@ -423,6 +445,7 @@ async function renderHome(){
   $('#view').innerHTML=`${greeting}
   ${unavailableNotice}
   ${credentialCard}
+  ${voteCard}
   ${simulatorCard}
   ${parkingCard}
   ${specialNotice}
@@ -699,18 +722,56 @@ async function toggleActivityRegistration(id,registered){try{await api('/api/act
 
 async function renderVotes(){
   const {votes=[]}=await api('/api/votes');
-  $('#view').innerHTML=`<div class="card vote-hero"><span class="eyebrow">🗳️ PARTICIPACIÓN ASPCH</span><h2>Votaciones</h2><p>Cuando Directorio abra una votación habilitada para ti, podrás participar una sola vez. El padrón se congela al abrirse.</p><div class="vote-privacy"><strong>Voto secreto</strong><span>Mi ASPCH registra que participaste, pero la papeleta secreta se guarda sin tu Member ID. No es un sistema criptográfico verificable contra un administrador con acceso directo a la base del servidor.</span></div></div><section class="section"><div class="vote-list">${votes.length?votes.map(voteMemberCard).join(''):'<div class="card empty">No hay votaciones abiertas o cerradas visibles.</div>'}</div></section>`;
-  $$('.vote-cast').forEach(b=>b.onclick=()=>castVoteUi(Number(b.dataset.election),Number(b.dataset.option)));
+  $('#view').innerHTML=`<div class="card vote-hero"><span class="eyebrow">🗳️ PARTICIPACIÓN ASPCH</span><h2>Votaciones oficiales</h2><p>Cuando Directorio abra una votación habilitada para ti, podrás participar una sola vez. El padrón se congela al abrirse.</p><div class="vote-privacy"><strong>Voto secreto garantizado</strong><span>Mi ASPCH registra tu participación para control de quórum, pero la papeleta se guarda de forma desacoplada y anónima en SQLite sin vincular tu identidad a la opción elegida.</span></div></div><section class="section"><div class="vote-list">${votes.length?votes.map(voteMemberCard).join(''):'<div class="card empty">No hay votaciones abiertas o cerradas visibles en este momento.</div>'}</div></section>`;
+  $$('.vote-cast').forEach(b=>b.onclick=()=>castVoteUi(Number(b.dataset.election),Number(b.dataset.option),b.dataset.label));
   $$('.vote-verify').forEach(b=>b.onclick=()=>verifyVoteReceiptUi(Number(b.dataset.election)));
 }
 function voteMemberCard(v){
   const open=v.status==='OPEN',eligible=!!v.eligible,voted=!!v.voted,secret=v.secrecy==='SECRET';
   const receipt=localStorage.getItem(`miAspchVoteReceipt:${v.id}`)||'';
-  const options=(v.options||[]).map(o=>`<button class="button ${open&&eligible&&!voted?'secondary':'ghost'} vote-cast" data-election="${v.id}" data-option="${o.id}" ${open&&eligible&&!voted?'':'disabled'}>${escapeHtml(o.label)}</button>`).join('');
+  const options=(v.options||[]).map(o=>`<button class="button ${open&&eligible&&!voted?'primary':'ghost'} vote-cast" data-election="${v.id}" data-option="${o.id}" data-label="${escapeHtml(o.label)}" ${open&&eligible&&!voted?'':'disabled'}>${escapeHtml(o.label)}</button>`).join('');
   const result=v.results?`<div class="vote-results">${(v.results.options||[]).map(o=>`<div><span>${escapeHtml(o.label)}</span><strong>${o.votes}</strong></div>`).join('')}<p>${v.results.participation||0} de ${v.results.eligible||0} participaron · ${v.results.turnout||0}%</p></div>`:'';
-  return `<article class="card vote-card"><div class="section-head"><div><span class="eyebrow">${secret?'VOTO SECRETO':'VOTO IDENTIFICADO'} · ${escapeHtml(v.status)}</span><h3>${escapeHtml(v.title)}</h3><p>${escapeHtml(v.description||'')}</p></div><span class="badge ${voted?'green':eligible?'blue':'amber'}">${voted?'✓ Participaste':eligible?'Habilitado':'Fuera del padrón'}</span></div>${open&&eligible&&!voted?`<p class="hint">Selecciona una opción. La participación es definitiva y no se puede cambiar.</p><div class="vote-options">${options}</div>`:''}${open&&!eligible?'<div class="notice amber"><strong>No estás habilitado en el padrón de esta votación.</strong></div>':''}${voted&&receipt?`<div class="vote-receipt"><span>Tu comprobante guardado en este dispositivo</span><code>${escapeHtml(receipt)}</code>${v.status!=='OPEN'?`<button class="button ghost vote-verify" data-election="${v.id}">Verificar comprobante</button>`:''}</div>`:''}${result}</article>`;
+  return `<article class="card vote-card">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">${secret?'VOTO SECRETO':'VOTO IDENTIFICADO'} · ${escapeHtml(v.status)}</span>
+        <h3>${escapeHtml(v.title)}</h3>
+        <p>${escapeHtml(v.description||'')}</p>
+      </div>
+      <span class="badge ${voted?'green':eligible?'blue':'amber'}">${voted?'✓ Voto registrado':eligible?'Habilitado':'Fuera del padrón'}</span>
+    </div>
+    ${voted ? `
+      <div class="vote-status-banner" style="margin-top:14px;padding:12px 14px;background:var(--green-soft,#e8f5e9);border-radius:10px;color:var(--green,#2e7d32);">
+        <p style="margin:0;font-weight:600;">✓ Voto registrado</p>
+        <p class="hint" style="margin:4px 0 0 0;color:inherit;opacity:0.85;">Tu participación ya fue recibida de forma definitiva y segura.</p>
+      </div>
+    ` : ''}
+    ${open&&eligible&&!voted?`
+      <p class="hint" style="margin-top:12px;">Selecciona tu preferencia. Tu participación es definitiva y no se puede cambiar.</p>
+      <div class="vote-options">${options}</div>
+    `:''}
+    ${open&&!eligible?`<div class="admin-alert amber" style="margin-top:12px;"><span>⚠</span><div><strong>No estás habilitado en el padrón de esta votación.</strong><p>Esta votación está restringida según regla de elegibilidad.</p></div></div>`:''}
+    ${voted&&receipt?`
+      <div class="vote-receipt" style="margin-top:14px;">
+        <span>Comprobante de voto (guardado en tu dispositivo)</span>
+        <code>${escapeHtml(receipt)}</code>
+        ${v.status!=='OPEN'?`<button class="button ghost vote-verify" data-election="${v.id}">Verificar comprobante</button>`:''}
+      </div>
+    `:''}
+    ${result}
+  </article>`;
 }
-async function castVoteUi(electionId,optionId){if(!confirm('Tu voto se registrará de forma definitiva. ¿Confirmar esta opción?'))return;try{const r=await api('/api/votes/cast',{method:'POST',body:{electionId,optionId}});if(r.receipt)localStorage.setItem(`miAspchVoteReceipt:${electionId}`,r.receipt);toast('Participación registrada. Guarda tu comprobante.');renderVotes()}catch(e){toast(e.message,true)}}
+async function castVoteUi(electionId,optionId,label='esta opción'){
+  if(!confirm(`¿Confirmar tu voto por "${label}"?\n\nTu participación se registrará de forma definitiva y no podrá modificarse.`))return;
+  try{
+    const r=await api('/api/votes/cast',{method:'POST',body:{electionId,optionId}});
+    if(r.receipt)localStorage.setItem(`miAspchVoteReceipt:${electionId}`,r.receipt);
+    toast('¡Voto registrado exitosamente! Guarda tu comprobante.');
+    renderVotes();
+  }catch(e){
+    toast(e.message,true);
+  }
+}
 async function verifyVoteReceiptUi(electionId){const receipt=localStorage.getItem(`miAspchVoteReceipt:${electionId}`)||'';if(!receipt)return toast('Este dispositivo no conserva el comprobante.',true);try{const r=await api(`/api/votes/receipt?electionId=${electionId}&receipt=${encodeURIComponent(receipt)}`);toast(r.found?'Comprobante incluido en el escrutinio.':'Comprobante no encontrado.',!r.found)}catch(e){toast(e.message,true)}}
 
 function renderContact(){
@@ -962,6 +1023,481 @@ async function adminReservationControl(memberId,action,reservationId){
   const confirmText=parking?'LIBERAR RESERVA':'CANCELAR RESERVA';
   try{await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{reservationId,confirm:confirmText}});toast('Reserva actualizada y auditada.');await renderAdminReservations()}catch(err){toast(err.message,true)}
 }
+async function renderAdminVotes(){
+  if(state.member?.role!=='ADMIN')return go('home');
+  if(state.adminVotesTimer){clearInterval(state.adminVotesTimer);state.adminVotesTimer=null;}
+  try{
+    const d=await api('/api/admin/votes');
+    state.adminVotesData=d;
+    renderAdminVotesView(d);
+    state.adminVotesTimer=setInterval(async()=>{
+      if(state.view==='admin-votes'&&state.member?.role==='ADMIN'){
+        try{
+          const fresh=await api('/api/admin/votes');
+          state.adminVotesData=fresh;
+          renderAdminVotesView(fresh);
+        }catch(err){
+          console.warn('[Admin Votes auto-refresh]:', err.message);
+        }
+      }else{
+        clearInterval(state.adminVotesTimer);
+        state.adminVotesTimer=null;
+      }
+    },30000);
+  }catch(err){
+    $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · VOTACIONES</span><h2>Votaciones y participación oficial</h2><p>Error al consultar el panel de votaciones.</p></div><span class="badge red">ERROR</span></section><div class="admin-alert red" style="margin-top:14px;"><span>⚠</span><div><strong>Sin conexión</strong><p>${escapeHtml(err.message||'No se pudo conectar con la base de datos.')}</p></div></div><div class="toolbar" style="margin-top:14px;"><button class="button primary" id="admin-votes-retry" type="button">Actualizar ahora</button></div>`;
+    $('#admin-votes-retry')?.addEventListener('click',()=>renderAdminVotes());
+  }
+}
+
+function renderAdminVotesView(d){
+  const votes=d.votes||[];
+  const openCount=votes.filter(v=>v.status==='OPEN').length;
+  const draftCount=votes.filter(v=>v.status==='DRAFT').length;
+  const closedCount=votes.filter(v=>v.status==='CLOSED'||v.status==='ARCHIVED').length;
+  const totalEligible=votes.reduce((acc,v)=>acc+Number(v.results?.eligible||v.eligible||0),0);
+  const totalParticipation=votes.reduce((acc,v)=>acc+Number(v.results?.participation||v.participation||0),0);
+
+  $('#view').innerHTML=`
+  <section class="admin-module-hero card">
+    <div>
+      <span class="eyebrow">CONTROL INFORMÁTICA · VOTACIONES</span>
+      <h2>Votaciones y participación oficial</h2>
+      <p>Gestión de procesos electorales en SQLite. Padrón congelado por regla, participación en tiempo real y secreto de papeleta.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge ${openCount>0?'green':'blue'}">${openCount} abierta${openCount===1?'':'s'}</span>
+        <button class="button primary" id="admin-vote-toggle-form" type="button">➕ Nueva votación</button>
+        <button class="button secondary" id="admin-votes-refresh" type="button">Actualizar ahora</button>
+      </div>
+      <small class="hint" style="margin:0;font-size:10px;">Última lectura: ${formatLocalDateTime(new Date().toISOString())} · Auto-refresh: 30s</small>
+    </div>
+  </section>
+
+  <div class="admin-summary-grid">
+    ${adminSummaryCard('🗳️','Votaciones abiertas',openCount,`${draftCount} borrador(es) · ${closedCount} cerrada(s)`)}
+    ${adminSummaryCard('👥','Habilitados padrón',totalEligible,'suma padrones en procesos')}
+    ${adminSummaryCard('✍️','Votos registrados',totalParticipation,'participaciones totales')}
+    ${adminSummaryCard('🛡️','Secreto de papeleta','100%','Papeleta desacoplada en SQLite')}
+  </div>
+
+  <!-- Formulario Crear/Editar Votación -->
+  <section id="admin-vote-form-container" class="card hidden" style="margin-top:14px;border:1px solid var(--primary-soft,#bbdefb);">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">CONFIGURACIÓN DE ELECCIÓN</span>
+        <h3 id="admin-vote-form-title">Nueva votación</h3>
+        <p>Define título, padrón de votantes, opciones y programación. Al abrir se congelará el padrón oficial en SQLite.</p>
+      </div>
+      <button class="button ghost" id="admin-vote-form-close" type="button">✕ Cerrar</button>
+    </div>
+    <form id="admin-vote-form" class="admin-form" style="margin-top:14px;display:grid;gap:12px;">
+      <input id="admin-vote-id" type="hidden">
+      <div>
+        <label style="font-weight:600;font-size:12px;">Título de la votación *</label>
+        <input id="admin-vote-title" placeholder="Ej: Elección Comisión Revisora de Cuentas 2026-2027" required style="width:100%;">
+      </div>
+      <div>
+        <label style="font-weight:600;font-size:12px;">Descripción / Pregunta / Fundamentación</label>
+        <textarea id="admin-vote-desc" placeholder="Detalle de la materia sometida a votación..." style="width:100%;min-height:70px;"></textarea>
+      </div>
+      <div class="grid two" style="gap:12px;">
+        <div>
+          <label style="font-weight:600;font-size:12px;">Tipo de secreto *</label>
+          <select id="admin-vote-secrecy" style="width:100%;">
+            <option value="SECRET">Secreta (recomendado · papeleta anónima en SQLite)</option>
+            <option value="IDENTIFIED">Identificada (registro nominal auditable)</option>
+          </select>
+          <small class="hint">El voto secreto desvincula la identidad de la opción elegida.</small>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:12px;">Regla de padrón electoral *</label>
+          <select id="admin-vote-eligibility" style="width:100%;">
+            <option value="ACTIVE_ALL">Todos los socios activos (no desafiliados)</option>
+            <option value="AL_DIA_ONLY">Solo socios al día / exentos (excluye morosos)</option>
+            <option value="BOARD_ONLY">Solo miembros de Directorio</option>
+          </select>
+          <small class="hint">El padrón se congelará en el momento exacto de abrir la votación.</small>
+        </div>
+      </div>
+      <div class="grid two" style="gap:12px;">
+        <div>
+          <label style="font-weight:600;font-size:12px;">Apertura programada (opcional)</label>
+          <input id="admin-vote-opens" type="datetime-local" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:12px;">Cierre programado (opcional)</label>
+          <input id="admin-vote-closes" type="datetime-local" style="width:100%;">
+        </div>
+      </div>
+      <div>
+        <label style="font-weight:600;font-size:12px;">Opciones de respuesta (una por línea, mínimo 2) *</label>
+        <textarea id="admin-vote-options" placeholder="A favor&#10;En contra&#10;Abstención" required style="width:100%;min-height:80px;"></textarea>
+      </div>
+      <div class="toolbar" style="margin-top:8px;">
+        <button class="button primary" id="admin-vote-submit-btn" type="submit">Guardar borrador</button>
+        <button class="button ghost" id="admin-vote-cancel-btn" type="button">Cancelar</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Listado de Votaciones -->
+  <section class="section" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin:0;">Procesos de votación (${votes.length})</h3>
+    </div>
+    <div class="vote-list">${votes.length?votes.map(adminVoteCardRow).join(''):'<div class="card empty">No hay votaciones registradas. Pulsa “➕ Nueva votación” para crear la primera.</div>'}</div>
+  </section>
+
+  <!-- Modal Padrón y Participantes -->
+  <div id="admin-voters-modal-backdrop" class="modal-backdrop hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;">
+    <div class="card" style="max-width:760px;width:100%;max-height:90vh;display:flex;flex-direction:column;padding:20px;gap:14px;overflow:hidden;">
+      <div class="section-head" style="margin:0;">
+        <div>
+          <span class="eyebrow">AUDITORÍA DE PADRÓN Y PARTICIPACIÓN</span>
+          <h3 id="admin-voters-modal-title">Padrón de votantes</h3>
+        </div>
+        <button class="button ghost" id="admin-voters-modal-close" type="button">✕</button>
+      </div>
+      <div class="admin-alert blue" style="margin:0;font-size:12px;">
+        <span>🛡️</span>
+        <div>
+          <strong>Privacidad y secreto de voto garantizado</strong>
+          <p style="margin:2px 0 0 0;">Este reporte detalla si cada socio habilitado ya emitió su voto o está pendiente. La opción votada está completamente desacoplada en SQLite y nunca se expone.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="admin-voters-search" placeholder="Filtrar por nombre, RUT o correo..." style="flex:1;">
+        <select id="admin-voters-filter" style="width:160px;">
+          <option value="ALL">Todos los socios</option>
+          <option value="VOTED">Ya votaron</option>
+          <option value="PENDING">Pendientes</option>
+        </select>
+      </div>
+      <div id="admin-voters-list-container" style="flex:1;overflow-y:auto;border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:8px;display:grid;gap:6px;min-height:200px;">
+        <div class="empty">Cargando padrón...</div>
+      </div>
+    </div>
+  </div>
+  `;
+
+  // Attach events
+  $('#admin-votes-refresh')?.addEventListener('click',()=>renderAdminVotes());
+  $('#admin-vote-toggle-form')?.addEventListener('click',()=>{
+    resetAdminVoteForm();
+    $('#admin-vote-form-container')?.classList.remove('hidden');
+    $('#admin-vote-title')?.focus();
+  });
+  $('#admin-vote-form-close')?.addEventListener('click',()=>{
+    $('#admin-vote-form-container')?.classList.add('hidden');
+  });
+  $('#admin-vote-cancel-btn')?.addEventListener('click',()=>{
+    resetAdminVoteForm();
+    $('#admin-vote-form-container')?.classList.add('hidden');
+  });
+  $('#admin-vote-form')?.addEventListener('submit',handleAdminVoteSubmit);
+
+  // Card action buttons
+  $$('.admin-vote-edit-btn').forEach(b=>b.onclick=()=>editAdminVote(Number(b.dataset.id),votes));
+  $$('.admin-vote-duplicate-btn').forEach(b=>b.onclick=()=>duplicateAdminVote(Number(b.dataset.id),votes));
+  $$('.admin-vote-open-btn').forEach(b=>b.onclick=()=>handleAdminVoteStatus(Number(b.dataset.id),'OPEN'));
+  $$('.admin-vote-close-btn').forEach(b=>b.onclick=()=>handleAdminVoteStatus(Number(b.dataset.id),'CLOSED'));
+  $$('.admin-vote-archive-btn').forEach(b=>b.onclick=()=>handleAdminVoteStatus(Number(b.dataset.id),'ARCHIVED'));
+  $$('.admin-vote-delete-btn').forEach(b=>b.onclick=()=>handleAdminVoteDelete(Number(b.dataset.id)));
+  $$('.admin-vote-export-btn').forEach(b=>b.onclick=()=>window.open(`/api/admin/votes/export?id=${b.dataset.id}`,'_blank'));
+  $$('.admin-vote-voters-btn').forEach(b=>b.onclick=()=>openAdminVotersModal(Number(b.dataset.id),votes));
+
+  // Modal backdrop close
+  $('#admin-voters-modal-close')?.addEventListener('click',()=>{
+    $('#admin-voters-modal-backdrop')?.classList.add('hidden');
+  });
+}
+
+function adminVoteCardRow(v){
+  const results=v.results||{};
+  const eligible=Number(results.eligible||v.eligible||0);
+  const participation=Number(results.participation||v.participation||0);
+  const pending=Math.max(0, eligible - participation);
+  const turnout=Number(results.turnout||v.turnout||(eligible?Math.round(participation*10000/eligible)/100:0));
+  const isDraft=v.status==='DRAFT';
+  const isOpen=v.status==='OPEN';
+  const isClosed=v.status==='CLOSED';
+  const isArchived=v.status==='ARCHIVED';
+  const isSecret=v.secrecy==='SECRET';
+
+  const statusBadge = isDraft ? '<span class="badge gray">BORRADOR</span>'
+    : isOpen ? '<span class="badge green"><i class="dot"></i>ABIERTA</span>'
+    : isClosed ? '<span class="badge blue">CERRADA</span>'
+    : '<span class="badge gray">ARCHIVADA</span>';
+
+  const secrecyBadge = isSecret
+    ? '<span class="badge blue" title="Papeleta secreta e independiente en SQLite">🛡️ Voto secreto</span>'
+    : '<span class="badge amber" title="Registro nominal de votos">Voto identificado</span>';
+
+  const ruleLabels = { ACTIVE_ALL: 'Todos los activos', AL_DIA_ONLY: 'Solo al día', BOARD_ONLY: 'Solo Directorio' };
+  const ruleBadge = `<span class="badge gray">${ruleLabels[v.eligibility_rule]||v.eligibility_rule}</span>`;
+
+  // Options and results breakdown
+  const optionsHtml = (results.options||v.options||[]).map(o => {
+    const votes = Number(o.votes||0);
+    const pct = participation > 0 ? Math.round(votes * 1000 / participation) / 10 : 0;
+    return `
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;">
+          <span><strong>${escapeHtml(o.label)}</strong></span>
+          <span><strong>${votes} voto${votes===1?'':'s'}</strong> (${pct}%)</span>
+        </div>
+        <div style="background:var(--surface-2,#e2e8f0);height:8px;border-radius:4px;overflow:hidden;">
+          <div style="background:var(--primary,#1976d2);height:100%;width:${pct}%;border-radius:4px;transition:width 0.3s ease;"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+  <article class="card vote-card" style="border:1px solid var(--border,#d8dee8);margin-bottom:14px;padding:20px;">
+    <div class="section-head" style="align-items:flex-start;margin-bottom:12px;">
+      <div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+          ${statusBadge}
+          ${secrecyBadge}
+          ${ruleBadge}
+          <span class="hint" style="font-size:11px;">ID #${v.id}</span>
+        </div>
+        <h3 style="margin:4px 0;">${escapeHtml(v.title)}</h3>
+        ${v.description?`<p style="margin:4px 0 0 0;color:var(--muted,#667085);font-size:13px;">${escapeHtml(v.description)}</p>`:''}
+      </div>
+    </div>
+
+    <!-- Participación / Quórum -->
+    ${!isDraft ? `
+    <div style="background:var(--surface-2,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:12px 14px;margin:12px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+        <div>
+          <strong style="font-size:14px;">Participación: ${participation} de ${eligible} habilitados</strong>
+          <span class="hint" style="margin-left:6px;font-size:12px;">(${pending} pendiente${pending===1?'':'s'})</span>
+        </div>
+        <span class="badge ${turnout>=50?'green':'blue'}" style="font-size:13px;font-weight:700;">${turnout}% Quórum</span>
+      </div>
+      <div style="background:var(--border,#cbd5e1);height:10px;border-radius:5px;overflow:hidden;">
+        <div style="background:var(--green,#2e7d32);height:100%;width:${Math.min(100,turnout)}%;border-radius:5px;transition:width 0.3s ease;"></div>
+      </div>
+    </div>
+    ` : `
+    <div class="admin-alert gray" style="margin:12px 0;font-size:12px;">
+      <span>ℹ️</span>
+      <div><strong>Borrador no abierto</strong> · El padrón se calculará y congelará al momento de pulsar “Abrir votación”.</div>
+    </div>
+    `}
+
+    <!-- Opciones / Resultados -->
+    <div style="margin-top:12px;">
+      <span class="eyebrow" style="font-size:11px;margin-bottom:6px;display:block;">${isDraft?'OPCIONES CONFIGURADAS':'ESCRUTINIO EN TIEMPO REAL'}</span>
+      ${optionsHtml || '<div class="empty compact-empty">Sin opciones configuradas.</div>'}
+    </div>
+
+    <!-- Fechas -->
+    <div style="display:flex;gap:14px;font-size:11px;color:var(--muted,#667085);margin-top:12px;flex-wrap:wrap;">
+      <span>Apertura: ${v.opens_at ? formatLocalDateTime(v.opens_at) : (isDraft ? 'Manual al abrir' : 'Inmediata')}</span>
+      <span>Cierre: ${v.closes_at ? formatLocalDateTime(v.closes_at) : 'Manual al cerrar'}</span>
+      <span>Creada: ${formatLocalDateTime(v.created_at)}</span>
+    </div>
+
+    <!-- Toolbar de acciones -->
+    <div class="toolbar" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border,#e2e8f0);display:flex;gap:8px;flex-wrap:wrap;">
+      ${isDraft ? `
+        <button class="button primary admin-vote-open-btn" data-id="${v.id}" type="button">▶️ Abrir votación (Congelar padrón)</button>
+        <button class="button secondary admin-vote-edit-btn" data-id="${v.id}" type="button">✏️ Editar</button>
+        <button class="button ghost admin-vote-duplicate-btn" data-id="${v.id}" type="button">📋 Duplicar</button>
+        <button class="button ghost admin-vote-delete-btn" data-id="${v.id}" type="button" style="color:var(--red);">🗑️ Eliminar</button>
+      ` : ''}
+      ${isOpen ? `
+        <button class="button secondary admin-vote-close-btn" data-id="${v.id}" type="button" style="color:var(--amber,#b45309);">⏹️ Cerrar votación</button>
+        <button class="button ghost admin-vote-voters-btn" data-id="${v.id}" type="button">👥 Ver padrón y participación</button>
+        <button class="button ghost admin-vote-export-btn" data-id="${v.id}" type="button">📊 Exportar CSV</button>
+        <button class="button ghost admin-vote-duplicate-btn" data-id="${v.id}" type="button">📋 Duplicar</button>
+      ` : ''}
+      ${isClosed ? `
+        <button class="button ghost admin-vote-voters-btn" data-id="${v.id}" type="button">👥 Ver padrón y participación</button>
+        <button class="button ghost admin-vote-export-btn" data-id="${v.id}" type="button">📊 Exportar CSV</button>
+        <button class="button ghost admin-vote-archive-btn" data-id="${v.id}" type="button">📦 Archivar</button>
+        <button class="button ghost admin-vote-duplicate-btn" data-id="${v.id}" type="button">📋 Duplicar</button>
+      ` : ''}
+      ${isArchived ? `
+        <button class="button ghost admin-vote-voters-btn" data-id="${v.id}" type="button">👥 Ver padrón y participación</button>
+        <button class="button ghost admin-vote-export-btn" data-id="${v.id}" type="button">📊 Exportar CSV</button>
+        <button class="button ghost admin-vote-duplicate-btn" data-id="${v.id}" type="button">📋 Duplicar</button>
+      ` : ''}
+    </div>
+  </article>
+  `;
+}
+
+function resetAdminVoteForm(){
+  $('#admin-vote-form')?.reset();
+  if($('#admin-vote-id'))$('#admin-vote-id').value='';
+  if($('#admin-vote-form-title'))$('#admin-vote-form-title').textContent='Nueva votación';
+  if($('#admin-vote-submit-btn'))$('#admin-vote-submit-btn').textContent='Guardar borrador';
+}
+
+function editAdminVote(id, votes){
+  const v=votes.find(x=>Number(x.id)===id);
+  if(!v||v.status!=='DRAFT')return toast('Solo se pueden editar borradores.',true);
+  $('#admin-vote-id').value=v.id;
+  $('#admin-vote-form-title').textContent=`Editar borrador #${v.id}`;
+  $('#admin-vote-title').value=v.title||'';
+  $('#admin-vote-desc').value=v.description||'';
+  $('#admin-vote-secrecy').value=v.secrecy||'SECRET';
+  $('#admin-vote-eligibility').value=v.eligibility_rule||'ACTIVE_ALL';
+  $('#admin-vote-opens').value=isoToLocalInput(v.opens_at);
+  $('#admin-vote-closes').value=isoToLocalInput(v.closes_at);
+  $('#admin-vote-options').value=(v.options||[]).map(x=>x.label).join('\n');
+  $('#admin-vote-submit-btn').textContent='Guardar cambios';
+  $('#admin-vote-form-container')?.classList.remove('hidden');
+  $('#admin-vote-title')?.focus();
+  $('#admin-vote-form-container')?.scrollIntoView({behavior:'smooth'});
+}
+
+function duplicateAdminVote(id, votes){
+  const v=votes.find(x=>Number(x.id)===id);
+  if(!v)return;
+  resetAdminVoteForm();
+  $('#admin-vote-id').value='';
+  $('#admin-vote-form-title').textContent=`Nueva votación (duplicada de #${v.id})`;
+  $('#admin-vote-title').value=`[Copia] ${v.title||''}`;
+  $('#admin-vote-desc').value=v.description||'';
+  $('#admin-vote-secrecy').value=v.secrecy||'SECRET';
+  $('#admin-vote-eligibility').value=v.eligibility_rule||'ACTIVE_ALL';
+  $('#admin-vote-options').value=(v.options||[]).map(x=>x.label).join('\n');
+  $('#admin-vote-submit-btn').textContent='Crear borrador';
+  $('#admin-vote-form-container')?.classList.remove('hidden');
+  $('#admin-vote-title')?.focus();
+  $('#admin-vote-form-container')?.scrollIntoView({behavior:'smooth'});
+  toast('Datos cargados en el formulario. Revisa y guarda el nuevo borrador.');
+}
+
+async function handleAdminVoteSubmit(e){
+  e.preventDefault();
+  const id=Number($('#admin-vote-id').value)||null;
+  const options=$('#admin-vote-options').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(options.length<2)return toast('Ingresa al menos 2 opciones de respuesta.',true);
+  const body={
+    id,
+    title:$('#admin-vote-title').value.trim(),
+    description:$('#admin-vote-desc').value.trim(),
+    secrecy:$('#admin-vote-secrecy').value,
+    eligibilityRule:$('#admin-vote-eligibility').value,
+    opensAt:localInputToIso($('#admin-vote-opens').value),
+    closesAt:localInputToIso($('#admin-vote-closes').value),
+    options
+  };
+  try{
+    const r=await api(id?'/api/admin/votes/update':'/api/admin/votes',{method:'POST',body});
+    toast(id?`Votación #${r.id} actualizada.`:`Votación #${r.id} creada como borrador.`);
+    resetAdminVoteForm();
+    $('#admin-vote-form-container')?.classList.add('hidden');
+    renderAdminVotes();
+  }catch(err){
+    toast(err.message,true);
+  }
+}
+
+async function handleAdminVoteStatus(id, status){
+  const msg = status==='OPEN'
+    ? '¿Abrir la votación? Se congelará el padrón oficial de socios en SQLite de forma irreversible y quedará habilitada para votación.'
+    : status==='CLOSED'
+    ? '¿Cerrar la votación? Se impedirá el ingreso de nuevos votos y quedarán fijados los resultados.'
+    : status==='ARCHIVED'
+    ? '¿Archivar esta votación?'
+    : '¿Continuar?';
+  if(!confirm(msg))return;
+  try{
+    const r=await api('/api/admin/votes/status',{method:'POST',body:{id,status}});
+    toast(status==='OPEN'?`Votación abierta · padrón: ${r.eligible||0} socios congelados.`:`Votación ${status.toLowerCase()}.`);
+    renderAdminVotes();
+  }catch(e){
+    toast(e.message,true);
+  }
+}
+
+async function handleAdminVoteDelete(id){
+  if(!confirm('¿Eliminar definitivamente este borrador de votación?'))return;
+  try{
+    await api('/api/admin/votes/delete',{method:'POST',body:{id}});
+    toast('Borrador eliminado.');
+    renderAdminVotes();
+  }catch(e){
+    toast(e.message,true);
+  }
+}
+
+async function openAdminVotersModal(id, votes){
+  const v=votes.find(x=>Number(x.id)===id);
+  const backdrop=$('#admin-voters-modal-backdrop');
+  if(!backdrop)return;
+  backdrop.classList.remove('hidden');
+  $('#admin-voters-modal-title').textContent=`Padrón y Participación · Votación #${id} (${v?.title||''})`;
+  const container=$('#admin-voters-list-container');
+  if(container)container.innerHTML='<div class="empty">Cargando padrón electoral...</div>';
+  try{
+    const r=await api(`/api/admin/votes/voters?id=${id}`);
+    state.currentAdminVoters=r.voters||[];
+    const searchInput=$('#admin-voters-search');
+    const filterSelect=$('#admin-voters-filter');
+    if(searchInput)searchInput.value='';
+    if(filterSelect)filterSelect.value='ALL';
+
+    const update=()=>{
+      renderAdminVotersList(state.currentAdminVoters, searchInput?.value.trim()||'', filterSelect?.value||'ALL');
+    };
+
+    if(searchInput)searchInput.oninput=update;
+    if(filterSelect)filterSelect.onchange=update;
+    update();
+  }catch(e){
+    if(container)container.innerHTML=`<div class="card empty" style="color:var(--red);">${escapeHtml(e.message||'Error al cargar padrón.')}</div>`;
+  }
+}
+
+function renderAdminVotersList(voters, query='', filter='ALL'){
+  let list = voters || [];
+  if (filter === 'VOTED') list = list.filter(x => x.voted);
+  else if (filter === 'PENDING') list = list.filter(x => !x.voted);
+  if (query) {
+    const q = query.toLowerCase();
+    list = list.filter(x => (x.name||'').toLowerCase().includes(q) || (x.email||'').toLowerCase().includes(q) || (x.rut||'').toLowerCase().includes(q));
+  }
+  const votedCount = voters.filter(x => x.voted).length;
+  const pendingCount = voters.length - votedCount;
+  const container = $('#admin-voters-list-container');
+  if (!container) return;
+  if (!list.length) {
+    container.innerHTML = `<div class="empty">No hay socios que coincidan con el filtro (${voters.length} en total: ${votedCount} votaron, ${pendingCount} pendientes).</div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div style="font-size:12px;color:var(--muted,#667085);margin-bottom:4px;display:flex;justify-content:space-between;">
+      <span>Mostrando ${list.length} de ${voters.length} habilitados</span>
+      <span>${votedCount} votaron · ${pendingCount} pendientes</span>
+    </div>
+    ${list.map(m => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);">
+        <div>
+          <strong style="font-size:13px;">${escapeHtml(m.name||'Socio')}</strong>
+          <span style="font-size:11px;color:var(--muted,#667085);margin-left:6px;">${escapeHtml(m.rut||'')} · ${escapeHtml(m.email||'')}</span>
+        </div>
+        <div>
+          ${m.voted
+            ? `<span class="badge green" style="font-size:11px;"><i class="dot"></i>Votó ${m.votedAt ? formatLocalDateTime(m.votedAt) : ''}</span>`
+            : `<span class="badge amber" style="font-size:11px;">⏳ Pendiente</span>`
+          }
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
 async function renderAdminNotifications(){
   if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/notifications'),push=d.push||{},otp=d.gmailOtp||{},errors=d.recentErrors||[];
