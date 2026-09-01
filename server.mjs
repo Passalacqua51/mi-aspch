@@ -761,7 +761,11 @@ async function routeApi(req, res, url) {
       const events=auditRows(db,{limit:8}).map(x=>({id:x.id,action:x.action,entityType:x.entity_type||null,actorName:x.actor_name||'Sistema',createdAt:x.created_at}));
       return json(res,200,{generatedAt:new Date().toISOString(),health:{ok:!alerts.some(x=>x.severity==='critical'),status:alerts.some(x=>x.severity==='critical')?'CRITICAL':alerts.length?'WARNING':'OPERATIVE',version:VERSION,uptimeSeconds:Math.round(process.uptime())},operational,financial,integrations:{bdSocios:{status:operational.bdSocios.records?'LOCAL_SNAPSHOT_READY':'NO_LOCAL_DATA',...operational.bdSocios},googleSheets:{status:caps.sheets?.read?'CONFIGURED_NOT_PROBED':'DISABLED',read:!!caps.sheets?.read,write:!!caps.sheets?.write},googleCalendar:{status:caps.calendar?.read?'CONFIGURED_NOT_PROBED':'DISABLED',read:!!caps.calendar?.read,write:!!caps.calendar?.write},otp:{status:caps.gmail?.otp?'DELIVERY_ENABLED':'DELIVERY_DISABLED',...operational.otp},push:{status:pushEnabled()?'ENABLED':'DISABLED',enabled:pushEnabled(),...operational.push},simulators:{status:'NO_RELIABLE_LOCAL_SOURCE',available:false,impact:'Ocupación no mostrada; Calendar no se consulta automáticamente desde este dashboard.'}},sqlite:{...operational.sqlite,sizeBytes:sqliteSize},modules,alerts,audit:events});
     }
-    if(req.method==='GET'&&p==='/api/admin/reservations')return json(res,200,adminReservationsSnapshot(db,{today:chileClock().date}));
+    if(req.method==='GET'&&p==='/api/admin/reservations'){
+      const today=chileClock().date;
+      const liveParking=await getAdminLiveParking(today);
+      return json(res,200,adminReservationsSnapshot(db,{today,liveParking}));
+    }
     if(req.method==='GET'&&p==='/api/admin/integrations')return json(res,200,await adminIntegrationsSnapshot());
     if(req.method==='GET'&&p==='/api/admin/system')return json(res,200,adminSystemSnapshot());
     if(req.method==='GET'&&p==='/api/admin/notifications')return json(res,200,adminNotificationsSnapshot(db,{pushReady:pushEnabled(),gmailOtpReady:gmailOtpSendEnabled()}));
@@ -1403,6 +1407,87 @@ async function readParkingLedgerRows(date=null, { includeInactive=false }={}) {
     });
   });
   return out;
+}
+
+async function getAdminLiveParking(date) {
+  if (!sheetsReadEnabled()) {
+    return {
+      live: false,
+      source: 'SQLITE_SNAPSHOT_FALLBACK',
+      sourceLabel: 'SQLite local (snapshot)',
+      warning: 'Lectura de Google Sheets no habilitada.'
+    };
+  }
+  try {
+    const rawData = await sheetsGet(config.parkingSheetId, parkingTabRange(config.parkingReservationsTab, 'A2:J20000'));
+    const rawSpaces = db.prepare("SELECT id, label, building, board_only AS boardOnly, sort_order AS sortOrder FROM parking_spaces WHERE active=1 ORDER BY CAST(building AS INTEGER), sort_order, label").all();
+    const liveToday = [];
+    const liveActive = [];
+    (rawData.values || []).forEach(r => {
+      const rowDate = validDate(r[0]);
+      if (!rowDate) return;
+      const building = String(r[1] || '').trim();
+      const label = String(r[2] || '').trim();
+      const space = rawSpaces.find(s => s.building === building && s.label === label);
+      if (!space) return;
+      const status = String(r[7] || 'ACTIVO').trim().toUpperCase() || 'ACTIVO';
+      const active = !['CANCELADO','CANCELLED','DESOCUPADO','VACATED','ANULADO'].includes(status);
+      if (!active) return;
+      const member = memberFromParkingIdentity({ rut: r[3], name: r[4], email: r[5], validation: r[9] });
+      const item = {
+        spaceId: space.id,
+        spaceLabel: space.label,
+        building: space.building,
+        reservationDate: rowDate,
+        memberName: member?.name || String(r[4] || '').trim() || 'Reserva Google Sheets',
+        memberEmail: member?.email || normalizeEmail(r[5] || ''),
+        memberRut: member?.rut || String(r[3] || '').trim(),
+        memberId: member?.id || null,
+        origin: String(r[6] || '').trim(),
+        status,
+        createdAt: String(r[8] || '').trim()
+      };
+      if (rowDate >= date) liveActive.push(item);
+      if (rowDate === date) liveToday.push(item);
+    });
+
+    const spaces = rawSpaces.map(s => {
+      const res = liveToday.find(r => String(r.spaceId) === String(s.id)) || null;
+      return {
+        id: s.id,
+        label: s.label,
+        building: s.building,
+        boardOnly: !!s.boardOnly,
+        occupied: !!res,
+        reservation: res ? {
+          memberName: res.memberName,
+          memberEmail: res.memberEmail,
+          memberId: res.memberId,
+          createdAt: res.createdAt,
+          reservationDate: res.reservationDate,
+          origin: res.origin
+        } : null
+      };
+    });
+
+    return {
+      live: true,
+      source: 'GOOGLE_SHEETS_LIVE',
+      sourceLabel: `Google Sheets (${config.parkingReservationsTab})`,
+      readAt: new Date().toISOString(),
+      spaces,
+      today: liveToday,
+      active: liveActive
+    };
+  } catch (err) {
+    console.error('[Mi ASPCH] getAdminLiveParking error:', err.message);
+    return {
+      live: false,
+      source: 'SQLITE_SNAPSHOT_FALLBACK',
+      sourceLabel: 'SQLite local (snapshot de respaldo)',
+      warning: `Sin conexión con Google Sheets (${err.message})`
+    };
+  }
 }
 
 async function writeParkingLedger({ date, space, member=null, name='', validation='', origin='MI_ASPCH', status='ACTIVO' }) {

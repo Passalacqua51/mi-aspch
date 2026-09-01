@@ -253,7 +253,7 @@ function navigationItemVisible(id){
   return keys[id]?serviceVisible(keys[id]):true;
 }
 async function go(view){
-  clearTimeout(state.parkingPollTimer);closeMobileMenu();closeAccountMenu();
+  clearTimeout(state.parkingPollTimer);if(state.adminReservationsTimer&&view!=='admin-reservations'){clearInterval(state.adminReservationsTimer);state.adminReservationsTimer=null;}closeMobileMenu();closeAccountMenu();
   if(view==='admin')view='developer';
   if(ADMIN_VIEWS.has(view)&&state.member?.role!=='ADMIN')view='home';
   if(simpleModeEnabled()&&!window.IS_ADMIN_PANEL&&!['credential','parking','contact'].includes(view))view='credential';
@@ -842,25 +842,115 @@ async function adminMasterMemberAction(memberId,action,extra={}){
 }
 async function renderAdminReservations(){
   if(state.member?.role!=='ADMIN')return go('home');
-  const d=await api('/api/admin/reservations'),s=d.summary||{},parking=d.parking||{},study=d.study||{},sim=d.simulators||{};
+  if(state.adminReservationsTimer){clearInterval(state.adminReservationsTimer);state.adminReservationsTimer=null;}
+  try{
+    const d=await api('/api/admin/reservations');
+    state.adminReservationsData=d;
+    renderAdminReservationsView(d);
+    state.adminReservationsTimer=setInterval(async()=>{
+      if(state.view==='admin-reservations'&&state.member?.role==='ADMIN'){
+        try{
+          const fresh=await api('/api/admin/reservations');
+          state.adminReservationsData=fresh;
+          renderAdminReservationsView(fresh);
+        }catch(err){
+          const banner=$('#admin-reservations-status-banner');
+          if(banner)banner.innerHTML=`<div class="admin-alert amber" style="margin-top:12px;"><span>⚠</span><div><strong>Sin conexión / última lectura</strong><p>${escapeHtml(err.message||'No fue posible contactar el servidor.')} Mostrando datos de ${state.adminReservationsData?.generatedAt?formatLocalDateTime(state.adminReservationsData.generatedAt):'última lectura'}.</p></div></div>`;
+        }
+      }else{
+        clearInterval(state.adminReservationsTimer);
+        state.adminReservationsTimer=null;
+      }
+    },30000);
+  }catch(err){
+    $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · RESERVAS</span><h2>Estacionamientos y reservas</h2><p>Error al consultar la fuente real de reservas.</p></div><span class="badge red">ERROR</span></section><div class="admin-alert red" style="margin-top:14px;"><span>⚠</span><div><strong>Sin conexión / última lectura</strong><p>${escapeHtml(err.message||'No se pudo conectar con la fuente de datos.')}</p></div></div><div class="toolbar" style="margin-top:14px;"><button class="button primary" id="admin-reservations-retry" type="button">Actualizar ahora</button></div>`;
+    $('#admin-reservations-retry')?.addEventListener('click',()=>renderAdminReservations());
+  }
+}
+function renderAdminReservationsView(d){
+  const s=d.summary||{},parking=d.parking||{},study=d.study||{},sim=d.simulators||{},spaces=parking.spaces||[];
   const available=Math.max(0,Number(s.parkingSpaces||0)-Number(s.parkingToday||0));
+  const isLive=parking.live===true;
+  const liveBadge=isLive
+    ? `<span class="badge green"><i class="dot"></i>EN VIVO · ${escapeHtml(parking.sourceLabel||'Google Sheets')}</span>`
+    : `<span class="badge amber"><i class="dot"></i>RESPALDO · ${escapeHtml(parking.sourceLabel||'SQLite local')}</span>`;
+  const warningBanner=(!isLive||parking.warning)?`<div class="admin-alert amber" style="margin-top:12px;"><span>⚠</span><div><strong>Sin conexión / última lectura</strong><p>${escapeHtml(parking.warning||'Mostrando última lectura / respaldo local.')}</p></div></div>`:'';
   $('#view').innerHTML=`
-  <section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · RESERVAS</span><h2>Operación local de reservas</h2><p>Vista consolidada de SQLite. Liberar estacionamiento y cancelar sala reutiliza acciones ADMIN confirmadas y auditadas, sin escrituras externas.</p></div><span class="badge blue">${escapeHtml(d.today||today())}</span></section>
+  <section class="admin-module-hero card">
+    <div>
+      <span class="eyebrow">CONTROL INFORMÁTICA · RESERVAS</span>
+      <h2>Operación local de reservas</h2>
+      <p>Estado de estacionamientos en tiempo real desde ${escapeHtml(parking.sourceLabel||'fuente oficial')}. Ocupación por cupo y reservas activas.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge blue">${escapeHtml(d.today||today())}</span>
+        ${liveBadge}
+        <button class="button secondary" id="admin-reservations-refresh" type="button">Actualizar ahora</button>
+      </div>
+      <small class="hint" style="margin:0;font-size:10px;">Última lectura: ${formatLocalDateTime(parking.readAt||d.generatedAt)} · Auto-refresh: 30s</small>
+    </div>
+  </section>
+  ${warningBanner}
+  <div id="admin-reservations-status-banner"></div>
   <div class="admin-summary-grid">
-    ${adminSummaryCard('🚗','Estacionamientos hoy',s.parkingToday||0,`${available} cupos locales disponibles`)}
+    ${adminSummaryCard('🚗','Estacionamientos hoy',s.parkingToday||0,`${available} cupos disponibles`)}
     ${adminSummaryCard('🗓️','Reservas activas',s.parkingActive||0,'estacionamientos hoy y futuros')}
     ${adminSummaryCard('📖','Sala de estudios',s.studyActive||0,'reservas activas')}
     ${adminSummaryCard('⏳','Lista de espera',s.waitlistActive||0,'solicitudes activas')}
   </div>
   <section class="section admin-master-grid">
-    <div class="card admin-master-wide"><span class="eyebrow">ESTACIONAMIENTOS DE HOY</span><h3>Ocupación local</h3><div class="admin-operation-list">${(parking.today||[]).map(r=>adminParkingReservationRow(r,true)).join('')||'<div class="empty compact-empty">Sin reservas activas para hoy.</div>'}</div></div>
+    <div class="card admin-master-wide">
+      <div class="section-head">
+        <div><span class="eyebrow">ESTACIONAMIENTOS DE HOY</span><h3>Estado por estacionamiento</h3><p>Padre Mariano 87 y 103</p></div>
+        <span class="badge ${available>0?'green':'amber'}">${available} cupo(s) libre(s)</span>
+      </div>
+      <div class="admin-operation-list">${spaces.map(adminParkingSpaceRow).join('')||'<div class="empty compact-empty">Sin estacionamientos configurados.</div>'}</div>
+    </div>
     <div class="card"><span class="eyebrow">ESTACIONAMIENTOS</span><h3>Reservas activas</h3><div class="admin-operation-list">${(parking.active||[]).map(r=>adminParkingReservationRow(r,false)).join('')||'<div class="empty compact-empty">Sin reservas activas.</div>'}</div></div>
     <div class="card"><span class="eyebrow">SALA DE ESTUDIOS</span><h3>Reservas activas</h3><div class="admin-operation-list">${(study.active||[]).map(adminStudyReservationRow).join('')||'<div class="empty compact-empty">Sin reservas activas de sala.</div>'}</div></div>
     <div class="card"><span class="eyebrow">LISTA DE ESPERA</span><h3>Solicitudes activas</h3><div class="admin-operation-list">${(study.waitlist||[]).map(adminStudyWaitlistRow).join('')||'<div class="empty compact-empty">Sin solicitudes en espera.</div>'}</div></div>
     <div class="card"><span class="eyebrow">SIMULADORES</span><h3>Fuente de ocupación</h3><div class="admin-alert amber"><span>⚠</span><div><strong>Fuente no disponible / local no fiable</strong><p>${escapeHtml(sim.impact||'No se muestran turnos hasta contar con una sincronización local segura.')}</p></div></div><p class="hint">Estado: ${escapeHtml(String(sim.status||'NO_RELIABLE_LOCAL_SOURCE').replaceAll('_',' '))}. Esta vista no consulta Calendar.</p></div>
     <div class="card"><span class="eyebrow">AUDITORÍA</span><h3>Acciones recientes de reservas</h3><div class="admin-event-list">${(d.audit||[]).map(adminReservationAuditRow).join('')||'<div class="empty compact-empty">Sin acciones ADMIN registradas.</div>'}</div></div>
   </section>`;
+  $('#admin-reservations-refresh')?.addEventListener('click',async e=>{
+    e.currentTarget.disabled=true;
+    try{
+      const fresh=await api('/api/admin/reservations');
+      state.adminReservationsData=fresh;
+      renderAdminReservationsView(fresh);
+      toast('Estacionamientos actualizados.');
+    }catch(err){
+      toast('Sin conexión / última lectura: '+(err.message||'error'),true);
+    }
+  });
   $$('.admin-reservation-control').forEach(button=>button.onclick=()=>adminReservationControl(Number(button.dataset.member),button.dataset.action,Number(button.dataset.id)));
+}
+function adminParkingSpaceRow(s){
+  if(s.occupied && s.reservation){
+    const r=s.reservation;
+    return `<div class="admin-operation-row">
+      <span class="admin-operation-icon">🚗</span>
+      <div>
+        <strong>Estacionamiento ${escapeHtml(s.label)} · Padre Mariano ${escapeHtml(s.building)}${s.boardOnly?' (Directorio)':''}</strong>
+        <p><strong>${escapeHtml(r.memberName||'Socio')}</strong>${r.memberEmail?` · ${escapeHtml(r.memberEmail)}`:''}</p>
+        <small>${r.createdAt?`Reserva creada ${formatLocalDateTime(r.createdAt)}`:`Fecha: ${escapeHtml(r.reservationDate||'Hoy')}`}${r.id?` · ID #${r.id}`:''}</small>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="badge amber"><i class="dot"></i>OCUPADO</span>
+        <button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId}" data-id="${r.id}" data-action="release-parking">Liberar</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="admin-operation-row">
+    <span class="admin-operation-icon" style="opacity:0.6;">🅿️</span>
+    <div>
+      <strong>Estacionamiento ${escapeHtml(s.label)} · Padre Mariano ${escapeHtml(s.building)}${s.boardOnly?' (Directorio)':''}</strong>
+      <p style="color:var(--green);font-weight:600;">Libre · Disponible</p>
+      <small>Sin reserva registrada para hoy</small>
+    </div>
+    <span class="badge green"><i class="dot"></i>LIBRE</span>
+  </div>`;
 }
 function adminParkingReservationRow(r,isToday){return `<div class="admin-operation-row"><span class="admin-operation-icon">🚗</span><div><strong>${escapeHtml(r.memberName||'Socio')}</strong><p>Est. ${escapeHtml(r.spaceLabel||r.spaceId||'—')} · Padre Mariano ${escapeHtml(r.building||'—')} · ${isToday?'Hoy':escapeHtml(r.reservationDate||'—')}</p><small>${escapeHtml(r.memberEmail||'')}</small></div><button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId}" data-id="${r.id}" data-action="release-parking">Liberar</button></div>`}
 function adminStudyReservationRow(r){return `<div class="admin-operation-row"><span class="admin-operation-icon">📖</span><div><strong>${escapeHtml(r.memberName||'Socio')}</strong><p>${escapeHtml(r.roomName||'Sala de estudios')} · ${formatLocalDateTime(r.startAt)} – ${hm(r.endAt)}</p><small>${escapeHtml(r.memberEmail||'')}</small></div><button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId}" data-id="${r.id}" data-action="cancel-study">Cancelar</button></div>`}
