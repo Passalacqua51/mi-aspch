@@ -3,7 +3,7 @@ name: aspch
 services:
   mi-aspch:
     # Imagen local inmutable verificada durante el despliegue de v0.6.16.
-    image: "mi-aspch:v0.6.16@sha256:6a99d3daf20c722a558d97164dea2eab34970940d363ac193aaf27396ca83a73"
+    image: "mi-aspch:v0.6.16-test-panel-retired@sha256:6b2d80fc461d30f2403d670a2e3384be747342b9d76a66b417a876c417e24865"
     pull_policy: never
     container_name: mi-aspch
     restart: unless-stopped

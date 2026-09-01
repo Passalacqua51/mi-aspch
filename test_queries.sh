@@ -1,0 +1,7 @@
+sqlite3 /home/casa/mi-aspch-source/runtime/preview/mi-aspch.sqlite "SELECT 'ACTIVO', id FROM members WHERE active=1 AND role='MEMBER' AND id NOT IN (SELECT member_id FROM member_financial_status) LIMIT 1;"
+sqlite3 /home/casa/mi-aspch-source/runtime/preview/mi-aspch.sqlite "SELECT 'MOROSO', m.id FROM members m JOIN member_financial_status f ON m.id=f.member_id WHERE f.financial_status='MOROSO' LIMIT 1;"
+sqlite3 /home/casa/mi-aspch-source/runtime/preview/mi-aspch.sqlite "SELECT 'JUBILADO', id FROM members WHERE (employer LIKE '%JUBILA%' OR position LIKE '%JUBILA%') AND active=1 LIMIT 1;"
+sqlite3 /home/casa/mi-aspch-source/runtime/preview/mi-aspch.sqlite "SELECT 'FO CPT', id FROM members WHERE position LIKE '%CPT%' AND active=1 LIMIT 1;"
+sqlite3 /home/casa/mi-aspch-source/runtime/preview/mi-aspch.sqlite "SELECT 'DIRECTORIO', id FROM members WHERE is_board=1 AND active=1 LIMIT 1;"
+sqlite3 /home/casa/mi-aspch-source/runtime/preview/mi-aspch.sqlite "SELECT 'CONGELADO', m.id FROM members m JOIN member_financial_status f ON m.id=f.member_id WHERE f.financial_status='CONGELADO' LIMIT 1;"
+sqlite3 /home/casa/mi-aspch-source/runtime/preview/mi-aspch.sqlite "SELECT 'DESAFILIADO', id FROM members WHERE active=0 LIMIT 1;"

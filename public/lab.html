@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Mi ASPCH · Laboratorio Preview</title>
+  <link rel="stylesheet" href="/lab.css?v=0.6.16-preview-loading-fix">
+</head>
+<body>
+  <aside class="profile-panel" aria-label="Selector de perfiles Preview">
+    <header>
+      <span>PREVIEW 8086</span>
+      <h1>Perfiles Mi ASPCH</h1>
+      <p>Sesiones sintéticas aisladas</p>
+    </header>
+    <nav id="profile-list">
+      <button class="profile-button active" type="button" data-profile="ACTIVO">ACTIVO</button>
+      <button class="profile-button" type="button" data-profile="MOROSO">MOROSO</button>
+      <button class="profile-button" type="button" data-profile="JUBILADO">JUBILADO</button>
+      <button class="profile-button" type="button" data-profile="MODO SIMPLE">MODO SIMPLE</button>
+      <button class="profile-button" type="button" data-profile="FO CPT">FO CPT</button>
+      <button class="profile-button" type="button" data-profile="DIRECTORIO">DIRECTORIO</button>
+      <button class="profile-button" type="button" data-profile="CONGELADO">CONGELADO</button>
+      <button class="profile-button" type="button" data-profile="DESAFILIADO">DESAFILIADO</button>
+      <button class="profile-button" type="button" data-profile="INFORMÁTICA">INFORMÁTICA</button>
+    </nav>
+    <div id="profile-status" class="profile-status" role="status" aria-live="polite">Creando sesión ACTIVO…</div>
+  </aside>
+  <main class="lab-stage">
+    <section class="phone" aria-label="Vista mobile autenticada de Mi ASPCH">
+      <div class="phone-notch" aria-hidden="true"></div>
+      <div id="phone-loading" class="phone-loading">Abriendo Mi ASPCH…</div>
+      <iframe id="app-frame" title="Mi ASPCH autenticada" src="about:blank"></iframe>
+    </section>
+  </main>
+  <script src="/lab.js?v=0.6.16-preview-loading-fix" defer></script>
+</body>
+</html>

@@ -21,7 +21,7 @@ $('#login-rut').addEventListener('input',e=>{
   e.target.value=formatRutDisplay(value);activateAdminIdentityMode(false);
 });
 $('#retry-code')?.addEventListener('click',()=>$('#identity-form').requestSubmit());
-$('#back-identity').addEventListener('click',()=>{clearAuthErrors();if($('#presets-list').children.length>0)$('#preview-presets').classList.remove('hidden');showAuthStep('identity')});
+$('#back-identity').addEventListener('click',()=>{clearAuthErrors();showAuthStep('identity')});
 $('#logout')?.addEventListener('click',doLogout); $('#lock-logout').addEventListener('click',doLogout);
 $('#unlock-form').addEventListener('submit',unlock); $('#biometric-button').addEventListener('click',unlockWithPasskey); $('#show-pin-button')?.addEventListener('click',showPinFallback);
 initUiMode();
@@ -47,7 +47,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 boot();
 
-function initialView(){if(window.IS_ADMIN_PANEL) return 'developer'; return new URLSearchParams(location.search).get('view')||'home'}
+function initialView(){const requested=new URLSearchParams(location.search).get('view');if(window.IS_ADMIN_PANEL)return requested||'admin-dashboard';if(simpleModeEnabled())return ['credential','parking','contact'].includes(requested)?requested:'credential';return requested||'home'}
 function openAppUrl(url){try{const u=new URL(url,location.origin);const view=u.searchParams.get('view');if(view)go(view)}catch{}}
 function initUiMode(){
   state.uiMode='iphone';
@@ -58,7 +58,6 @@ function initUiMode(){
 async function boot(){
   try{
     state.config=await api('/api/config');
-    const waf=$('#whatsapp-fab');if(waf&&state.config?.contact?.whatsappUrl)waf.href=state.config.contact.whatsappUrl;
     const data=await api('/api/me');
     state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
     if(state.security?.pinSet && !state.security?.unlocked){
@@ -66,70 +65,7 @@ async function boot(){
     }
     sessionStorage.setItem('miAspchUnlocked','1');
     loginSuccess();
-  }catch{await loadPresets();showAuth()}
-}
-async function loadPresets(){
-  try{
-    const r=await api('/api/preview/members');
-    if(r?.members?.length>0){
-      const presets=$('#preview-presets'),list=$('#presets-list');
-      list.innerHTML='';
-      r.members.forEach(m=>{
-        const btn=document.createElement('button');
-        btn.className='button secondary clean-btn';
-        btn.type='button';
-        btn.textContent=`${m.name||m.email} (${m.rut||'?'})`;
-        btn.addEventListener('click',()=>presetLogin(m.id));
-        list.appendChild(btn);
-      });
-      presets.classList.remove('hidden');
-    }
-  }catch{}
-}
-async function presetLogin(memberId){
-  try{
-    const r=await api('/api/preview/login',{method:'POST',body:{memberId}});
-    console.log('presetLogin response:', r);
-    if(!r?.ok){
-      console.error('presetLogin error:', r?.error);
-      toast(r?.error||'Error al iniciar sesión.',true);
-      return;
-    }
-    // Usar el member que devuelve preview/login directamente
-    state.member=r.member;
-    sessionStorage.setItem('miAspchUnlocked','1');
-    
-    // Después de 500ms, intentar cargar datos completos
-    setTimeout(async ()=>{
-      try{
-        const data=await api('/api/me');
-        console.log('post-preset /api/me:', data);
-        state.member=data.member;
-        state.membership=data.membership;
-        state.access=data.access;
-        state.security=data.security;
-        state.modules=data.modules||null;
-        state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
-      }catch(err){
-        console.error('post-preset /api/me error:', err);
-      }
-      // Setup UI y ir al perfil
-      const m=state.member;
-      applyMemberTheme(m);
-      $('#auth-screen').classList.add('hidden');
-      $('#lock-screen').classList.add('hidden');
-      $('#app-shell').classList.remove('hidden');
-      $('#sidebar-name').textContent=firstLast(m.name);
-      $('#sidebar-role').textContent=m.role==='ADMIN'?'Administrador':(m.isBoard?'Directorio':(isHelicopterMember(m)?'Helicópteros':'Asociado'));
-      $('#sidebar-avatar').textContent=initials(m.name);
-      $('#top-avatar').textContent=initials(m.name);
-      renderNav();
-      go('profile');
-    }, 500);
-  }catch(err){
-    console.error('presetLogin exception:', err);
-    toast(err.message||'Error al iniciar sesión.',true);
-  }
+  }catch{showAuth()}
 }
 
 function showAuthStep(step='identity'){
@@ -223,7 +159,7 @@ async function unlockWithPasskey(){
 function showLockButtonState(){if($('#lock-screen').classList.contains('hidden'))return;showLock()}
 async function lockNow(){if(!state.security?.pinSet&&!state.security?.passkeySet){toast('Primero configura un PIN o Face ID/huella en Seguridad.');return go('security')}try{await api('/api/security/lock',{method:'POST',body:{}});state.security.unlocked=false;sessionStorage.removeItem('miAspchUnlocked');showLock()}catch(e){toast(e.message,true)}}
 async function doLogout(){sessionStorage.removeItem('miAspchUnlocked');try{await api('/api/auth/logout',{method:'POST',body:{}})}catch{}location.reload()}
-function showAuth(){$('#auth-screen').classList.remove('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');$('#preview-presets').classList.add('hidden');showAuthStep('identity')}
+function showAuth(){$('#auth-screen').classList.remove('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');showAuthStep('identity')}
 function showLock(){
   if(!state.member)return showAuth();
   $('#auth-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');$('#lock-screen').classList.remove('hidden');
@@ -242,27 +178,49 @@ function showPinFallback(){
   $('#biometric-help').textContent='Ingresa tu PIN personal para continuar.';
   setTimeout(()=>$('#unlock-pin')?.focus(),60);
 }
+function isHelicopterMember(m){return /HELIC/i.test(String(m?.category||''))||/HELIC/i.test(String(m?.position||''))}
+function applyMemberTheme(m){document.body.classList.toggle('member-helicopter',isHelicopterMember(m))}
 function loginSuccess(){
   const m=state.member;applyMemberTheme(m);
+  if(isInactiveMembership())return renderInactiveMembership();
   $('#auth-screen').classList.add('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.remove('hidden');
   $('#sidebar-name').textContent=firstLast(m.name);$('#sidebar-role').textContent=m.role==='ADMIN'?'Administrador':(m.isBoard?'Directorio':(isHelicopterMember(m)?'Helicópteros':'Asociado'));
   $('#sidebar-avatar').textContent=initials(m.name);$('#top-avatar').textContent=initials(m.name);renderNav();go(initialView());
 }
 
+function isInactiveMembership(){return state.member?.role!=='ADMIN'&&(!state.member?.active||state.access?.reason==='DESAFILIADO'||state.access?.financial?.status==='DESAFILIADO')}
+function renderInactiveMembership(){
+  $('#auth-screen').classList.add('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');
+  let screen=$('#inactive-membership-screen');
+  if(!screen){screen=document.createElement('main');screen.id='inactive-membership-screen';screen.className='inactive-membership-screen';document.body.append(screen)}
+  screen.innerHTML='<section class="card inactive-membership-card" role="status"><span class="inactive-membership-icon">🔒</span><span class="eyebrow">MI ASPCH</span><h1>Membresía no activa</h1><p>Tu membresía no se encuentra activa. Contacta a ASPCH para revisar tu situación.</p><a class="button primary" href="mailto:aspch@aspch.org">Contactar a ASPCH</a></section>';
+  screen.classList.remove('hidden');
+}
+
 
 function renderNav(){
   const allItems=NAV.map(x=>[...x]),adminItems=(state.member?.role==='ADMIN' && window.IS_ADMIN_PANEL)?ADMIN_NAV.map(x=>[...x]):[];
+  document.body.classList.toggle('simple-mode',simpleModeEnabled()&&!window.IS_ADMIN_PANEL);
+  document.body.classList.toggle('admin-panel',adminItems.length>0);
+  if(adminItems.length){
+    $('#desktop-nav').innerHTML=`<div class="nav-section-label">Control Informática</div>${adminItems.map(x=>navItem(...x)).join('')}`;
+    $('#mobile-nav').innerHTML='';$('#mobile-more-nav').innerHTML='';$('#more-menu-toggle')?.classList.add('hidden');
+    $$('[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));return;
+  }
   const primaryIds=['home','parking','booking','profile'];
+  if(simpleModeEnabled())primaryIds.splice(0,primaryIds.length,'credential','parking','contact');
   const primary=allItems.filter(x=>primaryIds.includes(x[0]));
-  const secondary=allItems.filter(x=>!primaryIds.includes(x[0])&&navigationItemVisible(x[0]));
+  const secondary=simpleModeEnabled()?[]:allItems.filter(x=>!primaryIds.includes(x[0])&&navigationItemVisible(x[0]));
   const items=[...primary,...secondary];
   const admin=adminItems.length?`<details class="sidebar-more admin-navigation" open><summary>Administración</summary><div class="sidebar-more-items">${adminItems.map(x=>navItem(...x)).join('')}</div></details>`:'';
   $('#desktop-nav').innerHTML=`<div class="nav-section-label">Principal</div>${primary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}<details class="sidebar-more" open><summary>Más servicios</summary><div class="sidebar-more-items">${secondary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}</div></details>${admin}`;
-  const mobileLabel={home:'Inicio',parking:'Estac.',booking:'Reservas',profile:'Perfil'};
+  const mobileLabel={home:'Inicio',parking:'Estac.',booking:'Reservas',profile:'Perfil',credential:'Credencial',contact:'Contacto'};
   $('#mobile-nav').innerHTML=primary.map(([id,icon,label])=>navItem(id,icon,mobileLabel[id]||label)).join('');
   renderMobileMore(items,adminItems);
   $$('[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
+  $('#more-menu-toggle')?.classList.toggle('hidden',simpleModeEnabled());
   $('#more-menu-toggle')?.classList.toggle('active',!primaryIds.includes(state.view));
+  $('.account-menu-wrap')?.classList.toggle('hidden',simpleModeEnabled());
 }
 function renderMobileMore(items,adminItems=[]){
   const byId=Object.fromEntries(items.map(x=>[x[0],x]));
@@ -298,11 +256,32 @@ async function go(view){
   clearTimeout(state.parkingPollTimer);closeMobileMenu();closeAccountMenu();
   if(view==='admin')view='developer';
   if(ADMIN_VIEWS.has(view)&&state.member?.role!=='ADMIN')view='home';
+  if(simpleModeEnabled()&&!window.IS_ADMIN_PANEL&&!['credential','parking','contact'].includes(view))view='credential';
+  if(state.access?.reason==='MOROSO'&&['booking','reservations','simulators','studyroom'].includes(view)){
+    state.view=view;renderNav();$('#page-title').textContent=view==='booking'?'Reservas':({reservations:'Mi agenda',simulators:'Turnos de simulador',studyroom:'Sala de estudios'}[view]||'Reservas');renderMorosoBenefitBlock(view);return;
+  }
   state.view=view;renderNav();
   const titles={home:'Inicio',booking:'Reservas',reservations:'Mi agenda',credential:'Credencial digital',security:'Seguridad',membership:'Mensualidad',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Contacto y asesorías',contact:'Contacto',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
   $('#page-title').textContent=titles[view]||'Mi ASPCH';const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
-  const routes={home:renderHome,booking:renderBookingHub,reservations:renderReservations,credential:renderCredential,security:renderSecurity,membership:renderMembership,parking:()=>renderParking(),simulators:renderSimulators,studyroom:renderStudyRoom,marketplace:renderMarketplace,activities:renderActivities,votes:renderVotes,advisors:renderContact,contact:renderContact,convenios:renderConvenios,library:renderLibrary,news:renderNews,profile:renderProfile,'admin-dashboard':renderAdminDashboard,'admin-members':renderAdminMembers,'admin-reservations':renderAdminReservations,'admin-notifications':renderAdminNotifications,'admin-integrations':renderAdminIntegrations,'admin-security':renderAdminSecurity,'admin-audit':renderAdminAudit,'admin-system':renderAdminSystem,developer:renderDeveloper,...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
-  try{if(!routes[view])return go('home');await routes[view]()}catch(err){if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message)}</div>`}
+  const routes={home:()=>renderHome(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-reservations':()=>renderAdminReservations(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
+  try{if(!routes[view])return go('home');await routes[view]()}catch(err){console.error(`[Mi ASPCH] No se pudo renderizar ${view}:`,err);if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message||'No fue posible cargar esta sección.')}</div>`}
+}
+
+function renderMorosoBenefitBlock(view){
+  const label=view==='simulators'?'Simuladores':view==='studyroom'?'Sala de estudios':'Reservas';
+  $('#view').innerHTML=`<div class="benefit-preview-shell moroso-benefit-block"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">${escapeHtml(label.toUpperCase())}</span><h2>Servicio no disponible por cuotas pendientes</h2><p>Regulariza tu situación para volver a utilizar este servicio.</p><button class="button primary" data-go="membership">Información para regularizar</button></div><div class="benefit-preview-content" inert aria-hidden="true"><div class="card booking-hero"><h2>${escapeHtml(label)}</h2><p>Contenido temporalmente bloqueado.</p></div></div></div>`;
+  $('[data-go="membership"]')?.addEventListener('click',()=>go('membership'));
+}
+
+function showDebtAlert(membership){
+  const financial=membership?.financial||state.access?.financial;
+  if(financial?.status!=='MOROSO'||$('.debt-alert-overlay'))return;
+  const months=Number(financial.monthsDue||0);
+  const monthsLine=months>0?`<p><strong>${months} ${months===1?'cuota pendiente':'cuotas pendientes'}</strong></p>`:'<p><strong>Existen cuotas pendientes.</strong></p>';
+  const backedAmount=financial.amountDueAvailable===true&&Number.isFinite(Number(financial.amountDue))&&Number(financial.amountDue)>0;
+  const amountLine=backedAmount?`<p>Monto respaldado: <strong>${escapeHtml(formatClpClient(financial.amountDue))}</strong></p>`:'';
+  const overlay=document.createElement('div');overlay.className='setup-overlay debt-alert-overlay';overlay.innerHTML=`<section class="card setup-card debt-alert-card" role="alertdialog" aria-modal="true" aria-labelledby="debt-alert-title"><span class="eyebrow">CONDICIÓN MOROSO</span><h2 id="debt-alert-title">Cuotas pendientes</h2>${monthsLine}${amountLine}<p class="hint">Revisa la información disponible para regularizar tu membresía.</p><div class="toolbar"><button class="button primary" id="debt-alert-membership">Información para regularizar</button><button class="button ghost" id="debt-alert-close">Cerrar</button></div></section>`;document.body.append(overlay);
+  $('#debt-alert-membership').onclick=()=>{overlay.remove();go('membership')};$('#debt-alert-close').onclick=()=>overlay.remove();
 }
 
 
@@ -363,13 +342,14 @@ function homeMembershipRow(pay){
 async function renderHome(){
   const week=mondayOf(today());
   const fetches=[
-    getParking(today()).catch(()=>({spaces:[],mineReservation:null})),
-    getSimulators(week,addDays(week,4)).catch(()=>({occupancies:[]})),
-    api('/api/membership')
+    homeDataOrFallback(getParking(today()),{spaces:[],mineReservation:null},'estacionamiento'),
+    state.access?.simulatorView===false?Promise.resolve({occupancies:[]}):homeDataOrFallback(getSimulators(week,addDays(week,4)),{occupancies:[]},'simuladores'),
+    homeDataOrFallback(api('/api/membership'),{membership:state.membership||{status:'PENDIENTE'}},'mensualidad')
   ];
 
   const [parking,sims,pay]=await Promise.all(fetches);
   state.membership=pay.membership;state.access=state.access||{};
+  const unavailable=[parking,sims,pay].filter(item=>item?._homeUnavailable).map(item=>item._homeLabel);
 
   // 1. Saludo compacto
   const greeting=`<section class="hero hero-compact">
@@ -378,6 +358,7 @@ async function renderHome(){
       <h1>${escapeHtml(welcomeText(state.member))}</h1>
     </div>
   </section>`;
+  const unavailableNotice=unavailable.length?`<div class="card empty home-data-fallback">Sin información temporal de ${escapeHtml(unavailable.join(', '))}. El resto de Inicio sigue disponible.</div>`:'';
 
   // 2. Credencial vigente
   const credentialCard=`<div class="card home-row-card" data-go="credential">
@@ -440,6 +421,7 @@ async function renderHome(){
   </div>`;
 
   $('#view').innerHTML=`${greeting}
+  ${unavailableNotice}
   ${credentialCard}
   ${simulatorCard}
   ${parkingCard}
@@ -448,6 +430,17 @@ async function renderHome(){
   ${contactDiscreet}`;
 
   $$('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
+  showDebtAlert(pay.membership);
+}
+
+async function homeDataOrFallback(promise,fallback,label,timeoutMs=5000){
+  let timer;
+  try{
+    return await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`timeout ${label}`)),timeoutMs)})]);
+  }catch(error){
+    console.warn(`[Mi ASPCH] Inicio sin ${label}: ${error.message||error}`);
+    return {...fallback,_homeUnavailable:true,_homeLabel:label};
+  }finally{clearTimeout(timer)}
 }
 
 function renderBookingHub(){
@@ -614,9 +607,6 @@ function maybeRetirementNotification(membership){
   localStorage.setItem(key,'1');
   setTimeout(()=>showAppNotification('retirement',notice.title,notice.body,'/?view=home'),700);
 }
-function whatsappLink(text=''){return `https://wa.me/56948825381?text=${encodeURIComponent(text)}`}
-function paymentMessage(){return `Hola ASPCH, soy ${titleName(state.member?.name||'socio')} y quiero consultar/pagar mi mensualidad en Mi ASPCH.`}
-
 async function renderSimulators(){
   if(!state.simWeek)state.simWeek=mondayOf(today());const data=await getSimulators(state.simWeek,addDays(state.simWeek,4),true);state.simulators=data;if(!data.simulators.some(s=>s.id===state.simFilter))state.simFilter=data.simulators[0]?.id||'a320';renderSimulatorsFromCache();
 }
@@ -754,6 +744,65 @@ async function renderLibraryFavorites(){const {items}=await api('/api/library');
 async function toggleLibraryFavoriteUi(id,favorite){try{await api('/api/library/favorite',{method:'POST',body:{id,favorite}});toast(favorite?'Guardado en favoritos.':'Quitado de favoritos.');renderLibrary()}catch(err){toast(err.message,true)}}
 
 async function renderNews(){const news=await getNews(true);$('#view').innerHTML=`<div class="card"><div class="section-head"><div><h3>Noticias / Instagram</h3></div></div><div class="news-list">${news.length?news.map(newsHtml).join(''):'<div class="empty">Sin publicaciones.</div>'}</div></div>`}
+async function renderProfile(){
+  const m=state.member;
+  $('#view').innerHTML=`<div class="grid two profile-page"><div class="card"><span class="eyebrow">👤 SOCIO</span><h2>${escapeHtml(titleName(m.name))}</h2>${m.isBoard?'<span class="badge blue">⭐ Directorio</span>':''}${preferredNameProfileHtml()}<div class="profile-grid">${field('📧 Correo',m.email)}${field('🪪 RUT',m.rut||'—')}${field('📱 Teléfono',m.phone||'—')}${field('🏢 Empleador',m.employer||'—')}${field('🧭 Categoría',m.category||'—')}${field('✈️ Cargo',m.position||'—')}</div>${airlineDataHtml(m)}</div><div class="card service-personalization-card"><span class="eyebrow">⚙️ PREFERENCIAS</span><h2>Personaliza tu experiencia</h2><p class="muted-copy">Elige los servicios que quieres mantener visibles.</p><button id="personalize-services" class="button secondary" type="button">Personalizar servicios</button><label class="simple-mode-toggle"><span><strong>Modo simple</strong><small>Muestra únicamente Credencial, Estacionamiento y Contacto.</small></span><input id="simple-mode-toggle" type="checkbox" ${simpleModeEnabled()?'checked':''}></label></div><div class="card"><span class="eyebrow">🔔 NOTIFICACIONES</span><h2>Elige qué quieres recibir</h2><div class="notification-prefs">${notificationPrefToggle('parking','🚗 Estacionamientos','Recordatorios de reserva y desocupación.')}${notificationPrefToggle('simulators','✈️ Simuladores','Avisos de próximos turnos confirmados.')}${notificationPrefToggle('studyroom','📖 Sala de estudios','Liberación de horarios de tu lista de espera.')}${notificationPrefToggle('membership','💳 Membresía','Avisos sobre tu estado de membresía.')}${notificationPrefToggle('news','📰 Noticias','Novedades relevantes de ASPCH.')}</div><div class="toolbar"><button class="button primary" id="enable-general-notifications">🔔 Activar notificaciones</button></div></div></div>`;
+  installEditableNumericInputs($('#view'));
+  $('#preferred-name-form-profile')?.addEventListener('submit',savePreferredName);$('#airline-data-form')?.addEventListener('submit',saveAirlineData);
+  $('#personalize-services')?.addEventListener('click',()=>openServicePersonalization());$('#simple-mode-toggle')?.addEventListener('change',saveSimpleMode);
+  $('#enable-general-notifications')?.addEventListener('click',()=>enableBrowserNotifications());$$('.notif-toggle').forEach(el=>el.addEventListener('change',e=>setNotificationPref(e.currentTarget.dataset.key,e.currentTarget.checked)));
+}
+async function saveSimpleMode(e){
+  const enabled=!!e.currentTarget.checked;e.currentTarget.disabled=true;
+  try{const result=await api('/api/profile/services',{method:'PUT',body:{services:state.uiPreferences.services,simpleMode:enabled}});state.uiPreferences=normalizedUiPreferences(result.uiPreferences);renderNav();toast(enabled?'Modo simple activado.':'Modo simple desactivado.');await go(enabled?'credential':'profile')}catch(err){e.currentTarget.checked=!enabled;e.currentTarget.disabled=false;toast(err.message,true)}
+}
+
+async function renderMembership(){
+  const pay=await api('/api/membership');state.membership=pay.membership;const q=pay.membership?.quote||{},financial=pay.membership?.financial||state.access?.financial||{};
+  const months=Number(financial.monthsDue||0),backedAmount=financial.amountDueAvailable===true&&Number.isFinite(Number(financial.amountDue))&&Number(financial.amountDue)>0;
+  const debt=financial.status==='MOROSO'?`<div class="debt-inline"><strong>${months>0?`${months} ${months===1?'cuota pendiente':'cuotas pendientes'}`:'Cuotas pendientes'}</strong>${backedAmount?`<span>Monto respaldado: ${escapeHtml(formatClpClient(financial.amountDue))}</span>`:'<span>El monto exacto no está disponible en la fuente validada.</span>'}</div>`:'';
+  const payment=pay.paymentMethod==='PAYROLL'?'<div class="transfer-box payroll"><strong>Pago mediante descuento por planilla</strong><p>Tu mensualidad se gestiona mediante descuento por planilla.</p></div>':pay.membership.status==='EXENTO'?'<div class="transfer-box exempt"><strong>✅ Sin pago mensual</strong><p>Tu categoría está exenta de mensualidad.</p></div>':transferHtml(pay.transfer);
+  $('#view').innerHTML=`<section id="membership-view" class="security-page"><div class="card membership-card"><span class="eyebrow">💳 MENSUALIDAD</span><div class="membership-title"><span class="membership-category-icon">${escapeHtml(q.icon||'💳')}</span><div><h2>${escapeHtml(q.monthlyDisplay||q.formula||'Por definir')}</h2><p>${escapeHtml(q.label||'Socio ASPCH')}</p></div></div>${membershipStatusBadge(pay.membership.status)}${debt}<div class="profile-grid compact-grid">${field('📅 Periodicidad',pay.membership.periodicity||'Mensual')}${field('📌 Estado',membershipStatusLabel(pay.membership.status))}${q.formula?field('🧮 Cálculo',q.formula):''}</div>${payment}<p class="hint">${escapeHtml(pay.membership.message||'')}</p></div></section>`;
+  $('#copy-transfer')?.addEventListener('click',()=>copyTransfer(pay.transfer));
+}
+
+async function renderSecurity(){
+  const [sessionsData,hist]=await Promise.all([api('/api/security/sessions'),api('/api/history?limit=30').catch(()=>({history:[]}))]);
+  const bioReady=!!state.security?.biometricAvailable&&!!window.PublicKeyCredential,bioState=state.security?.passkeySet?`${state.security.passkeyCount||1} registrada${Number(state.security.passkeyCount||1)===1?'':'s'}`:'Aún no configurado';
+  $('#view').innerHTML=`<section class="security-page"><div class="card"><span class="eyebrow">🔐 SEGURIDAD DEL DISPOSITIVO</span><h2>${state.security?.pinSet?'PIN configurado':'Crea un PIN de respaldo'}</h2><form id="pin-form" class="pin-form">${state.security?.pinSet?'<input id="current-pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN actual" required>':''}<input id="new-pin" type="password" inputmode="numeric" maxlength="6" placeholder="Nuevo PIN (4–6 dígitos)" required><button class="button primary">${state.security?.pinSet?'Cambiar PIN':'Crear PIN'}</button></form><div class="security-bio"><div><strong>Face ID / huella</strong><span class="badge ${state.security?.passkeySet?'green':'blue'}">${escapeHtml(bioState)}</span></div><div class="toolbar">${bioReady?`<button class="button secondary" id="register-passkey" type="button">${state.security?.passkeySet?'Agregar otra passkey':'Activar Face ID / huella'}</button>`:''}${state.security?.passkeySet?'<button class="button ghost" id="remove-passkeys" type="button">Eliminar passkeys</button>':''}</div></div></div><div class="card"><span class="eyebrow">SESIONES</span><h2>Dispositivos con acceso</h2><div class="session-list">${(sessionsData.sessions||[]).map(s=>`<div><span>${s.current?'Este dispositivo':'Otra sesión'}</span><small>Creada ${formatLocalDateTime(s.createdAt)}</small><span class="badge ${s.current?'green':'blue'}">${s.current?'Actual':'Activa'}</span></div>`).join('')||'<div class="empty">Sin sesiones activas.</div>'}</div><button id="close-other-sessions" class="button ghost" type="button">Cerrar otras sesiones</button></div><div class="card history-card"><span class="eyebrow">🧾 TU HISTORIAL</span><h2>Actividad de tu cuenta</h2><div class="history-list">${(hist.history||[]).length?hist.history.map(historyRow).join(''):'<div class="empty">Aún no hay movimientos registrados.</div>'}</div></div></section>`;
+  installEditableNumericInputs($('#view'));$('#pin-form')?.addEventListener('submit',savePin);$('#register-passkey')?.addEventListener('click',registerPasskey);$('#remove-passkeys')?.addEventListener('click',removePasskeys);$('#close-other-sessions')?.addEventListener('click',async()=>{try{await api('/api/security/sessions',{method:'DELETE',body:{}});toast('Otras sesiones cerradas.');renderSecurity()}catch(err){toast(err.message,true)}});
+}
+
+function historyRow(x){const labels={PARKING_RESERVED:'Reservaste estacionamiento',PARKING_CANCELLED:'Cancelaste estacionamiento',PARKING_CHECKED_IN:'Marcaste llegada al estacionamiento',PARKING_VACATED:'Liberaste estacionamiento',SIMULATOR_CANCELLED:'Cancelaste un turno de simulador',STUDY_RESERVED:'Reservaste Sala de estudios',STUDY_RESERVATION_CANCELLED:'Cancelaste Sala de estudios',STUDY_WAITLIST_JOINED:'Pediste aviso de Sala de estudios',MARKETPLACE_CREATED:'Publicaste un producto para revisión'};return `<div class="history-row"><div><strong>${escapeHtml(labels[x.action]||String(x.action||'Actividad').replaceAll('_',' '))}</strong><span>${formatLocalDateTime(x.createdAt)}</span></div><span class="history-actor">${x.actorName&&x.actorName!==state.member?.name?'ASPCH':'Tú'}</span></div>`}
+function airlineDataHtml(m){if(!/L[IÍ]NEA\s*A[EÉ]REA/i.test(String(m.category||'')))return '';return `<div class="airline-update"><div class="section-head compact"><div><h3>✈️ ¿Cambiaste de línea aérea?</h3><p>Actualiza tus datos asociados a la ficha ASPCH.</p></div></div><form id="airline-data-form" class="airline-form"><label>Línea aérea actual<input id="airline-employer" maxlength="80" value="${escapeHtml(m.employer||'')}" required></label><label>Teléfono<input id="airline-phone" inputmode="tel" maxlength="30" value="${escapeHtml(m.phone||'')}"></label><button class="button secondary" type="submit">Guardar cambios</button></form></div>`}
+async function saveAirlineData(e){e.preventDefault();setLoading(e.currentTarget,true);try{const r=await api('/api/profile/airline-data',{method:'POST',body:{employer:$('#airline-employer').value,phone:$('#airline-phone').value}});state.member=r.member;applyMemberTheme(state.member);toast(r.message||'Datos actualizados.');renderProfile()}catch(err){toast(err.message,true)}finally{setLoading(e.currentTarget,false)}}
+function membershipStatusLabel(status){return ({AL_DIA:'Al día',EXENTO:'Exento',PENDIENTE:'Pendiente',MOROSO:'Moroso',DESAFILIADO:'Desafiliado',JUBILADO:'Jubilado',DIRECTORIO:'Directorio',CONGELADO:'Congelado'})[status]||String(status||'Pendiente')}
+function membershipStatusBadge(status){const cls=['MOROSO','PENDIENTE','DESAFILIADO'].includes(status)?'amber':'green';return `<span class="badge ${cls}"><i class="dot"></i>${escapeHtml(membershipStatusLabel(status))}</span>`}
+function transferHtml(t){if(!t?.configured)return '<div class="transfer-box pending"><strong>🏦 Transferencia bancaria</strong><p>Sin información bancaria disponible.</p></div>';return `<div class="transfer-box"><div class="section-head compact"><div><strong>🏦 Datos de transferencia ASPCH</strong><p>Usa estos datos para regularizar tu mensualidad.</p></div><button id="copy-transfer" class="button ghost" type="button">📋 Copiar</button></div><dl><dt>Banco</dt><dd>${escapeHtml(t.bank)}</dd><dt>Tipo de cuenta</dt><dd>${escapeHtml(t.accountType)}</dd><dt>N° de cuenta</dt><dd>${escapeHtml(t.accountNumber)}</dd><dt>Titular</dt><dd>${escapeHtml(t.holder)}</dd><dt>RUT</dt><dd>${escapeHtml(t.rut)}</dd>${t.email?`<dt>Correo</dt><dd>${escapeHtml(t.email)}</dd>`:''}</dl></div>`}
+async function copyTransfer(t){if(!t?.configured)return;const value=[`Banco: ${t.bank}`,`Tipo: ${t.accountType}`,`Cuenta: ${t.accountNumber}`,`Titular: ${t.holder}`,`RUT: ${t.rut}`,t.email?`Correo: ${t.email}`:''].filter(Boolean).join('\n');try{await navigator.clipboard.writeText(value);toast('Datos de transferencia copiados.')}catch{toast('No fue posible copiar automáticamente.',true)}}
+function formatClpClient(value){return new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(value||0))}
+async function registerPasskey(){const btn=$('#register-passkey');if(btn)btn.disabled=true;try{const options=await api('/api/security/passkey/register/options',{method:'POST',body:{}}),response=await browserRegisterPasskey(options),r=await api('/api/security/passkey/register/verify',{method:'POST',body:{response}});state.security=r.security;toast('Face ID / huella quedó asociado a Mi ASPCH');renderSecurity()}catch(err){if(err?.name!=='NotAllowedError')toast(err.message||'No fue posible registrar la passkey.',true)}finally{if(btn)btn.disabled=false}}
+async function removePasskeys(){if(!confirm('¿Eliminar todas las passkeys registradas?'))return;try{const r=await api('/api/security/passkeys',{method:'DELETE',body:{}});state.security=r.security;toast('Passkeys eliminadas');renderSecurity()}catch(err){toast(err.message,true)}}
+async function savePin(e){e.preventDefault();try{const r=await api('/api/security/pin',{method:'POST',body:{pin:$('#new-pin').value,currentPin:$('#current-pin')?.value||''}});state.security=r.security;sessionStorage.setItem('miAspchUnlocked','1');toast('PIN guardado correctamente');renderSecurity()}catch(err){toast(err.message,true);focusEditableNumeric(state.security?.pinSet?'#current-pin':'#new-pin')}}
+
+async function renderAdminDashboard(){
+  if(state.member?.role!=='ADMIN')return go('home');
+  const d=await api('/api/admin/dashboard'),m=d.metrics||{},finance=d.finance||{},caps=d.integrations?.google||{},links=ADMIN_NAV.filter(([id])=>id!=='admin-dashboard');
+  $('#view').innerHTML=`<section class="admin-dashboard-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA</span><h2>Estado general de Mi ASPCH</h2><p>Resumen maestro de lectura con la información operativa existente.</p></div><div class="admin-health"><span class="badge ${d.health?.ok?'green':'amber'}"><i class="dot"></i>${d.health?.ok?'Operativo':'Con alertas'}</span><strong>v${escapeHtml(d.health?.version||state.config?.version||'0.6.16')}</strong><small>${d.generatedAt?formatLocalDateTime(d.generatedAt):'Ahora'}</small></div></section><div class="admin-summary-grid">${adminSummaryCard('👥','Socios activos',m.members?.active||0,`${m.members?.total||0} registrados`)}${adminSummaryCard('💳','Estados financieros',Object.values(finance.counts||{}).reduce((a,b)=>a+Number(b||0),0),'registros disponibles')}${adminSummaryCard('🚗','Estacionamientos',m.parking?.active||0,`${m.parking?.today||0} para hoy`)}${adminSummaryCard('📖','Sala de estudios',m.study?.active||0,`${m.study?.waitlist||0} avisos`)}</div><section class="section grid two"><div class="card"><span class="eyebrow">INTEGRACIONES</span><h3>Capacidades configuradas</h3><div class="capability-grid">${cap('Sheets READ',caps.sheets?.read)}${cap('Sheets WRITE',caps.sheets?.write)}${cap('Calendar READ',caps.calendar?.read)}${cap('Calendar WRITE',caps.calendar?.write)}${cap('Gmail OTP',caps.gmail?.otp)}${cap('Web Push',d.integrations?.push?.enabled)}</div></div><div class="card"><span class="eyebrow">AUDITORÍA</span><h3>Últimos eventos</h3><div class="admin-event-list">${(d.audit||[]).map(adminDashboardEvent).join('')||'<div class="empty compact-empty">Sin eventos registrados.</div>'}</div></div></section><section class="section card"><span class="eyebrow">SECCIONES</span><h3>Control Informática</h3><div class="admin-dashboard-links">${links.map(([id,icon,label])=>`<a class="card admin-dashboard-link" role="link" tabindex="0" data-admin-go="${id}"><span>${icon}</span><div><strong>${escapeHtml(label)}</strong><small>Abrir sección</small></div><b>→</b></a>`).join('')}</div></section>`;
+  $$('[data-admin-go]').forEach(button=>button.onclick=()=>go(button.dataset.adminGo));
+}
+function adminSummaryCard(icon,label,value,detail){return `<div class="card admin-summary-card"><span>${icon}</span><div><small>${escapeHtml(label)}</small><strong>${Number(value||0)}</strong><p>${escapeHtml(detail)}</p></div></div>`}
+function adminDashboardEvent(e){return `<div class="admin-dashboard-event"><div><strong>${escapeHtml(e.action||'Evento')}</strong><span>${escapeHtml(e.actorName||'Sistema')}${e.entityType?` · ${escapeHtml(e.entityType)}`:''}</span></div><time>${e.createdAt?formatLocalDateTime(e.createdAt):'—'}</time></div>`}
+async function renderAdminMembers(){
+  if(state.member?.role!=='ADMIN')return go('home');const viewState=state.adminMembers={query:'',page:1,limit:20,selectedId:null};
+  $('#view').innerHTML=`<section class="admin-members-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA</span><h2>Socios</h2><p>Consulta y operación auditada sobre las fuentes existentes.</p></div><span class="badge blue"><i class="dot"></i>ADMIN</span></section><form id="admin-members-search" class="admin-members-search card" role="search"><label for="admin-members-query">Buscar por nombre, RUT o email</label><div><input id="admin-members-query" type="search" maxlength="120" autocomplete="off" placeholder="Nombre, RUT o email"><button class="button secondary" type="submit">Buscar</button></div></form><section class="admin-members-layout section"><div id="admin-members-list" class="card"><div class="empty compact-empty">Cargando socios…</div></div><aside id="admin-member-detail" class="card admin-member-detail"><div class="admin-member-detail-empty"><span>👤</span><strong>Selecciona un socio</strong><p>La información completa se carga únicamente al abrir una ficha.</p></div></aside></section>`;
+  $('#admin-members-search').onsubmit=async e=>{e.preventDefault();viewState.query=$('#admin-members-query').value.trim();viewState.page=1;viewState.selectedId=null;showAdminMemberDetailEmpty();await loadAdminMembersList()};await loadAdminMembersList();
+}
+async function loadAdminMembersList(){
+  const s=state.adminMembers,box=$('#admin-members-list');if(!box)return;box.innerHTML='<div class="empty compact-empty">Cargando socios…</div>';
+  try{const data=await api(`/api/admin/members/list?q=${encodeURIComponent(s.query)}&page=${s.page}&limit=${s.limit}`);s.page=data.page||1;box.innerHTML=`<div class="section-head admin-members-list-head"><div><h3>Listado de socios</h3><p>${Number(data.total||0)} resultado${Number(data.total||0)===1?'':'s'}</p></div><span class="badge blue">Página ${data.page||1} de ${data.pages||1}</span></div>${adminMembersTable(data.members||[])}<div class="admin-members-pagination"><button class="button ghost" id="admin-members-prev" type="button" ${data.page<=1?'disabled':''}>← Anterior</button><span>${data.total?`${(data.page-1)*data.limit+1}–${Math.min(data.page*data.limit,data.total)} de ${data.total}`:'Sin resultados'}</span><button class="button ghost" id="admin-members-next" type="button" ${data.page>=data.pages?'disabled':''}>Siguiente →</button></div>`;$('#admin-members-prev').onclick=async()=>{s.page=Math.max(1,s.page-1);await loadAdminMembersList()};$('#admin-members-next').onclick=async()=>{s.page+=1;await loadAdminMembersList()};$$('.admin-member-row',box).forEach(row=>row.onclick=()=>loadAdminMemberDetail(Number(row.dataset.id)))}catch(err){box.innerHTML=`<div class="empty">${escapeHtml(err.message)}</div>`}
+}
+
 function adminMembersTable(rows){
   if(!rows.length)return '<div class="empty">No se encontraron socios.</div>';
   return `<div class="admin-members-table" role="table" aria-label="Socios"><div class="admin-members-table-head" role="row"><span>Socio</span><span>RUT</span><span>Email</span><span>Estado</span></div>${rows.map(m=>`<button class="admin-member-row" type="button" role="row" data-id="${m.id}"><strong>${escapeHtml(m.name||'No disponible')}</strong><span data-label="RUT">${escapeHtml(m.rutMasked||'No disponible')}</span><span data-label="Email">${escapeHtml(m.emailMasked||'No disponible')}</span>${adminMemberStateBadge(m.membershipState)}</button>`).join('')}</div>`;
@@ -792,7 +841,7 @@ async function adminMasterMemberAction(memberId,action,extra={}){
   try{await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{...extra,confirm:confirmations[action]||''}});toast(action==='refresh'?'Diagnóstico actualizado.':'Acción administrativa completada y auditada.');await loadAdminMemberDetail(memberId)}catch(err){toast(err.message,true)}
 }
 async function renderAdminReservations(){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/reservations'),s=d.summary||{},parking=d.parking||{},study=d.study||{},sim=d.simulators||{};
   const available=Math.max(0,Number(s.parkingSpaces||0)-Number(s.parkingToday||0));
   $('#view').innerHTML=`
@@ -824,7 +873,7 @@ async function adminReservationControl(memberId,action,reservationId){
   try{await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{reservationId,confirm:confirmText}});toast('Reserva actualizada y auditada.');await renderAdminReservations()}catch(err){toast(err.message,true)}
 }
 async function renderAdminNotifications(){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/notifications'),push=d.push||{},otp=d.gmailOtp||{},errors=d.recentErrors||[];
   $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · NOTIFICACIONES</span><h2>Entregas y canales</h2><p>Estado local de Push y Gmail OTP. No se muestran códigos, tokens, endpoints, claves ni payloads de notificación.</p></div>${adminControlStatusBadge(push.status)}</section>
   <div class="admin-summary-grid">
@@ -843,7 +892,7 @@ async function renderAdminNotifications(){
 }
 function adminNotificationErrorRow(row){return `<div class="admin-error-row"><div><strong>${escapeHtml(row.source||'NOTIFICACIÓN')}</strong><p>${escapeHtml(row.summary||'Error de entrega')}${row.memberName?` · ${escapeHtml(row.memberName)}`:''}</p></div><time>${row.createdAt?formatLocalDateTime(row.createdAt):'Sin fecha'}</time></div>`}
 async function renderAdminSecurity(){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/security'),s=d.summary||{},admin=d.admin||{},members=d.members||[],events=d.events||[];
   $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · SEGURIDAD</span><h2>Sesiones y credenciales</h2><p>Resumen operativo sin hashes, salts, tokens, credenciales WebAuthn ni códigos OTP. No crea accesos alternativos.</p></div>${adminControlStatusBadge(admin.configured&&admin.active&&admin.pinConfigured?'OK':'ADVERTENCIA')}</section>
   <div class="admin-summary-grid">
@@ -868,7 +917,7 @@ async function adminSecurityAction(memberId,action,extra={}){
   try{await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{...extra,confirm:confirmations[action]||''}});toast('Acción de seguridad completada y auditada.');await renderAdminSecurity()}catch(err){toast(err.message,true)}
 }
 async function renderAdminAudit(filters={}){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const qs=new URLSearchParams();for(const [key,value] of Object.entries(filters))if(value)qs.set(key,value);qs.set('limit','200');
   const d=await api(`/api/admin/audit?${qs}`),f=d.filters||{},rows=d.rows||[];
   $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · AUDITORÍA</span><h2>Registro sanitizado</h2><p>Eventos de audit_log con actor, acción, socio afectado, categoría y resultado. Los detalles se reducen a campos operativos permitidos.</p></div><span class="badge blue">${d.total||0} resultado(s)</span></section>
@@ -879,7 +928,7 @@ async function renderAdminAudit(filters={}){
 }
 function adminAuditViewRow(row){return `<div class="admin-audit-view-row"><time>${row.createdAt?formatLocalDateTime(row.createdAt):'Sin fecha'}</time><div><strong>${escapeHtml(row.actorName||'Sistema')}</strong><small>${row.subjectName?`→ ${escapeHtml(row.subjectName)}`:'Sin socio afectado'}</small></div><code>${escapeHtml(row.action||'EVENTO')}</code><span>${escapeHtml(row.category||'OTROS')}</span>${adminControlStatusBadge(row.result||'OK')}<p>${escapeHtml(row.summary||'Sin detalle operativo adicional.')}</p></div>`}
 async function renderAdminIntegrations(){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/integrations');
   $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · INTEGRACIONES</span><h2>Estado y efecto operativo</h2><p>Capacidades configuradas y última evidencia local conocida. Esta carga no ejecuta probes de red ni dispara sincronizaciones.</p></div><span class="badge green">SIN PROBES EXTERNOS</span></section>
   <section class="section admin-integration-grid">${(d.items||[]).map(adminIntegrationCard).join('')}</section>
@@ -888,7 +937,7 @@ async function renderAdminIntegrations(){
 function adminControlStatusBadge(status){const value=String(status||'ADVERTENCIA'),tone=value==='OK'?'green':value==='ERROR'?'red':value==='DESHABILITADO'?'blue':'amber';return `<span class="badge ${tone}"><i class="dot"></i>${escapeHtml(value)}</span>`}
 function adminIntegrationCard(item){return `<article class="card admin-integration-card"><div class="admin-section-title"><div><span class="eyebrow">INTEGRACIÓN</span><h3>${escapeHtml(item.label||item.id)}</h3></div>${adminControlStatusBadge(item.status)}</div><p>${escapeHtml(item.summary||'Sin información local.')}</p><div class="admin-integration-impact"><strong>Funcionalidad afectada</strong><span>${escapeHtml(item.affects||'No informada.')}</span></div><div class="admin-integration-meta"><strong>${escapeHtml(item.lastKnownLabel||'Última evidencia')}</strong><span>${item.lastKnownAt?formatLocalDateTime(item.lastKnownAt):'No disponible'}</span><small>${escapeHtml(item.probe||'')}</small></div></article>`}
 async function renderAdminSystem(){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/system'),runtime=d.runtime||{},sqlite=d.sqlite||{},backups=d.backups||[],errors=d.recentErrors||[],failed=d.failedJobs||[],container=d.container||{};
   $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · SISTEMA</span><h2>Diagnóstico local acotado</h2><p>Runtime, integridad SQLite, tablas, backups y fallos registrados. Sin shell, SQL libre, navegador de archivos ni editor de configuración.</p></div>${adminControlStatusBadge(sqlite.ok?'OK':'ERROR')}</section>
   <div class="admin-summary-grid">
@@ -906,14 +955,21 @@ async function renderAdminSystem(){
     <div class="card admin-master-wide"><span class="eyebrow">TABLAS SQLITE</span><h3>Inventario y filas</h3><div class="admin-table-stats">${(sqlite.tables||[]).map(t=>`<div><span>${escapeHtml(t.name)}</span><strong>${t.count==null?'—':Number(t.count).toLocaleString('es-CL')}</strong></div>`).join('')}</div></div>
   </section>`;
 }
+function adminMasterBackup(b){
+  const tone=b.status==='OK'?'green':b.status==='ERROR'?'red':'amber';
+  return `<div class="admin-backup-row"><div><strong>${escapeHtml(b.fileName||'Copia de seguridad')}</strong><p>${escapeHtml(b.status||'—')}${b.sizeBytes?` · ${formatBytes(b.sizeBytes)}`:''}${b.error?` · ${escapeHtml(b.error)}`:''}</p></div><div><span class="badge ${tone}"><i class="dot"></i>${escapeHtml(b.status||'—')}</span><time>${b.createdAt?formatLocalDateTime(b.createdAt):'Sin fecha'}</time></div></div>`;
+}
+function adminMasterError(row){
+  return `<div class="admin-error-row"><div><strong>${escapeHtml(row.source||'ERROR')}</strong><p>${escapeHtml(row.detail||'Sin detalle disponible.')}</p></div><time>${row.createdAt?formatLocalDateTime(row.createdAt):'Sin fecha'}</time></div>`;
+}
 function renderAdminPlaceholder(id){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const [icon,title,description]=ADMIN_PLACEHOLDERS[id];
   $('#view').innerHTML=`<div class="card admin-placeholder"><span>${icon}</span><span class="eyebrow">ESTRUCTURA ADMIN</span><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p><strong>Pendiente · sin funciones ni datos adicionales</strong></div>`;
 }
 async function renderAdmin(){return renderDeveloper()}
 async function renderDeveloper(){
-  if(state.member.role!=='ADMIN')return go('home');
+  if(state.member?.role!=='ADMIN')return go('home');
   const o=await api('/api/admin/overview'),caps=o.google||{},m=o.metrics||{};
   const pending=(o.marketplace||[]).filter(x=>x.status==='PENDING');
   const reports=(o.marketplaceReports||[]).filter(x=>x.status==='OPEN');
@@ -1012,6 +1068,14 @@ function agreementAdminRow(a){return `<div><div><strong>${escapeHtml(a.title)}</
 function libraryAdminRow(a){return `<div><div><strong>${escapeHtml(a.title)}</strong><span>${escapeHtml(a.category||'General')} · ${escapeHtml(a.status)}</span></div><div class="toolbar"><button class="button ghost library-admin-edit" data-id="${a.id}">Editar</button>${a.status==='ACTIVE'?`<button class="button ghost library-admin-status" data-id="${a.id}" data-status="HIDDEN">Ocultar</button>`:`<button class="button secondary library-admin-status" data-id="${a.id}" data-status="ACTIVE">Activar</button>`}</div></div>`}
 function auditAdminRow(a){let d='';try{const x=JSON.parse(a.detail_json||'null');d=x?JSON.stringify(x):''}catch{}return `<div class="audit-row"><div><strong>${escapeHtml(a.action)}</strong><span>${escapeHtml(a.actor_name||'Sistema')}${a.subject_name?' → '+escapeHtml(a.subject_name):''} · ${formatLocalDateTime(a.created_at)}</span></div>${d?`<code title="${escapeHtml(d)}">${escapeHtml(d.slice(0,120))}</code>`:''}</div>`}
 function formatBytes(n){if(!n)return '0 B';const u=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return `${n.toFixed(i?1:0)} ${u[i]}`}
+function formatAdminDuration(value){
+  const totalSeconds=Math.max(0,Math.floor(Number(value)||0));
+  const days=Math.floor(totalSeconds/86400),hours=Math.floor(totalSeconds%86400/3600),minutes=Math.floor(totalSeconds%3600/60),seconds=totalSeconds%60;
+  if(days)return `${days} d ${hours} h`;
+  if(hours)return `${hours} h ${minutes} min`;
+  if(minutes)return `${minutes} min`;
+  return `${seconds} s`;
+}
 
 
 function cap(label,on){return `<span class="cap ${on?'on':'off'}"><i></i>${label}: ${on?'ON':'OFF'}</span>`}

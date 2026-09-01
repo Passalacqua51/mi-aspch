@@ -1,8 +1,24 @@
 # Pendientes
 
+- [ ] Con privilegios sudo renovados, deshabilitar y enmascarar la unidad
+      histórica `cloudflared-tunnel.service`; hoy no alcanza Preview porque
+      apunta a localhost y el puerto 8086 escucha exclusivamente en Tailscale.
+- [ ] Revisar y autorizar de forma separada el plan real de 182 cambios,
+      especialmente las 22 desactivaciones por DESAFILIADO.
+- [ ] Instalar/montar de forma read-only el XLSM de Arianna en la ruta runtime
+      canónica antes de habilitar una automatización; actualmente la ruta del
+      contenedor no contiene el archivo.
+- [ ] Tras una primera sincronización controlada, decidir frecuencia y mecanismo
+      del scheduler automático con el mismo dry-run, hash y auditoría.
 - [ ] Definir una migración separada para runtime y backups, con rollback.
 - [ ] Retirar en una tarea autorizada las variables de autenticación obsoletas
       del `.env` productivo, sin mostrar sus valores.
+- [ ] Diseñar una fuente local segura y sincronizada para turnos de simulador.
+- [ ] Definir una fuente segura si se requiere mostrar estado real del contenedor.
+- [ ] Definir persistencia segura de intentos/fallos y bloqueos de acceso si esas
+      métricas deben incorporarse a Seguridad.
+- [ ] Evaluar un endpoint ADMIN acotado para limpiar Push muerto solo si el borrado
+      automático 404/410 durante entregas resulta insuficiente.
 
 # En curso
 
@@ -14,6 +30,32 @@
 
 # Completadas recientemente
 
+- [x] Reproducir en 8086 el bundle obsoleto que omitía Perfil/Membresía,
+      invalidar caché HTTP/PWA exclusivamente en Preview y validar por navegación
+      real que ambos renderizadores son funciones globales.
+- [x] Estabilizar las vistas Preview, retirar WhatsApp flotante y aplicar el
+      comportamiento real de MOROSO, MODO SIMPLE, DESAFILIADO e INFORMÁTICA,
+      validando nueve perfiles con Playwright y sin tocar producción 8085.
+- [x] Sustituir el laboratorio simulado por nueve sesiones sintéticas reales y
+      aisladas en SQLite Preview, con un solo teléfono autenticado y sin tocar 8085.
+- [x] Implementar resumen dinámico compacto en Inicio de Mi ASPCH (Saludo, Credencial, Próximo simulador, Estacionamiento activo, Aviso ASPCH, Mensualidad con regla LATAM y Contacto discreto al final), desplegando solo Preview 8086 y sincronizando MediaCenter.
+- [x] Corregir el login light, unificar Simuladores/Sala bajo Reservas y añadir
+      personalización visual persistida por socio, desplegando solo Preview 8086.
+- [x] Instalar el logo institucional original sin variantes, retirarlo del hero
+      de Inicio, validar visualmente light/dark y actualizar solo Preview 8086.
+- [x] Crear Preview persistente 8086 con Compose separado, SQLite sanitizada,
+      fuentes reales read-only, login ADMIN exclusivo y efectos externos
+      bloqueados por configuración y por código.
+- [x] Implementar motor seguro y auditable XLSM → SQLite, deshabilitar el
+      importador legado y ejecutar dry-run real sin escrituras productivas.
+- [x] Completar Notificaciones, Seguridad y Auditoría con lecturas ADMIN-only,
+      detalles sanitizados y acciones de seguridad ya existentes.
+- [x] Completar Reservas, Integraciones y Sistema del Control Informática con
+      lecturas ADMIN-only, acciones de reservas auditadas y cero probes externos.
+- [x] Cerrar la primera versión útil del Control Informática maestro con
+      Dashboard, ficha diagnóstica, acciones ADMIN auditadas y XLSM read-only.
+- [x] Implementar la capa financiera independiente read-only/dry-run, sus pruebas
+      de seguridad y el reporte real de discrepancias sin conectar producción.
 - [x] Preparar en `feat/admin-members-readonly` la vista ADMIN de Socios de solo
       lectura, con listado minimizado, ficha real y pruebas sin efectos externos.
 - [x] Preparar en `feat/admin-dashboard-structure` la separación inicial de

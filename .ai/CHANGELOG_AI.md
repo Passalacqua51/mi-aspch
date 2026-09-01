@@ -1,55 +1,81 @@
-# Historial de contexto IA
+# Invalidación del bundle obsoleto en Preview 8086 — 2026-09-01
 
-## 2026-08-27
+- Reproducidos en el origen real los stacks de `renderProfile` y
+  `renderMembership` ausentes al ejecutar un bundle retenido.
+- Confirmado que el bundle actual servido coincide byte a byte con source.
+- `app.js` queda `no-store` únicamente en Preview, referenciado por SHA-256 en
+  mobile/ADMIN, y el namespace del Service Worker fue rotado.
+- Playwright navega por botones reales a Perfil/Membresía y exige que ambos
+  símbolos sean funciones globales, sin ReferenceError.
+- Reconstruido solo `mi-aspch-preview`; producción 8085 no fue recreada.
 
-- Se preparó `feat/admin-members-readonly`: Socios dejó de ser placeholder y
-  ahora ofrece búsqueda, listado paginado con PII enmascarada y ficha ADMIN-only.
-- La ficha usa únicamente SQLite sincronizado para identidad, estado financiero,
-  sesiones, passkeys y reservas activas de estacionamiento y sala de estudios.
-- Los endpoints dedicados aceptan solo GET; las pruebas HTTP confirmaron 403 para
-  socios, 404 para mutaciones y ausencia de escrituras/notificaciones.
-- Se preparó `feat/admin-dashboard-structure` con una navegación ADMIN dividida
-  en doce áreas objetivo.
-- Dashboard quedó ADMIN-only, de solo lectura y alimentado por métricas reales
-  resumidas; Developer conserva el Control Center existente.
-- Las diez áreas restantes quedaron como placeholders explícitos sin datos ni
-  capacidades nuevas. No se desplegó ni se ejecutaron efectos externos.
-- Se sanearon 28 copias textuales de la credencial Google revocada: 1 archivo
-  canónico ignorado por Git, 4 fuentes históricas, 2 archivos de runtime legado
-  y 21 archivos dentro de backups. Cada secreto fue reemplazado sin eliminar el
-  archivo ni alterar el resto de su contenido.
-- La búsqueda posterior confirmó cero apariciones de la credencial revocada y
-  mantuvo la credencial vigente únicamente en el `.env` canónico y su JSON
-  protegido. Archivos SQLite y el archivo comprimido revisado no contenían la
-  credencial afectada.
-- `npm run check` aprobó y producción continuó en `0.6.16`, saludable y sin
-  recreación del contenedor.
-- Se cerró la rotación de la credencial Google de Mi ASPCH: la clave nueva fue
-  validada con fuentes reales y la clave anterior quedó eliminada en Google.
-- Se confirmaron `/api/health`, BD SOCIOS, Sheet financiero, estacionamientos,
-  Calendar READ y sincronización de socios sin errores OAuth nuevos.
-- Se preservaron 109 sesiones activas y 2 passkeys; Gmail, OTP y notificaciones
-  Gmail permanecen desactivados.
-- Se preparó la release `0.6.16` con el retiro de accesos alternativos ya
-  integrado en `main`, sin cambios funcionales adicionales ni despliegue.
-- Backend, PWA, caché, paquetes y Compose quedaron referenciados en `0.6.16`;
-  el digest de imagen permanece pendiente hasta la construcción autorizada.
-- Se preparó `fix/remove-presentation-login` sin despliegue ni cambios de datos.
-- Se retiraron los accesos de presentación, demo, RUT directo, correo-only y la
-  exposición de OTP; RUT+OTP, PIN, Passkeys/WebAuthn y ADMIN quedan preservados.
-- Se añadió una verificación HTTP aislada de autenticación y rutas retiradas.
-- Se normalizaron `package-lock.json`, backend, PWA y documentación en `0.6.15`.
-- Se creó `compose.yaml` fijado a la imagen productiva por tag y digest.
-- Se declaró explícitamente el volumen externo `aspch_mi_aspch_data`.
-- Se archivó el Compose v0.6.4 anterior sin aplicarlo.
-- Se estableció `/home/casa/mi-aspch-source` como única fuente de código y documentación vigente.
-- Se trasladó el contexto `.ai/` canónico a la carpeta oficial.
-- Se registró producción actual `0.6.15`.
-- Se clasificó `/mnt/MediaCenter/aspch` como legado/runtime, no como fuente de código.
-- Se separó la documentación histórica bajo `docs/history/`.
+# Estabilización de perfiles y Control Informática Preview 8086 — 2026-09-01
 
-## 2026-08-23
+- Restauradas Perfil, Membresía, Seguridad, Dashboard y Socios con sus helpers
+  reales; eliminados `renderProfile/renderMembership is not defined` y errores
+  derivados al navegar.
+- Retirado de toda la UI el flotante/logo de WhatsApp y su asset PWA.
+- MOROSO bloquea Estacionamiento y Reservas, muestra alerta de cuotas y no
+  presenta montos sin evidencia financiera validada.
+- MODO SIMPLE queda reducido a Credencial, Estacionamiento y Contacto;
+  DESAFILIADO muestra `Membresía no activa` sin navegación.
+- INFORMÁTICA abre el Control real en vista web same-origin con rol ADMIN y
+  `informatica@aspch.org`; el retorno a MEMBER restaura el teléfono.
+- Validados los nueve perfiles y vistas principales con Playwright sin errores
+  JS graves. Reconstruido solo `mi-aspch-preview`; 8085 intacto.
 
-- Se creó el contexto persistente compartido para Mi ASPCH.
-- Se verificó que el contenedor está saludable y que `npm run check` aprueba.
-- Se registró que el proyecto aún no tiene repositorio Git inicializado en su ruta actual.
+# Retiro de test-notificaciones en producción 8085 — 2026-09-01
+
+- Confirmado que el archivo ya no existía, pero el fallback SPA respondía 200
+  con `index.html` manteniendo la URL temporal y una PWA antigua podía conservar
+  el panel en caché.
+- Añadida redirección 302 con `no-store` desde `/test-notificaciones.html` a `/`
+  y rotado el caché del Service Worker para eliminar copias antiguas.
+- Se guardó backup y se revisó el diff antes del deploy.
+- La imagen hotfix deriva de la imagen productiva inmutable y sustituye solo
+  `server.mjs` y `public/sw.js`; volumen, mounts, variables y datos se preservan.
+- Validado con HTTP y Playwright: `/` abre Mi ASPCH, la ruta retirada termina en
+  `/`, health healthy, cero reinicios y Preview 8086 intacto.
+
+# Laboratorio autenticado Preview 8086 — 2026-09-01
+
+- Añadido `POST /api/preview/impersonate`, disponible exclusivamente con
+  `PREVIEW_MODE=true` y 404 en modo normal.
+- Añadidos nueve socios sintéticos seguros con estados, preferencias y sesión
+  normal en SQLite Preview mediante `mi_aspch_preview_session`.
+- Reducido el laboratorio a selector izquierdo y un teléfono mobile en Inicio.
+- Retirados `?sim=`, `lab-interceptor.js`, presets de login, fallback ADMIN
+  global y la respuesta especial de Service Worker.
+- Verificados los nueve perfiles, incluido DESAFILIADO bloqueado e INFORMÁTICA
+  ADMIN, y la secuencia ACTIVO → MOROSO → JUBILADO.
+- Reconstruido únicamente `mi-aspch-preview`; producción 8085 intacta.
+
+# Corrección del arranque autenticado Preview 8086 — 2026-09-01
+
+- Restaurados `isHelicopterMember` y `applyMemberTheme`, cuya ausencia lanzaba
+  un `ReferenceError` después de que `/api/me` ya hubiera autenticado al socio.
+- Renovada la versión del recurso `app.js` para que la recarga del teléfono no
+  reutilice el JavaScript defectuoso del caché HTTP.
+- Añadida una prueba Playwright de la secuencia completa click → impersonate →
+  cookie → `/api/me` del iframe → Inicio para los cinco perfiles solicitados.
+- Verificados cookie host-only en 8086, Path `/`, SameSite Strict, HttpOnly,
+  iframe same-origin, Inicio visible y login/PIN ocultos.
+- Reconstruido solo `mi-aspch-preview`; `mi-aspch` 8085 conservó contenedor,
+  imagen, hora de inicio, cero reinicios y estado healthy.
+- Corregido el overlay persistente del teléfono: el estado oculto ahora usa
+  `display:none`, se renovaron las URLs de `lab.js`/`lab.css` y Playwright
+  comprueba que la capa desaparece después de abrir Inicio.
+- Corregido el “Cargando…” interno de Inicio: `go()` evaluaba referencias a
+  renderizadores ausentes antes de llamar a `renderHome()` y lanzaba
+  `ReferenceError: renderSecurity is not defined`.
+- Las rutas ahora se resuelven de forma diferida y `renderHome()` aplica timeout
+  con estado vacío a estacionamiento, simuladores y mensualidad.
+- Playwright verificó ACTIVO, MOROSO, JUBILADO, MODO SIMPLE, FO CPT e
+  INFORMÁTICA con contenido de Inicio visible, sin “Cargando…” ni errores JS.
+
+# Corrección Selector de Perfiles (8086) — supersedida
+
+- Eliminado el auto-login obligatorio de `informatica@aspch.org` para el puerto de Lab (8086).
+- `server.mjs` ahora intercepta `?sim=` en el Lab y carga directamente el perfil real desde SQLite simulando una sesión limpia, sin alterar datos y aislando la cookie para este laboratorio.
+- Modificado `lab-interceptor.js` para detener la interceptación de `/api/me` (ahora se nutre del backend real), conservando solo el mock 401 para la simulación de *login* (teléfono 1) y el pin lock (teléfono 2).
+- Agregado el botón **INFORMÁTICA** al selector de la UI `lab.html`.

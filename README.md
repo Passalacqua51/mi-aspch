@@ -1,5 +1,9 @@
 # Mi ASPCH
 
+El entorno persistente de pruebas privado se opera según
+[docs/PREVIEW.md](docs/PREVIEW.md). Usa un Compose, SQLite y puerto separados de
+producción.
+
 Mi ASPCH es una aplicación Node.js/PWA para los socios de la Asociación de
 Pilotos de Chile. El código oficial está preparado como `0.6.16`; producción
 continúa ejecutando `0.6.15` hasta un despliegue autorizado.

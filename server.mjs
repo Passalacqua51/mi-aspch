@@ -19,7 +19,8 @@ loadEnv(path.join(__dirname, '.env'));
 
 const VERSION = '0.6.16';
 const PREVIEW_MODE = bool(process.env.PREVIEW_MODE, false);
-const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'mi_aspch_session';
+const SESSION_COOKIE_NAME = PREVIEW_MODE ? 'mi_aspch_preview_session' : (process.env.SESSION_COOKIE_NAME || 'mi_aspch_session');
+if (PREVIEW_MODE) process.env.SESSION_COOKIE_NAME = SESSION_COOKIE_NAME;
 const WHATSAPP_NUMBER = normalizePhoneDigits(process.env.ASPCH_WHATSAPP || '56948825381');
 const PORT = Number(process.env.PORT || 8080);
 const BIND_ADDRESS = process.env.SERVER_BIND_ADDRESS || '0.0.0.0';
@@ -78,6 +79,18 @@ const config = {
   dailyBackupMinute:Math.max(0,Math.min(59,Number(process.env.DAILY_BACKUP_MINUTE||15)))
 };
 
+const PREVIEW_PROFILES = Object.freeze([
+  { key:'ACTIVO',label:'ACTIVO',email:'preview.activo@preview.invalid',name:'Cap. Alicia Activa',preferredName:'Alicia',rut:'99000001-8',birthDate:'1984-04-12',phone:'+56900000001',employer:'LATAM Airlines',category:'Línea Aérea',position:'CPT B787',role:'MEMBER',active:true,isBoard:false,financialStatus:'AL_DIA',monthsDue:0,amountDue:0,paid:true,simpleMode:false },
+  { key:'MOROSO',label:'MOROSO',email:'preview.moroso@preview.invalid',name:'FO Martín Moroso',preferredName:'Martín',rut:'99000002-6',birthDate:'1989-02-18',phone:'+56900000002',employer:'JetSMART',category:'Línea Aérea',position:'Primer Oficial A320',role:'MEMBER',active:true,isBoard:false,financialStatus:'MOROSO',monthsDue:3,amountDue:0,amountEvidence:'NONE',paid:false,simpleMode:false },
+  { key:'JUBILADO',label:'JUBILADO',email:'preview.jubilado@preview.invalid',name:'Cap. Jaime Jubilado',preferredName:'Jaime',rut:'99000003-4',birthDate:'1958-07-21',phone:'+56900000003',employer:'Jubilado',category:'Jubilado',position:'Capitán Jubilado',role:'MEMBER',active:true,isBoard:false,financialStatus:'JUBILADO',monthsDue:0,amountDue:0,paid:false,simpleMode:false },
+  { key:'MODO SIMPLE',label:'MODO SIMPLE',email:'preview.simple@preview.invalid',name:'Cap. Sofía Simple',preferredName:'Sofía',rut:'99000004-2',birthDate:'1982-11-08',phone:'+56900000004',employer:'LATAM Airlines',category:'Línea Aérea',position:'CPT A320',role:'MEMBER',active:true,isBoard:false,financialStatus:'AL_DIA',monthsDue:0,amountDue:0,paid:true,simpleMode:true },
+  { key:'FO CPT',label:'FO CPT',email:'preview.fo-cpt@preview.invalid',name:'FO Felipe Operaciones',preferredName:'Felipe',rut:'99000005-0',birthDate:'1991-05-27',phone:'+56900000005',employer:'SKY Airline',category:'Línea Aérea',position:'Primer Oficial A320',role:'MEMBER',active:true,isBoard:false,financialStatus:'AL_DIA',monthsDue:0,amountDue:0,paid:true,simpleMode:false },
+  { key:'DIRECTORIO',label:'DIRECTORIO',email:'preview.directorio@preview.invalid',name:'Cap. Daniela Directorio',preferredName:'Daniela',rut:'99000006-9',birthDate:'1977-01-14',phone:'+56900000006',employer:'LATAM Airlines',category:'Línea Aérea',position:'Directora Tesorera',role:'MEMBER',active:true,isBoard:true,financialStatus:'DIRECTORIO',monthsDue:0,amountDue:0,paid:false,simpleMode:false },
+  { key:'CONGELADO',label:'CONGELADO',email:'preview.congelado@preview.invalid',name:'FO Camilo Congelado',preferredName:'Camilo',rut:'99000007-7',birthDate:'1987-09-03',phone:'+56900000007',employer:'Particular',category:'Línea Aérea',position:'Primer Oficial',role:'MEMBER',active:true,isBoard:false,financialStatus:'CONGELADO',monthsDue:0,amountDue:0,paid:false,simpleMode:false },
+  { key:'DESAFILIADO',label:'DESAFILIADO',email:'preview.desafiliado@preview.invalid',name:'Diego Desafiliado',preferredName:'Diego',rut:'99000008-5',birthDate:'1980-12-30',phone:'+56900000008',employer:'Ex asociado',category:'Desafiliado',position:'Ex piloto',role:'MEMBER',active:false,isBoard:false,financialStatus:'DESAFILIADO',monthsDue:0,amountDue:0,paid:false,simpleMode:false },
+  { key:'INFORMATICA',label:'INFORMÁTICA',email:'informatica@aspch.org',name:'INFORMÁTICA PREVIEW',preferredName:'Informática',rut:'99000009-3',birthDate:null,phone:'+56900000009',employer:'ASPCH Preview',category:'Administración',position:'ADMIN Preview',role:'ADMIN',active:true,isBoard:false,financialStatus:'AL_DIA',monthsDue:0,amountDue:0,paid:true,simpleMode:false }
+]);
+
 let financialReadCache={mtimeMs:null,public:null,recordsByRut:new Map(),duplicateRuts:new Set()};
 initializeExternalData().catch(err=>console.error('[Mi ASPCH] Inicialización externa:',err.message));
 startV060Schedulers();
@@ -93,52 +106,6 @@ async function handleRequest(req, res, isLabPort, isAdminPort) {
   try {
     setSecurityHeaders(res);
     const url = new URL(req.url, effectiveRequestOrigin(req) || APP_ORIGIN);
-
-
-    if (PREVIEW_MODE && req.method === 'GET') {
-      let p = url.pathname;
-      if (p === '/' || p === '/index.html' || p === '/login.html' || p === '/mobile') {
-        const sim = url.searchParams.get('sim');
-        if (isLabPort && sim) {
-           let targetEmail = null;
-           let targetUser = null;
-           try {
-             if (sim === 'ACTIVO') targetUser = db.prepare("SELECT * FROM members WHERE active=1 AND role='MEMBER' AND id NOT IN (SELECT member_id FROM member_financial_status) LIMIT 1").get();
-             else if (sim === 'MOROSO') targetUser = db.prepare("SELECT m.* FROM members m JOIN member_financial_status f ON m.id=f.member_id WHERE f.financial_status='MOROSO' LIMIT 1").get();
-             else if (sim === 'JUBILADO') targetUser = db.prepare("SELECT * FROM members WHERE (employer LIKE '%JUBILA%' OR position LIKE '%JUBILA%') AND active=1 LIMIT 1").get();
-             else if (sim === 'SIMPLE') {
-                targetUser = db.prepare("SELECT * FROM members WHERE active=1 AND role='MEMBER' AND id NOT IN (SELECT member_id FROM member_financial_status) LIMIT 1").get();
-                if (targetUser) db.prepare("INSERT INTO member_ui_preferences (member_id, simple_mode) VALUES (?, 1) ON CONFLICT(member_id) DO UPDATE SET simple_mode=1").run(targetUser.id);
-             }
-             else if (sim === 'FO CPT') targetUser = db.prepare("SELECT * FROM members WHERE position LIKE '%CPT%' AND active=1 LIMIT 1").get();
-             else if (sim === 'DIRECTORIO') targetUser = db.prepare("SELECT * FROM members WHERE is_board=1 AND active=1 LIMIT 1").get();
-             else if (sim === 'CONGELADO') targetUser = db.prepare("SELECT m.* FROM members m JOIN member_financial_status f ON m.id=f.member_id WHERE f.financial_status='CONGELADO' LIMIT 1").get();
-             else if (sim === 'DESAFILIADO') targetUser = db.prepare("SELECT * FROM members WHERE active=0 LIMIT 1").get();
-             else if (sim === 'INFORMÁTICA') targetEmail = 'informatica@aspch.org';
-             
-             if (targetEmail) {
-                targetUser = db.prepare("SELECT * FROM members WHERE email=? AND active=1").get(targetEmail);
-             }
-             if (targetUser) {
-                const { token } = createSession(db, targetUser, { unlockedMs: 24 * 60 * 60_000 });
-                setSessionCookie(req, res, token);
-                req.headers.cookie = `${SESSION_COOKIE_NAME}=${token}`; // update for this request
-             }
-           } catch(e) { console.error("Sim error:", e); }
-        }
-
-        const member = memberFromRequest(db, req);
-        if (isAdminPort && (!member || member.role !== 'ADMIN')) {
-          const admin = db.prepare("SELECT * FROM members WHERE email=? AND active=1").get(String(process.env.ADMIN_EMAIL || 'informatica@aspch.org').trim().toLowerCase());
-          if (admin) {
-            const { token } = createSession(db, admin, { unlockedMs: 24 * 60 * 60_000 });
-            setSessionCookie(req, res, token);
-            req.headers.cookie = `${SESSION_COOKIE_NAME}=${token}`;
-          }
-        }
-      }
-    }
-
     req.isAdminPort = isAdminPort;
     req.isLabPort = isLabPort;
 
@@ -147,10 +114,6 @@ async function handleRequest(req, res, isLabPort, isAdminPort) {
       return await routeApi(req, res, url);
     }
     if (req.method === 'GET' && url.pathname.startsWith('/verify/')) return serveCredentialVerification(req, res, url.pathname);
-    if (PREVIEW_MODE && req.method === 'GET' && url.pathname === '/sw.js') {
-      res.statusCode = 200; res.setHeader('Content-Type', 'text/javascript; charset=utf-8'); res.setHeader('Cache-Control', 'no-store');
-      return res.end("self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.map(c=>caches.delete(c)))).then(()=>self.clients.claim()).then(()=>self.registration.unregister())));");
-    }
     return serveStatic(req, res, url.pathname);
   } catch (err) {
     console.error(err);
@@ -174,6 +137,7 @@ server.listen(PORT, BIND_ADDRESS, () => {
 
 async function routeApi(req, res, url) {
   const p = url.pathname;
+  if (!PREVIEW_MODE && p.startsWith('/api/preview/')) return json(res, 404, { error:'Ruta no encontrada.' });
   if (req.method === 'GET' && p === '/api/health') return json(res, 200, { ok:true, version:VERSION, preview:{enabled:PREVIEW_MODE,sqlite:'ISOLATED',externalEffects:PREVIEW_MODE?'BLOCKED':'CONFIGURED'}, google:googleCapabilities(), googleLegacy:googleEnabled(), push:{enabled:pushEnabled()}, financial:{sourceReady:fs.existsSync(FINANCIAL_XLSM_PATH),lastSync:latestFinancialSync(db)}, modules:moduleStates(db) });
   if (req.method === 'GET' && p === '/api/config') {
     const w = webauthnRequestInfo(effectiveRequestOrigin(req), isSecureRequest(req));
@@ -326,40 +290,22 @@ async function routeApi(req, res, url) {
     setSessionCookie(req,res,result.token);return json(res,200,{ok:true,member:publicMember(result.member)});
   }
 
-  // Endpoints de Preview para acceso rápido a presets de socios
-  if (PREVIEW_MODE && req.method === 'GET' && p === '/api/preview/members') {
-    const members = db.prepare(`
-      SELECT id, rut, email, name, active, role 
-      FROM members 
-      WHERE active=1 
-      ORDER BY name ASC 
-      LIMIT 50
-    `).all();
-    return json(res, 200, { 
-      members: members.map(m => ({
-        id: m.id,
-        rut: m.rut,
-        email: m.email,
-        name: m.name,
-        role: m.role
-      }))
-    });
-  }
-
-  if (PREVIEW_MODE && req.method === 'POST' && p === '/api/preview/login') {
+  if (PREVIEW_MODE && req.method === 'POST' && p === '/api/preview/impersonate') {
     const body = await readJson(req);
-    const memberId = Number(body.memberId) || null;
-    if (!memberId) return json(res, 400, { error: 'memberId es requerido.' });
-    
-    const member = db.prepare('SELECT * FROM members WHERE id=? AND active=1').get(memberId);
-    if (!member) return json(res, 403, { error: 'Socio no encontrado o inactivo.' });
-    
-    // Crear sesión con desbloqueo automático en preview
+    const profile = previewProfile(body.profile || body.type);
+    if (!profile) return json(res, 400, { error:'Perfil Preview no válido.' });
+    logout(db, req);
+    const member = upsertPreviewMember(profile);
+    db.prepare('DELETE FROM sessions WHERE member_id=?').run(member.id);
     const session = createSession(db, member, { unlockedMs: 24 * 60 * 60_000 });
     setSessionCookie(req, res, session.token);
     return json(res, 200, {
-      ok: true,
-      member: publicMember(member)
+      ok:true,
+      profile:profile.label,
+      member:publicMember(member),
+      membership:await membershipSummary(member),
+      access:benefitAccess(db,member),
+      uiPreferences:memberUiPreferences(db,member.id)
     });
   }
 
@@ -371,15 +317,7 @@ async function routeApi(req, res, url) {
     return json(res,403,{error:'Carga XLSM deshabilitada: la fuente se usa únicamente en lectura/diagnóstico.'});
   }
 
-  let member = memberFromRequest(db, req);
-  if (!member && PREVIEW_MODE) {
-    const admin = db.prepare("SELECT * FROM members WHERE email=? AND active=1").get(String(process.env.ADMIN_EMAIL || 'informatica@aspch.org').trim().toLowerCase());
-    if (admin) {
-      const { token } = createSession(db, admin, { unlockedMs: 24 * 60 * 60_000 });
-      setSessionCookie(req, res, token);
-      member = db.prepare("SELECT m.*, s.id AS session_id, s.expires_at AS session_expires, s.unlocked_until, (SELECT COUNT(*) FROM passkeys p WHERE p.member_id=m.id) AS passkey_count FROM sessions s JOIN members m ON m.id=s.member_id WHERE s.token_hash=?").get(crypto.createHash('sha256').update(`${process.env.SESSION_SECRET || 'dev'}|${token}`).digest('hex'));
-    }
-  }
+  let member = requestMember(req);
   if (!member) return json(res, 401, { error: 'Debes iniciar sesión.' });
   // La autorización ADMIN se evalúa antes del estado de desbloqueo para que
   // cualquier MEMBER reciba siempre 403 en toda la superficie maestra.
@@ -399,7 +337,7 @@ async function routeApi(req, res, url) {
       if (result.reason === 'format') return json(res, 400, { error: 'El PIN debe tener entre 4 y 6 dígitos.' });
       return json(res, 401, { error: 'El PIN actual no es correcto.' });
     }
-    member = memberFromRequest(db, req);
+    member = requestMember(req);
     return json(res, 200, { ok:true, security: securitySummary(member, req) });
   }
 
@@ -410,7 +348,7 @@ async function routeApi(req, res, url) {
     const body = await readJson(req);
     const result = unlockWithPin(db, member, body.pin);
     if (!result.ok) return json(res, 401, { error: result.reason === 'not_set' ? 'Aún no has creado un PIN.' : 'PIN incorrecto.' });
-    member = memberFromRequest(db, req);
+    member = requestMember(req);
     return json(res, 200, { ok:true, security: securitySummary(member, req) });
   }
 
@@ -431,7 +369,7 @@ async function routeApi(req, res, url) {
     const body = await readJson(req, 250_000);
     const result = await finishAuthentication(db, member, body.response || body);
     if (!result.ok) return json(res, 401, { error: passkeyError(result) });
-    member = memberFromRequest(db, req);
+    member = requestMember(req);
     return json(res, 200, { ok:true, security: securitySummary(member, req) });
   }
 
@@ -448,7 +386,7 @@ async function routeApi(req, res, url) {
     const body = await readJson(req, 250_000);
     const result = await finishRegistration(db, member, body.response || body);
     if (!result.ok) return json(res, 400, { error: passkeyError(result) });
-    member = memberFromRequest(db, req);
+    member = requestMember(req);
     return json(res, 200, { ok:true, count:result.count, security:securitySummary(member, req) });
   }
 
@@ -456,7 +394,7 @@ async function routeApi(req, res, url) {
     ensurePasskeyAllowed(req);
     if (!isUnlocked(member)) return json(res, 423, { error: 'Desbloquea Mi ASPCH para modificar la biometría.', code:'LOCKED' });
     const removed = removeAllPasskeys(db, member);
-    member = memberFromRequest(db, req);
+    member = requestMember(req);
     return json(res, 200, { ok:true, removed, security:securitySummary(member, req) });
   }
 
@@ -479,7 +417,7 @@ async function routeApi(req, res, url) {
       };
       return json(res, 400, { error: messages[result.reason] || 'No fue posible guardar el nombre de uso.' });
     }
-    member = memberFromRequest(db, req);
+    member = requestMember(req);
     return json(res, 200, { ok:true, member:publicMember(member) });
   }
 
@@ -518,7 +456,7 @@ async function routeApi(req, res, url) {
     db.prepare('UPDATE members SET employer=?, phone=?, updated_at=? WHERE id=?').run(employer, phone || previousPhone || null, now, member.id);
     db.prepare(`INSERT INTO airline_change_requests(member_id,previous_airline,new_airline,previous_phone,new_phone,status,created_at,sent_at)
       VALUES (?,?,?,?,?,?,?,?)`).run(member.id, previousEmployer || null, employer, previousPhone || null, phone || previousPhone || null, 'SYNCED_BD_SOCIOS', now, now);
-    member = memberFromRequest(db, req);
+    member = requestMember(req);
     return json(res, 200, { ok:true, synced, member:publicMember(member), message:'Datos actualizados en BD SOCIOS.' });
   }
 
@@ -1269,6 +1207,56 @@ function setSessionCookie(req, res, token) {
   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${30*24*3600}${secure ? '; Secure' : ''}`);
 }
 
+function isPreviewSyntheticMember(member) {
+  return PREVIEW_MODE && String(member?.email || '').toLowerCase().endsWith('@preview.invalid');
+}
+
+function requestMember(req) {
+  return memberFromRequest(db, req, { allowInactive:member => isPreviewSyntheticMember(member) });
+}
+
+function previewProfile(value) {
+  const key=String(value||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ');
+  return PREVIEW_PROFILES.find(profile => profile.key === key) || null;
+}
+
+function upsertPreviewMember(profile) {
+  const safeSynthetic=String(profile?.email||'').endsWith('@preview.invalid')||(profile?.role==='ADMIN'&&normalizeEmail(profile.email)===config.adminEmail);
+  if (!PREVIEW_MODE || !profile || !safeSynthetic) throw friendlyError(403,'Impersonación Preview no disponible.');
+  const stamp=new Date().toISOString();
+  const pinSalt=crypto.randomBytes(16).toString('base64url');
+  const pinHash=crypto.scryptSync(crypto.randomBytes(24).toString('base64url'),pinSalt,32).toString('base64url');
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare(`INSERT INTO members(email,name,preferred_name,rut,birth_date,phone,employer,category,position,role,active,is_board,pin_salt,pin_hash,pin_updated_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(email) DO UPDATE SET name=excluded.name,preferred_name=excluded.preferred_name,rut=excluded.rut,birth_date=excluded.birth_date,
+      phone=excluded.phone,employer=excluded.employer,category=excluded.category,position=excluded.position,role=excluded.role,active=excluded.active,
+      is_board=excluded.is_board,pin_salt=excluded.pin_salt,pin_hash=excluded.pin_hash,pin_updated_at=excluded.pin_updated_at,updated_at=excluded.updated_at`)
+      .run(profile.email,profile.name,profile.preferredName,profile.rut,profile.birthDate,profile.phone,profile.employer,profile.category,profile.position,profile.role,profile.active?1:0,profile.isBoard?1:0,pinSalt,pinHash,stamp,stamp);
+    const member=db.prepare('SELECT * FROM members WHERE email=?').get(profile.email);
+    db.prepare(`INSERT INTO member_financial_status(member_id,rut,source_status,financial_status,months_due,amount_due,source_year,source_updated_at,synced_at,deactivated_by_financial,amount_evidence)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(member_id) DO UPDATE SET rut=excluded.rut,source_status=excluded.source_status,
+      financial_status=excluded.financial_status,months_due=excluded.months_due,amount_due=excluded.amount_due,source_year=excluded.source_year,
+      source_updated_at=excluded.source_updated_at,synced_at=excluded.synced_at,deactivated_by_financial=excluded.deactivated_by_financial,amount_evidence=excluded.amount_evidence`)
+      .run(member.id,profile.rut,'PREVIEW_SYNTHETIC',profile.financialStatus,profile.monthsDue,profile.amountDue,Number(stamp.slice(0,4)),stamp,stamp,profile.financialStatus==='DESAFILIADO'?1:0,profile.amountEvidence||'COMPLETE');
+    db.prepare('DELETE FROM membership_payments WHERE member_id=?').run(member.id);
+    if (profile.paid) {
+      const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit'}).formatToParts(new Date());
+      const year=Number(parts.find(part=>part.type==='year').value),month=Number(parts.find(part=>part.type==='month').value);
+      db.prepare(`INSERT INTO membership_payments(member_id,membership_year,membership_month,amount_clp,provider,provider_order,status,paid_at,created_at)
+        VALUES (?,?,?,?,?,?, 'PAID',?,?)`).run(member.id,year,month,0,'PREVIEW',profile.key,stamp,stamp);
+    }
+    db.prepare('DELETE FROM passkeys WHERE member_id=?').run(member.id);
+    setMemberUiPreferences(db,{memberId:member.id,services:{parking:true,reservations:true,simulators:true,studyroom:true,library:true,agreements:true,news:true,agenda:true},simpleMode:profile.simpleMode});
+    db.exec('COMMIT');
+    return db.prepare('SELECT * FROM members WHERE id=?').get(member.id);
+  } catch (error) {
+    try { db.exec('ROLLBACK'); } catch {}
+    throw error;
+  }
+}
+
 function friendlyError(statusCode, message) {
   const e = new Error(message); e.statusCode=statusCode; e.expose=true; return e;
 }
@@ -1979,7 +1967,7 @@ function transferSummary(){
 }
 function securitySummary(m,req){
   const w=webauthnSummary(db,m,effectiveRequestOrigin(req),isSecureRequest(req));
-  return {pinSet:PREVIEW_MODE||!!m.pin_hash,unlocked:isUnlocked(m),unlockedUntil:m.unlocked_until||null,...w};
+  return {pinSet:!!m.pin_hash,unlocked:isUnlocked(m),unlockedUntil:m.unlocked_until||null,...w};
 }
 function visibleMemberRut(m){return m?.rut||null}
 function publicMember(m){ return {id:m.id,email:m.email,name:m.name,preferredName:m.preferred_name||null,rut:visibleMemberRut(m),phone:m.phone,employer:m.employer,category:m.category,position:m.position,role:m.role,active:!!m.active,isBoard:!!m.is_board,birthDate:m.birth_date||null}; }
@@ -2045,14 +2033,17 @@ function sendFile(res,file,cache='no-store') {
 }
 function serveStatic(req,res,pathname){
   if(req.method!=='GET'&&req.method!=='HEAD')return json(res,405,{error:'Método no permitido.'});
+  if(pathname==='/test-notificaciones.html'){
+    res.statusCode=302;res.setHeader('Location','/');res.setHeader('Cache-Control','no-store');return res.end();
+  }
   if(req.isAdminPort && pathname==='/') pathname='/admin.html';
   else if(req.isLabPort && PREVIEW_MODE && pathname==='/') pathname='/lab.html';
   else if(pathname==='/' || pathname==='/mobile') pathname='/index.html';
   let target=path.normalize(path.join(PUBLIC_DIR,pathname)); if(!target.startsWith(PUBLIC_DIR))return json(res,403,{error:'Ruta inválida.'});
   if(!fs.existsSync(target)||fs.statSync(target).isDirectory())target=path.join(PUBLIC_DIR,'index.html');
   const ext=path.extname(target).toLowerCase(); const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.ico':'image/x-icon'}[ext]||'application/octet-stream';
-  res.statusCode=200;res.setHeader('Content-Type',mime);res.setHeader('Cache-Control',ext==='.html'||target.includes('lab-interceptor.js')?'no-store':'public, max-age=3600'); if(req.method==='HEAD')return res.end();
-  if(PREVIEW_MODE && target.endsWith('index.html')){let html=fs.readFileSync(target,'utf8');html=html.replace('<head>','<head><script src="/lab-interceptor.js?v=8"></script><script>if(!new URLSearchParams(window.location.search).get("sim")) sessionStorage.setItem("miAspchUnlocked","1");if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(w){w.unregister()})});if(window.caches)caches.keys().then(function(k){k.forEach(function(c){caches.delete(c)})});</script>');res.setHeader('Content-Security-Policy', PREVIEW_MODE ? "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" : "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");return res.end(html);}
+  const cacheControl=ext==='.html'||(PREVIEW_MODE&&ext==='.js')?'no-store':'public, max-age=3600';
+  res.statusCode=200;res.setHeader('Content-Type',mime);res.setHeader('Cache-Control',cacheControl); if(req.method==='HEAD')return res.end();
   fs.createReadStream(target).pipe(res);
 }
 function setSecurityHeaders(res){

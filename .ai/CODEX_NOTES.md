@@ -1,5 +1,58 @@
 # Notas de Codex para ChatGPT
 
+## 2026-09-01 — Causa real de renderProfile/renderMembership ausentes
+
+Source y `/app.js` servido ya contenían ambos renderizadores con SHA-256
+`07cbcdd7bc0af08bc4fcbaeeaee64d763de5cc07ed823e28380d58cb939bf0cf`, pero
+el HTML seguía usando una etiqueta de versión estable, JavaScript tenía
+`max-age=3600` y el Service Worker no había rotado su caché. Un navegador con el
+bundle anterior podía recargar el iframe y seguir ejecutando código sin esas
+funciones.
+
+Se reprodujo contra el origen 8086: Perfil arrojó el ReferenceError desde
+`Object.profile → go → HTMLButtonElement` y Membresía desde
+`Object.membership → go → HTMLButtonElement`. Se versionó el asset con su hash,
+se aplicó `no-store` a JS solo bajo `PREVIEW_MODE` y se rotó el caché PWA.
+Playwright confirmó por navegación UI que ambos `typeof` son `function`, ambas
+vistas abren y no hay errores de consola. Solo se recreó Preview.
+
+## 2026-09-01 — Estabilización integral de perfiles Preview
+
+El commit de presets había eliminado los renderizadores reales de Perfil,
+Membresía, Seguridad, Dashboard y Socios dejando referencias residuales. Se
+restauraron como vistas separadas y funcionales, junto con sus helpers, y se
+eliminó el botón/logo flotante de WhatsApp.
+
+MOROSO conserva acceso a la app pero no a Estacionamiento, Simuladores ni Sala;
+Inicio muestra sus cuotas y omite el monto porque el perfil sintético no tiene
+evidencia financiera suficiente. MODO SIMPLE queda limitado a Credencial,
+Estacionamiento y Contacto. DESAFILIADO renderiza una pantalla terminal sin
+shell ni navegación. INFORMÁTICA usa `informatica@aspch.org` como ADMIN Preview
+y cambia el laboratorio a `admin.html` web; regresar a MEMBER restaura el marco
+mobile.
+
+Las pruebas API y Playwright recorrieron los nueve perfiles, las vistas
+principales y MEMBER ↔ INFORMÁTICA sin login, PIN, `Cargando…`, ReferenceError,
+TypeError, rejections ni errores de consola. Solo se reconstruyó Preview 8086;
+8085 no fue recreado ni reiniciado.
+
+## 2026-09-01 — Laboratorio con sesiones Preview reales
+
+Se reemplazaron los perfiles interceptados en cliente y los autologins globales
+por `POST /api/preview/impersonate`. La ruta crea o actualiza únicamente miembros
+sintéticos `@preview.invalid`, registra estado financiero y preferencias en la
+SQLite Preview, crea una sesión normal desbloqueada y rota la cookie HttpOnly
+`mi_aspch_preview_session`.
+
+El laboratorio quedó reducido a selector izquierdo y un teléfono mobile que
+abre Inicio después de crear la sesión. Los nueve perfiles aprobaron `/api/me`,
+mensualidad, estacionamiento, mercado, autorización ADMIN y carga mobile; la
+secuencia ACTIVO → MOROSO → JUBILADO rotó sesión y datos. DESAFILIADO conserva
+`active=0` y puede visualizar su estado bloqueado solo por ser sintético Preview.
+Con `PREVIEW_MODE=false`, la ruta devuelve 404. Se retiraron interceptor,
+`?sim=`, presets de login, fallback ADMIN y Service Worker especial. Solo se
+reconstruyó `mi-aspch-preview`; producción 8085 permaneció intacta.
+
 ## 2026-08-31 — Resumen dinámico compacto en Inicio
 
 Se ajustó la vista Inicio de Mi ASPCH para cumplir el flujo ordenado y sin rellenos:

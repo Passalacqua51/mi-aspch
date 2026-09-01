@@ -1,0 +1,132 @@
+name: aspch-preview
+
+services:
+  preview:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mi-aspch-preview:local
+    pull_policy: never
+    container_name: mi-aspch-preview
+    restart: unless-stopped
+    init: true
+    user: node
+    working_dir: /app
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file:
+      - ./.env
+    environment:
+      APP_NAME: Mi ASPCH Preview
+      APP_ORIGIN: http://${PREVIEW_BIND_IP}:8086
+      APP_ORIGINS: http://${PREVIEW_BIND_IP}:8086
+      PUBLIC_APP_URL: http://${PREVIEW_BIND_IP}:8086
+      SERVER_BIND_ADDRESS: 0.0.0.0
+      PORT: "8080"
+      DATA_DIR: /data
+      PROFILE_PHOTOS_DIR: /data/profile-fotos
+      SIPA_PHOTOS_DIR: /data/sipa-fotos
+      SIPA_PORTRAITS_DIR: /data/sipa-retratos
+      FINANCIAL_XLSM_PATH: /preview-source/BASE DE DATOS.xlsm
+      FINANCIAL_YEAR: "2026"
+      PREVIEW_MODE: "true"
+      NODE_ENV: production
+      SESSION_SECRET: ${PREVIEW_SESSION_SECRET}
+      OTP_SECRET: ${PREVIEW_OTP_SECRET}
+      SESSION_COOKIE_NAME: mi_aspch_preview_session
+      ADMIN_EMAIL: informatica@aspch.org
+      ADMIN_BOOTSTRAP_PIN_SALT: ""
+      ADMIN_BOOTSTRAP_PIN_HASH: ""
+      GOOGLE_ENABLED: "true"
+      GOOGLE_SHEETS_READ: "true"
+      GOOGLE_SHEETS_WRITE: "false"
+      GOOGLE_CALENDAR_READ: "true"
+      GOOGLE_CALENDAR_WRITE: "false"
+      GOOGLE_GMAIL_SEND: "false"
+      GOOGLE_GMAIL_OTP_SEND: "false"
+      GOOGLE_GMAIL_NOTIFICATION_SEND: "false"
+      VAPID_PUBLIC_KEY: ""
+      VAPID_PRIVATE_KEY: ""
+      PARKING_SHEET_SYNC: "false"
+      SIMULATOR_CANCEL_ENABLED: "false"
+      FINANCIAL_UPDATE_BD_SOCIOS: "false"
+      PRESENTATION_ALLOW_REAL_WRITES: "false"
+      APPLE_WALLET_ENABLED: "false"
+      BACKUP_RETENTION: "3"
+    command:
+      - node
+      - --no-warnings
+      - server.mjs
+    ports:
+      - name: preview-http
+        target: 8080
+        host_ip: ${PREVIEW_BIND_IP}
+        published: "8086"
+        protocol: tcp
+      - name: admin-http
+        target: 8082
+        host_ip: ${PREVIEW_BIND_IP}
+        published: "8092"
+        protocol: tcp
+    volumes:
+      - ./runtime/preview:/data
+      - /home/casa/financial-source-test/BASE DE DATOS.xlsm:/preview-source/BASE DE DATOS.xlsm:ro
+      - /mnt/MediaCenter/aspch/sipa-fotos:/data/sipa-fotos:ro
+      - /mnt/MediaCenter/aspch/sipa-retratos:/data/sipa-retratos:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:8080/api/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    stop_grace_period: 20s
+
+  preview-seed:
+    profiles:
+      - maintenance
+    image: mi-aspch-preview:local
+    pull_policy: never
+    user: node
+    working_dir: /app
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      PREVIEW_ADMIN_PIN: ${PREVIEW_ADMIN_PIN}
+      PREVIEW_ADMIN_EMAIL: informatica@aspch.org
+    command:
+      - node
+      - --no-warnings
+      - tools/refresh_preview_snapshot.mjs
+      - --source
+      - /production/mi-aspch.sqlite
+      - --target-dir
+      - /preview-data
+    volumes:
+      - aspch_mi_aspch_data:/production:ro
+      - ./runtime/preview:/preview-data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    network_mode: none
+    restart: "no"
+
+volumes:
+  aspch_mi_aspch_data:
+    external: true
+    name: aspch_mi_aspch_data

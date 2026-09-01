@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es">
-<head>
+<head><script>window.IS_ADMIN_PANEL = true;</script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
@@ -9,11 +9,28 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Mi ASPCH">
-  <title>Mi ASPCH</title>
+  <title>Control Informática - ASPCH</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/logo-aspch-original.png" type="image/png">
   <link rel="apple-touch-icon" href="/logo-aspch-original.png">
   <link rel="stylesheet" href="/styles.css?v=0.6.16-mobile-nav">
+
+<style>
+  body, html { max-width: 100% !important; margin: 0; padding: 0; background: var(--bg); height: 100vh; }
+  body.ui-iphone { display:block!important; min-height:100vh!important; padding:0!important; margin:0!important; overflow:auto!important; background:var(--bg)!important; }
+  body.ui-iphone #app-shell { display:grid!important; grid-template-columns:252px minmax(0,1fr)!important; width:100%!important; height:100vh!important; max-width:none!important; max-height:none!important; margin:0!important; border-radius:0!important; border:0!important; outline:0!important; box-shadow:none!important; overflow:visible!important; }
+  body.ui-iphone .app-shell::before, body.ui-iphone .app-shell::after { display:none!important; }
+  body.ui-iphone #auth-screen.hidden, body.ui-iphone #lock-screen.hidden { display:none!important; }
+  body.ui-iphone .sidebar { display:flex!important; }
+  body.ui-iphone .main-area { display:block!important; height:auto!important; min-height:100vh!important; overflow:visible!important; padding-bottom:0!important; }
+  #desktop-nav { display:flex!important; flex-direction:column; }
+  #view { padding:2rem; max-width:1440px; margin:0 auto; width:100%; overflow:visible; }
+  #mobile-nav, #mobile-more-backdrop, #mobile-more-drawer, #top-avatar { display: none !important; }
+  
+  /* Dev panel tweaks for wide screen */
+  .dev-metric-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important; }
+  .developer-hero { max-width: 100%; }
+</style>
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
