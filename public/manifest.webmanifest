@@ -2,6 +2,7 @@
   "name":"Mi ASPCH","short_name":"Mi ASPCH","description":"Portal de asociados ASPCH","start_url":"/","scope":"/","display":"standalone",
   "background_color":"#f5f6f9","theme_color":"#13224b","orientation":"any",
   "icons":[
-    {"src":"/logo-aspch-original.png","sizes":"2481x603","type":"image/png","purpose":"any"}
+    {"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
   ]
 }

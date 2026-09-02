@@ -597,6 +597,18 @@ async function routeApi(req, res, url) {
     return json(res, 200, { ok:true });
   }
 
+  if (req.method === 'POST' && p === '/api/parking/still-active') {
+    const body = await readJson(req);
+    const date = validDate(body.date) || todayChile();
+    const row = db.prepare(`SELECT r.id,p.label,p.building FROM parking_reservations r JOIN parking_spaces p ON p.id=r.space_id
+      WHERE r.reservation_date=? AND r.member_id=? AND r.status='ACTIVE' AND r.checked_in_at IS NOT NULL`).get(date, member.id);
+    if (!row) return json(res, 404, { error: 'No tienes un estacionamiento activo ese día.' });
+    const now = new Date().toISOString();
+    db.prepare('UPDATE parking_reservations SET last_reminder_at=? WHERE id=?').run(now, row.id);
+    audit(db,{actorId:member.id,subjectId:member.id,action:'PARKING_STILL_ACTIVE',entityType:'parking',entityId:row.id,details:{date,space:row.label}});
+    return json(res, 200, { ok:true });
+  }
+
   if (req.method === 'GET' && p === '/api/simulators') {
     const access=benefitAccess(db,member);
     if(!access.simulatorView)return json(res,403,{error:'Tu cuenta no está activa como socio ASPCH.'});
@@ -1053,7 +1065,7 @@ async function runBackgroundJobs(){
 
     // Estacionamiento: cada 4 horas desde el check-in, mientras siga ACTIVE.
     const active=db.prepare("SELECT r.id,r.member_id,r.checked_in_at,p.label FROM parking_reservations r JOIN parking_spaces p ON p.id=r.space_id WHERE r.status='ACTIVE' AND r.checked_in_at IS NOT NULL").all();
-    for(const r of active){const elapsed=now-new Date(r.checked_in_at),idx=Math.floor(elapsed/(4*3600_000));if(idx>=1&&moduleEnabled(db,'parking'))await sendMemberPush(db,r.member_id,{key:`parking-active:${r.id}:${idx}`,kind:'parking',title:`Estacionamiento ${r.label}`,body:'Recuerda liberar tu estacionamiento cuando termines de utilizarlo.',url:'/?view=parking',actions:[{action:'vacate-parking',title:'Liberar cupo'}]})}
+    for(const r of active){const elapsed=now-new Date(r.checked_in_at),idx=Math.floor(elapsed/(4*3600_000));if(idx>=1&&moduleEnabled(db,'parking'))await sendMemberPush(db,r.member_id,{key:`parking-active:${r.id}:${idx}`,kind:'parking',title:'¿Sigues usando el estacionamiento?',body:`Cupo ${r.label} · SÍ: sigo aquí · NO: ya desocupé. Toca para responder.`,url:'/?view=parking&parkingPrompt=1',actions:[{action:'keep-parking',title:'Sí, sigo aquí'},{action:'vacate-parking',title:'No, ya desocupé'}]})}
 
     // Simulador: recordatorio el día anterior a las 19:00, leyendo Calendar real.
     if(c.hour===19&&calendarReadEnabled())await pushTomorrowSimulatorReminders(c.date);

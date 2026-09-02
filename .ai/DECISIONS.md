@@ -19,6 +19,15 @@ Los teléfonos editados desde Mi ASPCH se escriben como número nacional de
 dígitos, sin signo `+` ni prefijo país `56`, para respetar el formato de BD
 SOCIOS.
 
+Los recordatorios de estacionamiento deben formular una pregunta explícita y
+ofrecer `Sí, sigo aquí` y `No, ya desocupé`. Como iOS entrega Web Push pero no
+muestra sus acciones personalizadas, al tocar la notificación se abre una
+confirmación equivalente dentro de la PWA. Confirmar que sigue estacionado se
+audita; confirmar que desocupó libera el cupo por el flujo existente.
+
+Los metadatos instalables y las notificaciones usan los iconos ASPCH cuadrados.
+Nunca se declara el logotipo horizontal como icono de aplicación.
+
 Face ID/huella se ofrece mediante Passkeys/WebAuthn y utiliza
 `reviewer-stopping-wages-roland.trycloudflare.com` como RP ID y origen. Ese
 hostname no se cambia durante la prueba: las credenciales WebAuthn pertenecen al

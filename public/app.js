@@ -1,6 +1,6 @@
 const $=(q,r=document)=>r.querySelector(q); const $$=(q,r=document)=>[...r.querySelectorAll(q)];
 const UI_SERVICE_DEFAULTS={parking:true,reservations:true,simulators:true,studyroom:true,library:true,agreements:true,news:true,agenda:true};
-const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,uiPreferences:{configured:false,simpleMode:false,services:{...UI_SERVICE_DEFAULTS}},registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
+const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,parkingPrompt:new URLSearchParams(location.search).get('parkingPrompt')==='1',simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,uiPreferences:{configured:false,simpleMode:false,services:{...UI_SERVICE_DEFAULTS}},registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
 const NAV=[['home','🏠','Inicio'],['parking','🚗','Estacionamiento'],['booking','🗓️','Reservas'],['profile','👤','Mi perfil'],['credential','🪪','Credencial'],['security','🔐','Seguridad'],['membership','💳','Mensualidad'],['convenios','🤝','Convenios'],['library','📚','Biblioteca'],['marketplace','🛒','Mercado ASPCH'],['activities','🎓','Cursos y charlas'],['votes','🗳️','Votaciones'],['contact','📞','Contacto'],['news','📰','Noticias']];
 const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥','Socios'],['admin-finance','💳','Finanzas'],['admin-reservations','🗓️','Reservas'],['admin-content','📰','Contenido'],['admin-votes','🗳️','Votaciones'],['admin-notifications','🔔','Notificaciones'],['admin-integrations','🔗','Integraciones'],['admin-security','🛡️','Seguridad'],['admin-audit','🧾','Auditoría'],['admin-system','⚙️','Sistema'],['developer','🛠️','Developer']];
 const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
@@ -47,7 +47,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 boot();
 
 function initialView(){const requested=new URLSearchParams(location.search).get('view');if(window.IS_ADMIN_PANEL)return requested||'admin-dashboard';if(simpleModeEnabled())return ['credential','parking','contact'].includes(requested)?requested:'credential';return requested||'home'}
-function openAppUrl(url){try{const u=new URL(url,location.origin);const view=u.searchParams.get('view');if(view)go(view)}catch{}}
+function openAppUrl(url){try{const u=new URL(url,location.origin);if(u.searchParams.get('parkingPrompt')==='1')state.parkingPrompt=true;const view=u.searchParams.get('view');if(view)go(view)}catch{}}
 function initUiMode(){
   state.uiMode='iphone';
   document.body.classList.add('ui-iphone');
@@ -575,7 +575,18 @@ async function renderParking(date=state.parking?.date||today()){
   <section class="section"><div class="section-head"><div><h3>Padre Mariano 87</h3><p>${allowed?'Toca un cupo gris para reservarlo aquí mismo':'Puedes ver disponibilidad, pero las reservas están deshabilitadas'} para ${humanDate(data.date)}.</p></div></div><div class="parking-grid">${group87.map(s=>parkingSpaceHtml(s,allowed)).join('')}</div></section>${previewEnd}`;
   $('#parking-date').addEventListener('change',e=>{state.parkingWeekStart=mondayOf(e.target.value);renderParking(e.target.value)});$('#parking-prev-week').onclick=()=>{state.parkingWeekStart=addDays(state.parkingWeekStart,-7);renderParking(state.parkingWeekStart)};$('#parking-next-week').onclick=()=>{state.parkingWeekStart=addDays(state.parkingWeekStart,7);renderParking(state.parkingWeekStart)};
   $$('.date-chip').forEach(b=>b.onclick=()=>renderParking(b.dataset.date));$$('.parking-space.available').forEach(b=>b.onclick=()=>reserveParking(b.dataset.space));$('#cancel-reservation')?.addEventListener('click',cancelParking);$('#parking-checkin')?.addEventListener('click',checkInParking);$('#parking-vacate')?.addEventListener('click',vacateParking);$('#enable-parking-notifications')?.addEventListener('click',enableBrowserNotifications);$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  showParkingConfirmationPrompt(mine,data.date);
   clearTimeout(state.parkingPollTimer);state.parkingPollTimer=setTimeout(()=>{if(state.view==='parking')renderParking(state.parking?.date||data.date)},45000);
+}
+
+function showParkingConfirmationPrompt(mine,date){
+  if(!state.parkingPrompt)return;
+  state.parkingPrompt=false;
+  try{const u=new URL(location.href);u.searchParams.delete('parkingPrompt');history.replaceState({},'',u.pathname+u.search)}catch{}
+  if(!mine?.checkedInAt)return toast('No tienes un estacionamiento activo que confirmar.',true);
+  const overlay=document.createElement('div');overlay.className='setup-overlay parking-confirm-overlay';overlay.innerHTML=`<section class="card setup-card" role="alertdialog" aria-modal="true" aria-labelledby="parking-confirm-title"><span class="eyebrow">ESTACIONAMIENTO</span><h2 id="parking-confirm-title">¿Sigues usando el estacionamiento?</h2><p>Confirma si mantienes ocupado el cupo o si ya lo desocupaste.</p><div class="toolbar"><button class="button ghost" id="parking-confirm-yes">Sí, sigo aquí</button><button class="button primary" id="parking-confirm-no">No, ya desocupé</button></div></section>`;document.body.append(overlay);
+  $('#parking-confirm-yes').onclick=async()=>{try{await api('/api/parking/still-active',{method:'POST',body:{date}});overlay.remove();toast('Perfecto, tu estacionamiento continúa activo.');renderParking(date)}catch(err){toast(err.message,true)}};
+  $('#parking-confirm-no').onclick=()=>{overlay.remove();vacateParking()};
 }
 
 function parkingSpaceHtml(s,allowed=true){const cls=s.mine?'mine':s.occupied?'occupied':allowed?'available':'restricted';const status=s.mine?'✓ Tu reserva':s.occupied?'Ocupado':allowed?'Libre · toca para reservar':'Libre · restringido';return `<button class="parking-space ${cls}" data-space="${s.id}" aria-label="Estacionamiento ${escapeHtml(s.label)}: ${escapeHtml(status)}" ${(!allowed||s.occupied&&!s.mine)?'disabled':''}><span class="parking-number">${escapeHtml(s.label)}</span><small>${escapeHtml(status)}</small></button>`}

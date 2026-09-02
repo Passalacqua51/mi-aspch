@@ -13,6 +13,10 @@
   una passkey compatible, con aserción estática contra la regresión.
 - Normalizado el teléfono editable a dígitos nacionales sin prefijo `56`, tanto
   para la ficha corregida como para futuras escrituras hacia BD SOCIOS.
+- Convertido el recordatorio de estacionamiento en una confirmación Sí/No, con
+  acciones nativas donde estén soportadas y diálogo interno al tocarlo en iOS.
+- Corregidos manifiesto, metadatos Apple y notificaciones para usar los iconos
+  cuadrados oficiales en vez del logotipo horizontal.
 
 # Transición OTP → PIN en producción — 2026-09-02
 

@@ -29,6 +29,12 @@
 - La ficha corregida conserva categoría `Comercial`, empleador `COMERCIAL` y el
   teléfono nacional de 9 dígitos sin prefijo `56`, tanto en SQLite como en BD
   SOCIOS. El formulario elimina ese prefijo en futuras ediciones.
+- Los recordatorios de estacionamiento preguntan si el cupo sigue ocupado. En
+  plataformas compatibles exponen `Sí, sigo aquí` / `No, ya desocupé`; en
+  iPhone, donde Web Push no muestra acciones personalizadas, tocar el aviso abre
+  inmediatamente la misma confirmación dentro de Mi ASPCH.
+- La PWA y las notificaciones usan iconos ASPCH cuadrados de 180, 192 y 512 px;
+  el logo institucional horizontal se conserva solo dentro de la interfaz.
 
 ## Transición OTP → PIN corregida en producción
 
