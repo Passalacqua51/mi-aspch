@@ -1,6 +1,6 @@
 const $=(q,r=document)=>r.querySelector(q); const $$=(q,r=document)=>[...r.querySelectorAll(q)];
 const UI_SERVICE_DEFAULTS={parking:true,reservations:true,simulators:true,studyroom:true,library:true,agreements:true,news:true,agenda:true};
-const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,parkingPrompt:new URLSearchParams(location.search).get('parkingPrompt')==='1',simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,uiPreferences:{configured:false,simpleMode:false,services:{...UI_SERVICE_DEFAULTS}},registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
+const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,parkingPrompt:new URLSearchParams(location.search).get('parkingPrompt')==='1',postLoginPromptsStarted:false,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,uiPreferences:{configured:false,simpleMode:false,services:{...UI_SERVICE_DEFAULTS}},registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
 const NAV=[['home','🏠','Inicio'],['parking','🚗','Estacionamiento'],['booking','🗓️','Reservas'],['profile','👤','Mi perfil'],['credential','🪪','Credencial'],['security','🔐','Seguridad'],['membership','💳','Mensualidad'],['convenios','🤝','Convenios'],['library','📚','Biblioteca'],['marketplace','🛒','Mercado ASPCH'],['activities','🎓','Cursos y charlas'],['votes','🗳️','Votaciones'],['contact','📞','Contacto'],['news','📰','Noticias']];
 const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥','Socios'],['admin-finance','💳','Finanzas'],['admin-reservations','🗓️','Reservas'],['admin-content','📰','Contenido'],['admin-votes','🗳️','Votaciones'],['admin-notifications','🔔','Notificaciones'],['admin-integrations','🔗','Integraciones'],['admin-security','🛡️','Seguridad'],['admin-audit','🧾','Auditoría'],['admin-system','⚙️','Sistema'],['developer','🛠️','Developer']];
 const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
@@ -141,7 +141,6 @@ async function setupInitialPin(e){
     sessionStorage.setItem('miAspchUnlocked','1');
     $('#setup-pin').value='';$('#setup-pin-confirm').value='';
     loginSuccess();
-    await promptFirstRunSetup();
     toast('Mi ASPCH quedó activado en este dispositivo.');
   }catch(err){showFormError(e.currentTarget,err.message,'#setup-pin');toast(err.message,true)}
   finally{setLoading(e.currentTarget,false)}
@@ -186,7 +185,13 @@ function loginSuccess(){
   if(isInactiveMembership())return renderInactiveMembership();
   $('#auth-screen').classList.add('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.remove('hidden');
   $('#sidebar-name').textContent=firstLast(m.name);$('#sidebar-role').textContent=m.role==='ADMIN'?'Administrador':(m.isBoard?'Directorio':(isHelicopterMember(m)?'Helicópteros':'Asociado'));
-  $('#sidebar-avatar').textContent=initials(m.name);$('#top-avatar').textContent=initials(m.name);renderNav();go(initialView());
+  $('#sidebar-avatar').textContent=initials(m.name);$('#top-avatar').textContent=initials(m.name);renderNav();go(initialView());schedulePostLoginPrompts();
+}
+
+function schedulePostLoginPrompts(){
+  if(state.postLoginPromptsStarted||!state.member?.isBoard)return;
+  state.postLoginPromptsStarted=true;
+  setTimeout(async()=>{await promptNotificationConsent();await promptFirstRunSetup()},250);
 }
 
 function isInactiveMembership(){return state.member?.role!=='ADMIN'&&(!state.member?.active||state.access?.reason==='DESAFILIADO'||state.access?.financial?.status==='DESAFILIADO')}
@@ -605,7 +610,7 @@ async function vacateParking(){try{await api('/api/parking/vacate',{method:'POST
 async function requestParkingNotifications(){if(!('Notification'in window))return toast('Este navegador no ofrece notificaciones.',true);const p=await Notification.requestPermission();toast(p==='granted'?'Recordatorios activados':'No se concedió permiso',p!=='granted')}
 function maybeParkingReminder(){clearTimeout(state.reminderTimer)}
 
-async function showParkingNotification(title,body){toast(`${title} ${body}`);if('Notification'in window&&Notification.permission==='granted'){try{const reg=await navigator.serviceWorker?.ready;if(reg)await reg.showNotification(title,{body,icon:'/logo-aspch-original.png',badge:'/logo-aspch-original.png',tag:'mi-aspch-parking',data:{url:'/?view=parking'}});else new Notification(title,{body,icon:'/logo-aspch-original.png'})}catch{}}}
+async function showParkingNotification(title,body){toast(`${title} ${body}`);if('Notification'in window&&Notification.permission==='granted'){try{const reg=await navigator.serviceWorker?.ready;if(reg)await reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png',tag:'mi-aspch-parking',data:{url:'/?view=parking'}});else new Notification(title,{body,icon:'/icon-192.png'})}catch{}}}
 
 function loadNotificationPrefs(){try{return {...{parking:true,simulators:true,studyroom:true,activities:true,agreements:true,news:true,membership:true,marketplace:true},...JSON.parse(localStorage.getItem('miAspchNotifyPrefs')||'{}')}}catch{return {parking:true,simulators:true,studyroom:true,activities:true,agreements:true,news:true,membership:true,marketplace:true}}}
 
@@ -616,7 +621,25 @@ function notificationPrefToggle(key,title,desc){const on=state.notifyPrefs?.[key
 async function enableBrowserNotifications(silent=false){
   if(!('Notification'in window)||!('serviceWorker'in navigator)||!('PushManager'in window)){if(!silent)toast('Este navegador no ofrece Web Push.',true);return false}
   const p=await Notification.requestPermission();if(p!=='granted'){if(!silent)toast('No se concedió permiso para notificaciones.',true);return false}
-  try{await syncPushSubscription();if(!silent)toast('Notificaciones push activadas en este dispositivo.');return true}catch(err){if(!silent)toast(err.message||'No fue posible activar Web Push.',true);return false}
+  try{await syncPushSubscription();localStorage.setItem(notificationConsentKey(),'yes');if(!silent)toast('Notificaciones push activadas en este dispositivo.');return true}catch(err){if(!silent)toast(err.message||'No fue posible activar Web Push.',true);return false}
+}
+
+function notificationConsentKey(){return `miAspchNotificationConsent:${state.member?.id||'unknown'}`}
+async function removeBrowserPushSubscription(){
+  try{const reg=await navigator.serviceWorker?.ready,sub=await reg?.pushManager?.getSubscription();if(!sub)return;try{await api('/api/push/subscribe',{method:'DELETE',body:{endpoint:sub.endpoint}})}catch{}await sub.unsubscribe()}catch{}
+}
+function promptNotificationConsent(){
+  if(!state.member?.isBoard||localStorage.getItem(notificationConsentKey()))return Promise.resolve();
+  if(!('Notification'in window)||!('serviceWorker'in navigator)||!('PushManager'in window)){localStorage.setItem(notificationConsentKey(),'unsupported');return Promise.resolve()}
+  if(Notification.permission==='granted'){return syncPushSubscription().then(()=>localStorage.setItem(notificationConsentKey(),'yes')).catch(()=>{})}
+  if(Notification.permission==='denied'){localStorage.setItem(notificationConsentKey(),'no');return Promise.resolve()}
+  return new Promise(resolve=>{
+    $('.notification-consent-overlay')?.remove();
+    const overlay=document.createElement('div');overlay.className='setup-overlay notification-consent-overlay';overlay.innerHTML=`<section class="card setup-card" role="dialog" aria-modal="true" aria-labelledby="notification-consent-title"><span class="eyebrow">🔔 NOTIFICACIONES</span><h2 id="notification-consent-title">¿Quieres recibir notificaciones?</h2><p>Podemos avisarte sobre estacionamientos, reservas y novedades importantes. Puedes cambiar esta decisión después en tu perfil.</p><div class="toolbar"><button class="button primary" id="notification-consent-yes" type="button">Sí, activar</button><button class="button ghost" id="notification-consent-no" type="button">No, gracias</button></div></section>`;document.body.append(overlay);
+    const close=value=>{localStorage.setItem(notificationConsentKey(),value);overlay.remove();resolve()};
+    $('#notification-consent-yes').onclick=async e=>{e.currentTarget.disabled=true;const enabled=await enableBrowserNotifications(true);close(enabled?'yes':'no');toast(enabled?'Notificaciones activadas.':'No se activaron las notificaciones.',!enabled)};
+    $('#notification-consent-no').onclick=async()=>{await removeBrowserPushSubscription();close('no');toast('No recibirás notificaciones en este dispositivo.')};
+  });
 }
 
 
@@ -631,7 +654,7 @@ async function syncPushSubscription(){
 async function showAppNotification(kind,title,body,url='/?view=home'){
   toast(`${title} ${body}`);
   if(!('Notification'in window) || Notification.permission!=='granted') return;
-  try{const reg=await navigator.serviceWorker?.ready;const opts={body,icon:'/logo-aspch-original.png',badge:'/logo-aspch-original.png',tag:`mi-aspch-${kind}`,data:{url}};if(reg)await reg.showNotification(title,opts);else new Notification(title,{body,icon:'/logo-aspch-original.png'})}catch{}
+  try{const reg=await navigator.serviceWorker?.ready;const opts={body,icon:'/icon-192.png',badge:'/icon-192.png',tag:`mi-aspch-${kind}`,data:{url}};if(reg)await reg.showNotification(title,opts);else new Notification(title,{body,icon:'/icon-192.png'})}catch{}
 }
 function maybeSimulatorReminder(){clearTimeout(state.simReminderTimer)}
 

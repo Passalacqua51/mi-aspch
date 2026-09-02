@@ -19,6 +19,8 @@
   cuadrados oficiales en vez del logotipo horizontal.
 - Corregida la recuperación de onboarding cuando una sesión OTP válida queda sin
   PIN: al cargar o recibir `PIN_REQUIRED`, la UI abre directamente `Crear PIN`.
+- Añadido consentimiento Push explícito Sí/No en el primer ingreso del
+  Directorio por dispositivo, con baja efectiva al rechazar.
 
 # Transición OTP → PIN en producción — 2026-09-02
 

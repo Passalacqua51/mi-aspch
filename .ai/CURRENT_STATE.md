@@ -39,6 +39,10 @@
   a `Crear PIN`, incluso después de recargar. Si la protección detecta
   `PIN_REQUIRED` desde la pantalla de desbloqueo, cambia al alta de PIN sin dejar
   el formulario anterior pegado.
+- Tras ingresar por primera vez en un dispositivo, cada integrante del
+  Directorio recibe una pregunta Sí/No de consentimiento para notificaciones.
+  Aceptar solicita el permiso nativo y suscribe; rechazar elimina cualquier
+  suscripción de ese dispositivo.
 
 ## Transición OTP → PIN corregida en producción
 

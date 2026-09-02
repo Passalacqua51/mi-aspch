@@ -28,6 +28,12 @@ audita; confirmar que desocupó libera el cupo por el flujo existente.
 Los metadatos instalables y las notificaciones usan los iconos ASPCH cuadrados.
 Nunca se declara el logotipo horizontal como icono de aplicación.
 
+En el primer ingreso de cada integrante del Directorio y en cada dispositivo se
+debe pedir consentimiento explícito para Web Push mediante `Sí, activar` o
+`No, gracias`. La opción afirmativa solicita el permiso nativo y crea la
+suscripción; la negativa no deja una suscripción activa. La elección se puede
+cambiar posteriormente desde Perfil.
+
 Face ID/huella se ofrece mediante Passkeys/WebAuthn y utiliza
 `reviewer-stopping-wages-roland.trycloudflare.com` como RP ID y origen. Ese
 hostname no se cambia durante la prueba: las credenciales WebAuthn pertenecen al

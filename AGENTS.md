@@ -46,6 +46,12 @@ fuente de código, contexto IA canónico ni contexto de build.
   exclusivamente al correo que esa persona ingresa en pantalla. Nunca se envía
   ni se exige autorización al correo histórico. Tras validar, ese correo pasa a
   ser el correo local vigente y se intenta sincronizar con BD SOCIOS.
+- El onboarding debe completar siempre `OTP → Crear PIN → Cuenta`. No precargar
+  PIN para integrantes que aún no han realizado su alta real. Maximiliano,
+  María José y Jaime conservan su estado actual salvo instrucción explícita.
+- En el primer ingreso del Directorio por dispositivo, preguntar claramente si
+  desea recibir notificaciones mediante opciones `Sí, activar` y `No, gracias`;
+  nunca solicitar ni crear una suscripción Push sin esa decisión del usuario.
 - Los teléfonos editados desde Mi ASPCH se guardan en BD SOCIOS como dígitos
   nacionales, sin `+` ni prefijo país `56` (por ejemplo, `9XXXXXXXX`).
 - Face ID/huella usa Passkeys/WebAuthn y está ligado al hostname del enlace. Para
