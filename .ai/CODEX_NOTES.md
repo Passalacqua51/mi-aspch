@@ -24,6 +24,11 @@ Además, `showLock()` ahora elimina `disabled` del botón biométrico cuando
 sin iniciar WebAuthn. Hay una cuenta de Directorio con una passkey existente,
 por lo que deberá enrolarla nuevamente bajo el hostname vigente.
 
+Por instrucción posterior se corrigió la ficha validada para que EMPLEADOR sea
+`COMERCIAL`, CATEGORÍA sea `Comercial` y el teléfono se persista como número
+nacional de nueve dígitos sin `56`. `normalizeProfilePhone()` elimina ahora ese
+prefijo antes de cualquier escritura futura a SQLite y BD SOCIOS.
+
 ## 2026-09-02 — Bloqueo visual después del OTP
 
 La evidencia SQLite del intento real mostró OTP consumido, cambio de correo

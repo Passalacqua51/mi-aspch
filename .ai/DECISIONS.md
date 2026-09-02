@@ -15,6 +15,10 @@ Su registro usa un único OTP enviado exclusivamente al correo ingresado en
 pantalla; el correo histórico no recibe ni autoriza nada. Al validar se adopta
 el correo ingresado localmente y se intenta sincronizar BD SOCIOS.
 
+Los teléfonos editados desde Mi ASPCH se escriben como número nacional de
+dígitos, sin signo `+` ni prefijo país `56`, para respetar el formato de BD
+SOCIOS.
+
 Face ID/huella se ofrece mediante Passkeys/WebAuthn y utiliza
 `reviewer-stopping-wages-roland.trycloudflare.com` como RP ID y origen. Ese
 hostname no se cambia durante la prueba: las credenciales WebAuthn pertenecen al

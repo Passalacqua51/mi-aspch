@@ -26,6 +26,9 @@
   una passkey son compatibles, deja de estar deshabilitado y permite iniciar la
   autenticación. Existe una cuenta de Directorio con passkey del hostname
   anterior que deberá volver a registrarla en el enlace vigente.
+- La ficha corregida conserva categoría `Comercial`, empleador `COMERCIAL` y el
+  teléfono nacional de 9 dígitos sin prefijo `56`, tanto en SQLite como en BD
+  SOCIOS. El formulario elimina ese prefijo en futuras ediciones.
 
 ## Transición OTP → PIN corregida en producción
 

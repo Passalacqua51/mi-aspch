@@ -11,6 +11,8 @@
   endpoint público; se recreó solo la app y cloudflared conservó proceso y URL.
 - Corregido el botón de Face ID/huella para habilitarse realmente cuando existe
   una passkey compatible, con aserción estática contra la regresión.
+- Normalizado el teléfono editable a dígitos nacionales sin prefijo `56`, tanto
+  para la ficha corregida como para futuras escrituras hacia BD SOCIOS.
 
 # Transición OTP → PIN en producción — 2026-09-02
 

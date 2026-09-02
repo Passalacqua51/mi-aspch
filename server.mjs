@@ -1934,12 +1934,11 @@ function formatClp(amount){
 }
 function isAirlineMember(member){return /L[IÍ]NEA\s*A[EÉ]REA/i.test(String(member.category||''))}
 function normalizeProfilePhone(value=''){
-  const raw=String(value||'').trim();
-  const digits=raw.replace(/\D+/g,'');
+  const digits=String(value||'').replace(/\D+/g,'');
   if(!digits)return '';
-  if(digits.startsWith('56'))return `+${digits}`;
-  if(digits.length===9)return `+56${digits}`;
-  return raw.slice(0,30);
+  // BD SOCIOS conserva el número nacional, sin el código país chileno 56.
+  if(/^56\d{9}$/.test(digits))return digits.slice(2);
+  return digits.slice(0,30);
 }
 function parseMemberBirthDate(rawValue){
   const raw=String(rawValue||'').trim();

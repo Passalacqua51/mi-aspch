@@ -46,6 +46,8 @@ fuente de código, contexto IA canónico ni contexto de build.
   exclusivamente al correo que esa persona ingresa en pantalla. Nunca se envía
   ni se exige autorización al correo histórico. Tras validar, ese correo pasa a
   ser el correo local vigente y se intenta sincronizar con BD SOCIOS.
+- Los teléfonos editados desde Mi ASPCH se guardan en BD SOCIOS como dígitos
+  nacionales, sin `+` ni prefijo país `56` (por ejemplo, `9XXXXXXXX`).
 - Face ID/huella usa Passkeys/WebAuthn y está ligado al hostname del enlace. Para
   esta prueba, `APP_ORIGIN`, `PUBLIC_APP_URL`, `WEBAUTHN_RP_ID` y
   `WEBAUTHN_ORIGINS` deben conservar el hostname
