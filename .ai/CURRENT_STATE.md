@@ -35,6 +35,10 @@
   inmediatamente la misma confirmación dentro de Mi ASPCH.
 - La PWA y las notificaciones usan iconos ASPCH cuadrados de 180, 192 y 512 px;
   el logo institucional horizontal se conserva solo dentro de la interfaz.
+- Una sesión recién validada por OTP cuya ficha no tenga PIN entra directamente
+  a `Crear PIN`, incluso después de recargar. Si la protección detecta
+  `PIN_REQUIRED` desde la pantalla de desbloqueo, cambia al alta de PIN sin dejar
+  el formulario anterior pegado.
 
 ## Transición OTP → PIN corregida en producción
 

@@ -17,6 +17,8 @@
   acciones nativas donde estén soportadas y diálogo interno al tocarlo en iOS.
 - Corregidos manifiesto, metadatos Apple y notificaciones para usar los iconos
   cuadrados oficiales en vez del logotipo horizontal.
+- Corregida la recuperación de onboarding cuando una sesión OTP válida queda sin
+  PIN: al cargar o recibir `PIN_REQUIRED`, la UI abre directamente `Crear PIN`.
 
 # Transición OTP → PIN en producción — 2026-09-02
 

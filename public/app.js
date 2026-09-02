@@ -59,6 +59,7 @@ async function boot(){
     state.config=await api('/api/config');
     const data=await api('/api/me');
     state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
+    if(!state.security?.pinSet)return showPinSetup();
     if(state.security?.pinSet && !state.security?.unlocked){
       return showLock();
     }
@@ -145,7 +146,7 @@ async function setupInitialPin(e){
   }catch(err){showFormError(e.currentTarget,err.message,'#setup-pin');toast(err.message,true)}
   finally{setLoading(e.currentTarget,false)}
 }
-async function unlock(e){e.preventDefault();clearFormError(e.currentTarget);setLoading(e.currentTarget,true);try{const r=await api('/api/security/unlock',{method:'POST',body:{pin:$('#unlock-pin').value}});state.security=r.security;sessionStorage.setItem('miAspchUnlocked','1');$('#unlock-pin').value='';loginSuccess()}catch(err){$('#unlock-pin').value='';showFormError(e.currentTarget,`${err.message} Puedes intentarlo nuevamente.`,'#unlock-pin');toast(err.message,true)}finally{setLoading(e.currentTarget,false)}}
+async function unlock(e){e.preventDefault();clearFormError(e.currentTarget);setLoading(e.currentTarget,true);try{const r=await api('/api/security/unlock',{method:'POST',body:{pin:$('#unlock-pin').value}});state.security=r.security;sessionStorage.setItem('miAspchUnlocked','1');$('#unlock-pin').value='';loginSuccess()}catch(err){$('#unlock-pin').value='';if(err.code==='PIN_REQUIRED')return;showFormError(e.currentTarget,`${err.message} Puedes intentarlo nuevamente.`,'#unlock-pin');toast(err.message,true)}finally{setLoading(e.currentTarget,false)}}
 async function unlockWithPasskey(){
   const btn=$('#biometric-button');if(btn.disabled)return;btn.disabled=true;
   try{

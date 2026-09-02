@@ -1,4 +1,4 @@
-const CACHE='mi-aspch-v0.6.16-parking-confirm-icon-71d43c9a';
+const CACHE='mi-aspch-v0.6.16-pin-recovery-7cb183e4';
 const STATIC=['/','/index.html','/styles.css','/app.js','/manifest.webmanifest','/logo-aspch-original.png','/icon-192.png','/icon-512.png','/apple-touch-icon.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
