@@ -1,5 +1,25 @@
 # Registro de decisiones
 
+## 2026-09-02 — `hidden` gobierna las pantallas de autenticación
+
+### Decisión
+
+El marco visual desktop puede forzar `display:flex` únicamente sobre
+`#auth-screen`, `#lock-screen` y `.app-shell` cuando no tengan la clase
+`hidden`. Ninguna regla responsive puede anular la visibilidad controlada por
+el flujo JavaScript.
+
+### Razón
+
+Forzar display en los tres contenedores impedía que un OTP verificado avanzara
+visualmente a la pantalla de PIN en viewport desktop, aunque el backend ya
+hubiera creado la sesión correctamente.
+
+### Estado
+
+Activa en el código compartido y en producción. Preview la adoptará en su
+próxima reconstrucción, ya que no monta `public/` desde el host.
+
 ## 2026-09-01 — JavaScript de Preview no usa caché HTTP persistente
 
 ### Decisión

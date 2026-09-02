@@ -68,6 +68,8 @@ assert.ok(homeSource.includes('Credencial vigente')&&homeSource.includes('Contac
 assert.ok(server.includes("p === '/api/profile/services'")&&server.includes('setMemberUiPreferences'),'Las preferencias visuales deben persistirse por socio');
 for(const text of ['Personaliza Mi ASPCH','Elige qué servicios quieres tener a la vista. Puedes cambiar esto después.','Personalizar servicios','Credencial y Perfil siempre estarán disponibles.'])assert.ok(app.includes(text),`Falta UX de preferencias: ${text}`);
 assert.ok(css.includes('@media(prefers-color-scheme:light)')&&css.includes('.auth-logo{opacity:1;filter:none;mix-blend-mode:normal}'),'Light Mode debe preservar el logo oficial sin filtros y con contraste');
+assert.match(css,/body\.ui-iphone #auth-screen:not\(\.hidden\),\s*body\.ui-iphone #lock-screen:not\(\.hidden\),\s*body\.ui-iphone \.app-shell:not\(\.hidden\)\{display:flex!important\}/,'El marco desktop solo debe mostrar la pantalla activa');
+assert.doesNotMatch(css,/body\.ui-iphone #auth-screen,\s*body\.ui-iphone #lock-screen,\s*body\.ui-iphone \.app-shell\{[^}]*display:flex!important/s,'La maqueta desktop no debe sobreescribir .hidden durante OTP/PIN');
 assert.ok(app.includes('Reserva aquí tu estacionamiento'),'Estacionamiento debe indicar reserva directa');
 assert.ok(app.includes('Libre · toca para reservar'),'Los cupos libres deben ser claramente reservables');
 assert.ok(index.includes('mobile-more-drawer'),'Falta menú móvil de servicios secundarios');

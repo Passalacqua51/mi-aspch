@@ -1,5 +1,19 @@
 # Notas de Codex para ChatGPT
 
+## 2026-09-02 — Bloqueo visual después del OTP
+
+La evidencia SQLite del intento real mostró OTP consumido, cambio de correo
+registrado y nueva sesión bloqueada, sin una llamada posterior a desbloqueo por
+PIN. No falló Gmail ni la verificación backend: en viewport desktop la regla
+del marco iPhone declaraba `display:flex!important` sobre las tres pantallas y
+ganaba a `.hidden` por especificidad.
+
+Se limitó el display forzado a `:not(.hidden)`, se versionó el CSS por SHA-256 y
+se rotó el namespace PWA. Una nueva aserción estática protege el invariante.
+Playwright confirmó autenticación visible/PIN oculto, luego PIN visible y
+finalmente app visible en 1280x900 y 390x844, sin errores JS. El túnel público
+sirve el mismo CSS verificado y 8085 permanece healthy sin reinicio.
+
 ## 2026-09-01 — Causa real de renderProfile/renderMembership ausentes
 
 Source y `/app.js` servido ya contenían ambos renderizadores con SHA-256

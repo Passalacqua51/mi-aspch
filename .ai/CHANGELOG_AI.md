@@ -1,3 +1,14 @@
+# Transición OTP → PIN en producción — 2026-09-02
+
+- Confirmado en SQLite que el OTP real fue aceptado, el correo se actualizó y
+  la sesión se creó; el fallo era exclusivamente de visibilidad en desktop.
+- La maqueta iPhone ya no fuerza `display:flex` sobre pantallas con `hidden`.
+- Versionado `styles.css` con su SHA-256 y rotado el caché del Service Worker.
+- Añadida regresión estática y validación Playwright desktop/mobile de las tres
+  pantallas, sin errores JavaScript.
+- Producción 8085 y el túnel público sirven el hotfix; contenedor healthy y sin
+  reinicio.
+
 # Invalidación del bundle obsoleto en Preview 8086 — 2026-09-01
 
 - Reproducidos en el origen real los stacks de `renderProfile` y

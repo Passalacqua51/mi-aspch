@@ -30,6 +30,10 @@
 
 # Completadas recientemente
 
+- [x] Corregir en producción el bloqueo visual posterior al OTP: `.hidden`
+      vuelve a ocultar la pantalla anterior en escritorio, el CSS quedó
+      versionado por hash y las transiciones OTP/PIN/app aprobaron en Playwright
+      para desktop y mobile.
 - [x] Reproducir en 8086 el bundle obsoleto que omitía Perfil/Membresía,
       invalidar caché HTTP/PWA exclusivamente en Preview y validar por navegación
       real que ambos renderizadores son funciones globales.

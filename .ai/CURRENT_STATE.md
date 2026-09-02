@@ -1,6 +1,19 @@
 # Estado actual
 
-Última actualización: 2026-09-01 UTC
+Última actualización: 2026-09-02 UTC
+
+## Transición OTP → PIN corregida en producción
+
+- Un intento real de Directorio confirmó que el OTP fue consumido, el correo
+  quedó actualizado y la sesión se creó, pero el navegador de escritorio
+  continuaba mostrando el formulario de OTP.
+- La causa era una regla del marco desktop que forzaba `display:flex!important`
+  sobre autenticación, PIN y app, anulando la clase global `hidden`.
+- El display forzado ahora solo aplica a la pantalla que no tenga `hidden`; el
+  hash de `styles.css` cambió y se rotó el caché del Service Worker.
+- Playwright validó en 1280x900 y 390x844 las transiciones autenticación → PIN →
+  app sin errores de JavaScript. Producción 8085 y el túnel público sirven el
+  CSS corregido; el contenedor continúa healthy y no fue necesario reiniciarlo.
 
 ## Invalidación real del bundle Preview
 
