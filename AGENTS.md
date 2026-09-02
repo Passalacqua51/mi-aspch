@@ -22,7 +22,14 @@ fuente de código, contexto IA canónico ni contexto de build.
 - **ChatGPT:** arquitecto/coordinador. Define prioridades, revisa resultados y prepara instrucciones para Codex.
 - **Codex:** implementador principal. Realiza normalmente los cambios de código y ejecuta pruebas.
 - **Antigravity:** auditor independiente en hitos importantes. Puede aplicar cambios exclusivamente documentales cuando el usuario/ChatGPT lo solicite explícitamente, pero no debe modificar código simultáneamente con Codex.
+- **GitHub Copilot CLI:** agente de respaldo cuando Codex o Antigravity/AGY estén sin cuota o tokens.
 - **Claude:** revisor de metodología y consistencia documental. Revisa `AGENTS.md` y `.ai/`; no implementa código ni toca producción.
+
+GitHub Copilot CLI, cuando actúe como fallback:
+
+- Debe inspeccionar siempre el estado actual del repositorio y del entorno antes de modificar.
+- Debe preservar los datos y la infraestructura crítica, evitar cambios destructivos y respetar las reglas permanentes de producción de este archivo.
+- Debe ejecutar los tests existentes relevantes antes de cerrar el trabajo.
 
 ## Regla de concurrencia
 
