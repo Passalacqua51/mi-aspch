@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es">
-<head><script>window.IS_ADMIN_PANEL = true;</script>
+<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
@@ -13,10 +13,11 @@
   <link rel="manifest" href="/manifest.webmanifest?v=43760df9cbceeb0a">
   <link rel="icon" href="/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/styles.css?v=300a0c10a7b95e0f">
+  <link rel="stylesheet" href="/styles.css?v=07653f77db459fc6">
 
 <style>
   body, html { max-width: 100% !important; margin: 0; padding: 0; background: var(--bg); height: 100vh; }
+  @media (min-width:901px) {
   body.ui-iphone { display:block!important; min-height:100vh!important; padding:0!important; margin:0!important; overflow:auto!important; background:var(--bg)!important; }
   body.ui-iphone #app-shell { display:grid!important; grid-template-columns:252px minmax(0,1fr)!important; width:100%!important; height:100vh!important; max-width:none!important; max-height:none!important; margin:0!important; border-radius:0!important; border:0!important; outline:0!important; box-shadow:none!important; overflow:visible!important; }
   body.ui-iphone .app-shell::before, body.ui-iphone .app-shell::after { display:none!important; }
@@ -26,6 +27,19 @@
   #desktop-nav { display:flex!important; flex-direction:column; }
   #view { padding:2rem; max-width:1440px; margin:0 auto; width:100%; overflow:visible; }
   #mobile-nav, #mobile-more-backdrop, #mobile-more-drawer, #top-avatar { display: none !important; }
+  }
+  @media (max-width:900px) {
+    body.ui-iphone{display:block!important;min-height:100dvh!important;padding:0!important;margin:0!important;overflow:auto!important;background:var(--bg)!important}
+    body.ui-iphone #auth-screen:not(.hidden),body.ui-iphone #lock-screen:not(.hidden){display:flex!important;width:100%!important;height:100dvh!important;max-width:none!important;max-height:none!important;border:0!important;border-radius:0!important;outline:0!important;margin:0!important}
+    body.ui-iphone #app-shell:not(.hidden){display:block!important;width:100%!important;height:auto!important;min-height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;overflow:visible!important}
+    body.ui-iphone .app-shell::before,body.ui-iphone .app-shell::after{display:none!important}
+    body.ui-iphone .sidebar,#desktop-nav{display:none!important}
+    body.ui-iphone .main-area{display:block!important;height:auto!important;min-height:100dvh!important;overflow:visible!important;padding-bottom:calc(82px + var(--safe-bottom))!important}
+    body.ui-iphone #mobile-nav{display:grid!important}
+    body.ui-iphone #top-avatar,body.ui-iphone #more-menu-toggle{display:grid!important}
+    body.ui-iphone #view{padding:16px!important;max-width:none!important}
+    #admin-mode-switch span{display:none}
+  }
   
   /* Dev panel tweaks for wide screen */
   .dev-metric-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important; }
@@ -116,6 +130,7 @@
         <div class="topbar-title-wrap"><button id="more-menu-toggle" class="icon-button mobile-more-button" title="Servicios" aria-label="Abrir servicios">☰</button><div><span class="eyebrow">MI ASPCH</span><h2 id="page-title">Inicio</h2></div></div>
         <div class="top-actions">
           <button id="install-app" class="button ghost hidden">Instalar app</button>
+          <button id="admin-mode-switch" class="button ghost hidden" type="button"></button>
           <div class="account-menu-wrap">
             <button id="top-avatar" class="avatar avatar-button" type="button" aria-label="Abrir menú de cuenta" aria-haspopup="menu" aria-expanded="false">A</button>
             <div id="account-menu" class="account-menu hidden" role="menu">
@@ -142,6 +157,6 @@
     </aside>
   </div>
 
-  <script src="/app.js?v=ec035a85b9aaa7ff" defer></script>
+  <script src="/app.js?v=b3753bcd3c83dd54" defer></script>
 </body>
 </html>

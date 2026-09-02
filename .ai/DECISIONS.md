@@ -34,6 +34,15 @@ debe pedir consentimiento explícito para Web Push mediante `Sí, activar` o
 suscripción; la negativa no deja una suscripción activa. La elección se puede
 cambiar posteriormente desde Perfil.
 
+Informática utiliza el mismo origen público y cookie de sesión que Mi ASPCH. La
+ruta `/informatica` sirve el panel ADMIN y ambas vistas incorporan un selector
+para alternar entre la experiencia del asociado y las métricas. La cuenta ADMIN
+recibe las capacidades visibles del Directorio por autorización de rol, nunca
+mediante impersonación o modificación de la nómina. El panel debe ser navegable
+en Safari móvil además de mantener su disposición ancha en escritorio. La ruta
+se detecta en el bundle externo; no se depende de scripts inline bloqueados por
+la CSP de producción.
+
 Face ID/huella se ofrece mediante Passkeys/WebAuthn y utiliza
 `reviewer-stopping-wages-roland.trycloudflare.com` como RP ID y origen. Ese
 hostname no se cambia durante la prueba: las credenciales WebAuthn pertenecen al

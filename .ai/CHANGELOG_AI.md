@@ -22,6 +22,14 @@
 - Añadido consentimiento Push explícito Sí/No en el primer ingreso del
   Directorio por dispositivo, con baja efectiva al rechazar.
 
+# Acceso dual de Informática — 2026-09-02
+
+- Habilitado `/informatica` bajo el mismo origen, login ADMIN y cookie segura.
+- Añadido cambio de modo entre Mi ASPCH y Panel Informática sin cerrar sesión.
+- El rol ADMIN recibe la experiencia funcional del Directorio sin impersonación.
+- Adaptado el panel de métricas a Safari móvil y corregida su detección mediante
+  el JavaScript externo para respetar la CSP estricta de producción.
+
 # Transición OTP → PIN en producción — 2026-09-02
 
 - Confirmado en SQLite que el OTP real fue aceptado, el correo se actualizó y

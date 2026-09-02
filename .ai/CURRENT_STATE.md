@@ -43,6 +43,11 @@
   Directorio recibe una pregunta Sí/No de consentimiento para notificaciones.
   Aceptar solicita el permiso nativo y suscribe; rechazar elimina cualquier
   suscripción de ese dispositivo.
+- Informática puede iniciar en `/informatica` bajo el mismo enlace público y
+  sesión segura. Un control visible alterna entre `Mi ASPCH` y `Panel
+  Informática`; su cuenta ADMIN obtiene la experiencia funcional del Directorio
+  sin impersonar a un socio. El panel presenta navegación móvil para métricas,
+  socios, reservas, sistema y las demás secciones en Safari.
 
 ## Transición OTP → PIN corregida en producción
 

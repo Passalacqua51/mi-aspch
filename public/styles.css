@@ -58,6 +58,8 @@ body.ui-iphone{--radius:18px}
 .ui-iphone .topbar .eyebrow{display:none}
 .ui-iphone .topbar h2{font-size:19px}
 .ui-iphone #install-app{display:none!important}
+.ui-iphone #admin-mode-switch{width:40px;padding:0;flex:none}
+.ui-iphone #admin-mode-switch span{display:none}
 .ui-iphone .view{padding:16px}
 .ui-iphone .mobile-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;width:100%;z-index:100;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);padding:6px 2px calc(6px + var(--safe-bottom));box-sizing:border-box}
 .ui-iphone .mobile-nav .nav-item{display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;padding:5px 2px;font-size:10px;font-weight:700;color:var(--muted);width:100%;min-width:0;box-sizing:border-box}

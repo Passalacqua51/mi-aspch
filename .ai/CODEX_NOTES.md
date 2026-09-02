@@ -348,3 +348,35 @@ El cambio de seguridad fue integrado en `main` y versionado como `0.6.16` sin
 modificaciones funcionales adicionales. Se actualizaron backend, PWA, caché,
 metadatos npm, pruebas y Compose. La imagen no fue construida ni desplegada;
 producción continúa en `0.6.15` y el digest de `0.6.16` queda pendiente.
+## 2026-09-02 — Acceso dual de Informática en el enlace público
+
+Se incorporó `/informatica` al mismo origen público de Mi ASPCH, sin crear una
+autenticación alternativa: reutiliza el login ADMIN, cookie HttpOnly y controles
+de autorización existentes. La portada ofrece `Acceso Informática` y, una vez
+autenticado, ambas vistas permiten alternar entre `Mi ASPCH` y `Panel
+Informática` sin cerrar sesión.
+
+La cuenta ADMIN recibe las capacidades visibles del Directorio mediante una
+regla explícita de rol, sin persistirla en la nómina ni impersonar a otra
+persona. El panel conserva escritorio ancho desde 901 px y habilita navegación
+móvil por métricas/secciones en Safari. El hostname y el proceso Cloudflare no
+se modifican. La detección de la ruta ADMIN vive en `app.js`, no en JavaScript
+inline, porque la CSP de producción admite únicamente scripts del mismo origen.
+
+## 2026-09-02 — Cierre y validación final de acceso dual Informática
+
+Se completó la verificación integral en producción y pruebas automatizadas:
+- Se protegió `setLoading` contra elementos nulos (`if(!el)return;`) para evitar
+  errores de `classList` cuando `e.currentTarget` se limpia al completar eventos
+  asíncronos en navegadores reales.
+- Se actualizaron los hashes de cache-busting: `app.js` (`b3753bcd3c83dd54`),
+  alineado en `index.html`, `admin.html` y caché Service Worker
+  `mi-aspch-v0.6.16-informatica-b3753bcd`.
+- Smoke móvil Safari/iPhone (390x844) validado sin errores: Acceso Informática,
+  RUT oculto, PIN password/numérico, ancho 390 px, sin overflowX, bandera
+  adminPanelFlag=true.
+- Flujo completo verificado vía Playwright: login Informática → Panel → Mi ASPCH →
+  Panel, alternancia fluida de modo con la misma sesión ADMIN y sin deslogueo.
+- Batería de pruebas: `git diff --check`, `npm run check`, `self_check_v0.6.0_static.mjs`,
+  `self_check_v0.6.0_core.mjs`, `self_check_auth.mjs` y smoke HTTP 100% aprobados.
+- Se conservaron intactos el túnel Cloudflare (PID 1089525), SQLite, `.env` y sesiones.

@@ -1,4 +1,5 @@
 const $=(q,r=document)=>r.querySelector(q); const $$=(q,r=document)=>[...r.querySelectorAll(q)];
+window.IS_ADMIN_PANEL=['/informatica','/informatica/','/admin','/admin.html'].includes(location.pathname);
 const UI_SERVICE_DEFAULTS={parking:true,reservations:true,simulators:true,studyroom:true,library:true,agreements:true,news:true,agenda:true};
 const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,parkingPrompt:new URLSearchParams(location.search).get('parkingPrompt')==='1',postLoginPromptsStarted:false,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,uiPreferences:{configured:false,simpleMode:false,services:{...UI_SERVICE_DEFAULTS}},registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
 const NAV=[['home','🏠','Inicio'],['parking','🚗','Estacionamiento'],['booking','🗓️','Reservas'],['profile','👤','Mi perfil'],['credential','🪪','Credencial'],['security','🔐','Seguridad'],['membership','💳','Mensualidad'],['convenios','🤝','Convenios'],['library','📚','Biblioteca'],['marketplace','🛒','Mercado ASPCH'],['activities','🎓','Cursos y charlas'],['votes','🗳️','Votaciones'],['contact','📞','Contacto'],['news','📰','Noticias']];
@@ -86,9 +87,9 @@ function activateAdminIdentityMode(active){
   else{input.removeAttribute('pattern');input.removeAttribute('maxlength');$('#identity-help').textContent='Si el correo es distinto al registrado, Mi ASPCH validará ambos correos antes de actualizar tu ficha ASPCH.'}
 }
 async function startRegistration(e){
-  e.preventDefault();clearFormError(e.currentTarget);
+  e.preventDefault();const form=e.currentTarget;clearFormError(form);
   const rut=$('#login-rut').value.trim(),email=$('#login-email').value.trim();
-  setLoading(e.currentTarget,true);
+  setLoading(form,true);
   try{
     if(rut.toLowerCase()===state.config?.adminEmail){
       await api('/api/auth/admin-login',{method:'POST',body:{email:rut,pin:email}});
@@ -107,9 +108,9 @@ async function startRegistration(e){
     showAuthStep('code');
   }catch(err){
     const adminMode=rut.toLowerCase()===state.config?.adminEmail;if(adminMode)$('#login-email').value='';
-    showFormError(e.currentTarget,adminMode?`${err.message} Corrige la clave y vuelve a intentar.`:err.message,adminMode?'#login-email':'#login-rut');toast(err.message,true);
+    showFormError(form,adminMode?`${err.message} Corrige la clave y vuelve a intentar.`:err.message,adminMode?'#login-email':'#login-rut');toast(err.message,true);
   }
-  finally{setLoading(e.currentTarget,false)}
+  finally{setLoading(form,false)}
 }
 async function verifyRegistration(e){
   e.preventDefault();clearFormError(e.currentTarget);setLoading(e.currentTarget,true);
@@ -158,7 +159,14 @@ async function unlockWithPasskey(){
 function showLockButtonState(){if($('#lock-screen').classList.contains('hidden'))return;showLock()}
 async function lockNow(){if(!state.security?.pinSet&&!state.security?.passkeySet){toast('Primero configura un PIN o Face ID/huella en Seguridad.');return go('security')}try{await api('/api/security/lock',{method:'POST',body:{}});state.security.unlocked=false;sessionStorage.removeItem('miAspchUnlocked');showLock()}catch(e){toast(e.message,true)}}
 async function doLogout(){sessionStorage.removeItem('miAspchUnlocked');try{await api('/api/auth/logout',{method:'POST',body:{}})}catch{}location.reload()}
-function showAuth(){$('#auth-screen').classList.remove('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');showAuthStep('identity')}
+function showAuth(){$('#auth-screen').classList.remove('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');showAuthStep('identity');if(window.IS_ADMIN_PANEL)prepareAdminLogin()}
+function prepareAdminLogin(){
+  const identity=$('#login-rut'),label=$('#login-rut-label'),title=$('#auth-screen .auth-clean-title');
+  if(!identity||!state.config?.adminEmail)return;
+  identity.value=state.config.adminEmail;label?.classList.add('hidden');activateAdminIdentityMode(true);
+  if(title)title.textContent='Acceso Informática';
+  $('#identity-help').textContent='Ingresa tu PIN de Informática para continuar.';$('#identity-help').classList.remove('hidden');
+}
 function showLock(){
   if(!state.member)return showAuth();
   $('#auth-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');$('#lock-screen').classList.remove('hidden');
@@ -185,7 +193,15 @@ function loginSuccess(){
   if(isInactiveMembership())return renderInactiveMembership();
   $('#auth-screen').classList.add('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.remove('hidden');
   $('#sidebar-name').textContent=firstLast(m.name);$('#sidebar-role').textContent=m.role==='ADMIN'?'Administrador':(m.isBoard?'Directorio':(isHelicopterMember(m)?'Helicópteros':'Asociado'));
-  $('#sidebar-avatar').textContent=initials(m.name);$('#top-avatar').textContent=initials(m.name);renderNav();go(initialView());schedulePostLoginPrompts();
+  $('#sidebar-avatar').textContent=initials(m.name);$('#top-avatar').textContent=initials(m.name);configureAdminModeSwitch();renderNav();go(initialView());schedulePostLoginPrompts();
+}
+
+function configureAdminModeSwitch(){
+  const button=$('#admin-mode-switch'),isAdmin=state.member?.role==='ADMIN';if(!button)return;
+  button.classList.toggle('hidden',!isAdmin);if(!isAdmin)return;
+  const panel=!!window.IS_ADMIN_PANEL;button.innerHTML=panel?'📱 <span>Ver Mi ASPCH</span>':'📊 <span>Panel Informática</span>';
+  button.setAttribute('aria-label',panel?'Ver Mi ASPCH':'Abrir Panel Informática');
+  button.onclick=()=>location.assign(panel?'/':'/informatica');
 }
 
 function schedulePostLoginPrompts(){
@@ -209,8 +225,13 @@ function renderNav(){
   document.body.classList.toggle('simple-mode',simpleModeEnabled()&&!window.IS_ADMIN_PANEL);
   document.body.classList.toggle('admin-panel',adminItems.length>0);
   if(adminItems.length){
+    const primaryIds=['admin-dashboard','admin-members','admin-reservations','admin-system'];
+    const primary=adminItems.filter(([id])=>primaryIds.includes(id)),secondary=adminItems.filter(([id])=>!primaryIds.includes(id));
     $('#desktop-nav').innerHTML=`<div class="nav-section-label">Control Informática</div>${adminItems.map(x=>navItem(...x)).join('')}`;
-    $('#mobile-nav').innerHTML='';$('#mobile-more-nav').innerHTML='';$('#more-menu-toggle')?.classList.add('hidden');
+    const mobileLabel={'admin-dashboard':'Métricas','admin-members':'Socios','admin-reservations':'Reservas','admin-system':'Sistema'};
+    $('#mobile-nav').innerHTML=primary.map(([id,icon,label])=>navItem(id,icon,mobileLabel[id]||label)).join('');
+    $('#mobile-more-nav').innerHTML=`<section class="mobile-menu-group"><span>Panel Informática</span>${secondary.map(x=>navItem(...x)).join('')}</section>`;
+    $('#more-menu-toggle')?.classList.remove('hidden');$('#more-menu-toggle')?.classList.toggle('active',!primaryIds.includes(state.view));
     $$('[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));return;
   }
   const primaryIds=['home','parking','booking','profile'];
@@ -1827,6 +1848,7 @@ function focusEditableNumeric(selector){
   setTimeout(()=>{el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch{}},30);
 }
 function setLoading(el,on){
+  if(!el)return;
   el.classList.toggle('loading',on);
   $$('button',el).forEach(button=>{
     if(on){button.dataset.loadingWasDisabled=button.disabled?'1':'0';button.disabled=true}

@@ -22,6 +22,9 @@ services:
       - "0.0.0.0:8085:8080"
     volumes:
       - mi_aspch_data:/data:z
+      - ./server.mjs:/app/server.mjs:ro
+      - ./lib:/app/lib:ro
+      - ./public:/app/public:ro
       - /mnt/MediaCenter/aspch/sipa-fotos:/data/sipa-fotos:ro
       - /mnt/MediaCenter/aspch/sipa-retratos:/data/sipa-retratos:ro
       - /mnt/MediaCenter/aspch/profile-fotos:/data/profile-fotos:rw

@@ -488,7 +488,7 @@ async function routeApi(req, res, url) {
       }
     }
     const spaces = db.prepare(`SELECT id,label,building,board_only FROM parking_spaces
-      WHERE active=1 AND (board_only=0 OR ?=1) ORDER BY CAST(building AS INTEGER),sort_order,label`).all(member.is_board ? 1 : 0);
+      WHERE active=1 AND (board_only=0 OR ?=1) ORDER BY CAST(building AS INTEGER),sort_order,label`).all(hasBoardExperience(member) ? 1 : 0);
     const rows = db.prepare(`SELECT r.id,r.space_id,r.member_id,r.checked_in_at,r.reminder_after_hours,r.last_reminder_at,r.created_at,p.label,p.building
       FROM parking_reservations r JOIN parking_spaces p ON p.id=r.space_id
       WHERE r.reservation_date=? AND r.status='ACTIVE'`).all(date);
@@ -500,7 +500,7 @@ async function routeApi(req, res, url) {
     return json(res, 200, {
       date,
       access:{allowed:access.parking,reason:access.reason},
-      canSeeBoardParking: !!member.is_board,
+      canSeeBoardParking: hasBoardExperience(member),
       mine: mineSpaceId,
       mineReservation: mineRow ? parkingPublicReservation(mineRow) : (sheetMine ? parkingPublicReservation({ id:`sheet-${date}-${sheetMine[0]}`,space_id:sheetMine[0],label:sheetMine[1].label,building:sheetMine[1].building,checked_in_at:null,reminder_after_hours:null }) : null),
       sync: { enabled: !!config.parkingSync, google: sheetsReadEnabled(), live: googleLive, source:'ESTACIONAMIENTOS ASPCH', warning: syncWarning },
@@ -516,7 +516,7 @@ async function routeApi(req, res, url) {
     if (!date || date < todayChile()) return json(res, 400, { error: 'Fecha inválida.' });
     const space = db.prepare('SELECT * FROM parking_spaces WHERE id=? AND active=1').get(spaceId);
     if (!space) return json(res, 404, { error: 'Estacionamiento no encontrado.' });
-    if (space.board_only && !member.is_board) return json(res, 403, { error: 'Ese estacionamiento está reservado para integrantes del Directorio.' });
+    if (space.board_only && !hasBoardExperience(member)) return json(res, 403, { error: 'Ese estacionamiento está reservado para integrantes del Directorio.' });
     if (config.parkingSync && sheetsReadEnabled()) {
       const live = await syncParkingDateFromGoogle(date, { force:true });
       const occupied = live.get(spaceId);
@@ -1398,7 +1398,7 @@ function formatRutForSheet(value='') {
 }
 function parkingValidationForMember(member) {
   if (!member) return '';
-  const board = member.is_board ? ' (Directorio)' : '';
+  const board = hasBoardExperience(member) ? ' (Directorio)' : '';
   return `✅ Socio${board}  |  ${formatRutForSheet(member.rut)}  |  ${member.name}`;
 }
 function parkingSpaceByBuildingLabel(building, label) {
@@ -2000,7 +2000,7 @@ function membershipPlanFor(member, uf){
   const isFO = /(^|\b)(FO|F\/O|PRIMER OFICIAL)(\b|$)/.test(position);
   const isCaptain = /(^|\b)(CPT|CAPT|CAPITAN|CAPITÁN)(\b|$)/.test(position);
   const base = { code:'GENERAL', label:'Socio ASPCH', icon:'👤', formula:'Por definir', monthlyClp:null, monthlyDisplay:'Por definir', note:'Falta parametrizar esta categoría.' };
-  if (member.is_board) return { code:'DIRECTORIO', label:'Directorio', icon:'⭐', formula:'Exento de mensualidad', monthlyClp:0, monthlyDisplay:'Sin mensualidad', exempt:true, note:'Los integrantes del Directorio están exentos de mensualidad.', specialNotice:retirement.turning65Today?{ title:'¡Felicitaciones por tus 65 años! 🎉', body:'Hoy comienzas una nueva etapa. Te invitamos a acercarte a las oficinas ASPCH para ayudarte con tus trámites y acompañarte en esta nueva vida.' }:null };
+  if (hasBoardExperience(member)) return { code:'DIRECTORIO', label:'Directorio', icon:'⭐', formula:'Exento de mensualidad', monthlyClp:0, monthlyDisplay:'Sin mensualidad', exempt:true, note:'Los integrantes del Directorio están exentos de mensualidad.', specialNotice:retirement.turning65Today?{ title:'¡Felicitaciones por tus 65 años! 🎉', body:'Hoy comienzas una nueva etapa. Te invitamos a acercarte a las oficinas ASPCH para ayudarte con tus trámites y acompañarte en esta nueva vida.' }:null };
   if (isRetired) return { code:'JUBILADO', label:'Jubilado', icon:'🧓', formula:'Exento de mensualidad', monthlyClp:0, monthlyDisplay:'Sin mensualidad', exempt:true, note:'Los asociados jubilados no pagan mensualidad.', specialNotice:retirement.turning65Today?{ title:'¡Felicitaciones por tus 65 años! 🎉', body:'Hoy comienzas una nueva etapa y tu membresía queda exenta de pago. Te invitamos a acercarte a las oficinas ASPCH para ayudarte con tus trámites y acompañarte en esta nueva vida.' }:null };
   if (isCommercial) return { code:'COMERCIAL', label:'Comercial', icon:'💼', formula:'$15.000 cuota', baseFeeClp:15000, lossLicenseContributionClp:0, monthlyClp:15000, monthlyDisplay:formatClp(15000), note:'Mensualidad fija de $15.000.' };
   if (isCorporate) return { code:'CORPORATIVO', label:'Corporativo', icon:'🏢', formula:'$15.000 cuota + $12.000 aporte pérdida de licencia', baseFeeClp:15000, lossLicenseContributionClp:12000, monthlyClp:27000, monthlyDisplay:formatClp(27000), note:'Total mensual: $27.000.' };
@@ -2091,7 +2091,8 @@ function securitySummary(m,req){
   return {pinSet:!!m.pin_hash,unlocked:isUnlocked(m),unlockedUntil:m.unlocked_until||null,...w};
 }
 function visibleMemberRut(m){return m?.rut||null}
-function publicMember(m){ return {id:m.id,email:m.email,name:m.name,preferredName:m.preferred_name||null,rut:visibleMemberRut(m),phone:m.phone,employer:m.employer,category:m.category,position:m.position,role:m.role,active:!!m.active,isBoard:!!m.is_board,birthDate:m.birth_date||null}; }
+function hasBoardExperience(m){return !!m?.is_board||m?.role==='ADMIN'}
+function publicMember(m){ return {id:m.id,email:m.email,name:m.name,preferredName:m.preferred_name||null,rut:visibleMemberRut(m),phone:m.phone,employer:m.employer,category:m.category,position:m.position,role:m.role,active:!!m.active,isBoard:hasBoardExperience(m),birthDate:m.birth_date||null}; }
 
 function credentialCode(memberId) {
   return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev').update(`member:${memberId}`).digest('base64url').slice(0,18).toUpperCase();
@@ -2157,7 +2158,8 @@ function serveStatic(req,res,pathname){
   if(pathname==='/test-notificaciones.html'){
     res.statusCode=302;res.setHeader('Location','/');res.setHeader('Cache-Control','no-store');return res.end();
   }
-  if(req.isAdminPort && pathname==='/') pathname='/admin.html';
+  if(pathname==='/informatica'||pathname==='/informatica/'||pathname==='/admin') pathname='/admin.html';
+  else if(req.isAdminPort && pathname==='/') pathname='/admin.html';
   else if(req.isLabPort && PREVIEW_MODE && pathname==='/') pathname='/lab.html';
   else if(pathname==='/' || pathname==='/mobile') pathname='/index.html';
   let target=path.normalize(path.join(PUBLIC_DIR,pathname)); if(!target.startsWith(PUBLIC_DIR))return json(res,403,{error:'Ruta inválida.'});

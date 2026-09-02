@@ -60,6 +60,10 @@ fuente de código, contexto IA canónico ni contexto de build.
   `reviewer-stopping-wages-roland.trycloudflare.com`. No cambiarlo sin una
   migración explícita, porque las passkeys registradas no son transferibles a
   otro dominio.
+- Informática accede desde el mismo hostname mediante `/informatica`, con la
+  autenticación ADMIN normal y la misma cookie segura. Debe poder alternar entre
+  `Mi ASPCH` (capacidades visibles del Directorio, sin impersonar una persona) y
+  `Panel Informática` (métricas y administración), también desde Safari móvil.
 
 ## Shared AI Context
 

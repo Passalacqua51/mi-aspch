@@ -103,6 +103,7 @@ try{
   }
   const morosoFixture=db.prepare('SELECT id FROM members WHERE email=?').get('moroso@example.test'),futureDate=new Date(Date.now()+86400_000).toISOString().slice(0,10),studyStart=new Date(Date.now()+90000_000),studyEnd=new Date(studyStart.getTime()+3600_000);
   db.prepare(`INSERT INTO parking_spaces(id,label,building,board_only,active,sort_order,updated_at) VALUES ('QA-1','QA 1','87',0,1,1,?)`).run(now);
+  db.prepare(`INSERT INTO parking_spaces(id,label,building,board_only,active,sort_order,updated_at) VALUES ('QA-BOARD','QA DIRECTORIO','103',1,1,2,?)`).run(now);
   db.prepare(`INSERT INTO parking_reservations(reservation_date,space_id,member_id,status,created_at) VALUES (?,'QA-1',?,'ACTIVE',?)`).run(futureDate,morosoFixture.id,now);
   const studyRoom=db.prepare('SELECT id FROM study_rooms ORDER BY id LIMIT 1').get();db.prepare(`INSERT INTO study_room_reservations(room_id,member_id,start_at,end_at,status,created_at) VALUES (?,?,?,?,'ACTIVE',?)`).run(studyRoom.id,morosoFixture.id,studyStart.toISOString(),studyEnd.toISOString(),now);
   db.prepare(`INSERT INTO study_room_waitlist(member_id,room_id,start_at,end_at,status,created_at) VALUES (?,?,?,?,'ACTIVE',?)`).run(morosoFixture.id,studyRoom.id,studyStart.toISOString(),studyEnd.toISOString(),now);
@@ -229,6 +230,19 @@ try{
   const adminLogin=await request(base,'/api/auth/admin-login',{body:{email:adminEmail,pin:adminPin}});
   assert.equal(adminLogin.response.status,200,'El login ADMIN normal debe funcionar');
   assert.ok(adminLogin.cookie,'El login ADMIN normal debe emitir sesión');
+  const informaticaEntry=await fetch(`${base}/informatica`);
+  const informaticaHtml=await informaticaEntry.text();
+  assert.equal(informaticaEntry.status,200,'La entrada pública /informatica debe estar disponible');
+  assert.match(informaticaHtml,/\/app\.js\?v=/,'/informatica debe cargar el script externo compatible con CSP');
+  assert.match(informaticaHtml,/admin-mode-switch/,'El panel debe permitir volver a Mi ASPCH con la misma sesión');
+  const adminMe=await request(base,'/api/me',{cookie:adminLogin.cookie});
+  assert.equal(adminMe.response.status,200,'ADMIN debe poder abrir Mi ASPCH con su sesión normal');
+  assert.equal(adminMe.json.member?.role,'ADMIN','La sesión debe conservar el rol ADMIN');
+  assert.equal(adminMe.json.member?.isBoard,true,'Informática debe recibir la experiencia efectiva de Directorio');
+  const adminParking=await request(base,'/api/parking',{cookie:adminLogin.cookie});
+  assert.equal(adminParking.response.status,200,'Informática debe poder abrir Estacionamientos como Directorio');
+  assert.equal(adminParking.json.canSeeBoardParking,true,'Informática debe tener acceso efectivo a estacionamientos del Directorio');
+  assert.ok(adminParking.json.spaces.some(space=>space.id==='QA-BOARD'&&space.boardOnly),'Informática debe ver los cupos exclusivos del Directorio');
   const adminDashboard=await request(base,'/api/admin/dashboard',{cookie:adminLogin.cookie});
   assert.equal(adminDashboard.response.status,200,'ADMIN debe poder leer el Dashboard');
   assert.equal(adminDashboard.json.health?.status,'CRITICAL','Dashboard debe alertar si falta la fuente XLSM autoritativa');

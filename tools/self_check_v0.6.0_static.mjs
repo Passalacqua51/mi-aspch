@@ -87,6 +87,10 @@ assert.ok(app.includes('async function renderSecurity')&&app.includes("api('/api
 assert.ok(app.includes('btn.disabled=!canUse')&&index.includes('Usar Face ID / huella'),'El botón biométrico debe habilitarse cuando WebAuthn y una passkey estén disponibles');
 assert.ok(app.includes("if(!state.security?.pinSet)return showPinSetup()")&&app.includes("if(err.code==='PIN_REQUIRED')return"),'Una sesión OTP sin PIN debe entrar directamente a la creación de PIN');
 assert.ok(app.includes('¿Quieres recibir notificaciones?')&&app.includes('Sí, activar')&&app.includes('No, gracias')&&app.includes('schedulePostLoginPrompts()'),'El Directorio debe decidir explícitamente si activa notificaciones al ingresar');
+assert.ok(server.includes("pathname==='/informatica'")&&app.includes("['/informatica','/informatica/','/admin','/admin.html'].includes(location.pathname)")&&app.includes("location.assign(panel?'/':'/informatica')"),'Informática debe detectar el panel bajo CSP y alternar app/panel en el mismo origen y sesión');
+assert.ok(index.includes('href="/informatica">Acceso Informática</a>')&&index.includes('id="admin-mode-switch"')&&read('public/admin.html').includes('id="admin-mode-switch"'),'El enlace público y ambas vistas deben exponer el cambio seguro de modo ADMIN');
+assert.ok(app.includes("'admin-dashboard':'Métricas'")&&app.includes("primaryIds=['admin-dashboard','admin-members','admin-reservations','admin-system']"),'El panel ADMIN debe ofrecer navegación útil en Safari móvil');
+assert.ok(server.includes("function hasBoardExperience(m){return !!m?.is_board||m?.role==='ADMIN'}")&&server.includes('isBoard:hasBoardExperience(m)'),'Informática debe ver la experiencia funcional del Directorio sin impersonación');
 assert.ok(app.includes('tel:+56222358612')&&app.includes('tel:+56222359821')&&app.includes('mailto:aspch@aspch.org'),'Contacto debe usar teléfonos y correo ASPCH');
 const mobileServices=app.slice(app.indexOf('function renderMobileMore'),app.indexOf('function openMobileMenu'));
 for(const id of ['parking','booking','reservations'])assert.ok(!mobileServices.includes(`['${id}'`),`Servicios no debe duplicar ${id}`);

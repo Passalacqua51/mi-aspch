@@ -30,6 +30,9 @@
 
 # Completadas recientemente
 
+- [x] Habilitar `/informatica` en el enlace Cloudflare canónico, compartir la
+      sesión ADMIN y alternar entre Mi ASPCH con capacidades del Directorio y el
+      panel de métricas con navegación compatible con Safari móvil.
 - [x] Fijar como regla operativa el enlace de prueba del Directorio sin
       reiniciarlo, verificar sus siete cuentas activas, reforzar `active=1` en
       cada sincronización de Directorio y cubrir con pruebas el OTP único al
