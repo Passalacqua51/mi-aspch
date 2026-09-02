@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { openDb } from '../lib/db.mjs';
+import { openDb, setBoardMembersByRut } from '../lib/db.mjs';
 import { initV050, financialSummary, benefitAccess, reserveStudyRoom, cancelStudyRoom, studyRoomAvailability, createMarketplaceListing, publicMarketplace, moderateMarketplace, marketplaceOwnerEdit } from '../lib/v050.mjs';
 import { initV060, setModuleState, moduleStates, addStudyWaitlist, memberStudyWaitlist, reportMarketplace, marketplaceReports, resolveMarketplaceReport, upsertAgreement, agreements, upsertLibraryItem, libraryItems, toggleLibraryFavorite, setActivityRegistration, activityCenter, setCredentialRevoked, credentialStatus, audit, auditRows, createBackup, backupRuns, adminMemberSearch, createVote, updateVoteDraft, deleteVoteDraft, setVoteStatus, memberVotes, castVote, voteResults } from '../lib/v060.mjs';
 
@@ -36,6 +36,11 @@ const m2=db.prepare("SELECT * FROM members WHERE email='qa2@example.test'").get(
 const m3=db.prepare("SELECT * FROM members WHERE email='qa3@example.test'").get();assert.equal(financialSummary(db,m3).status,'DIRECTORIO');
 const m4=db.prepare("SELECT * FROM members WHERE email='qa4@example.test'").get();assert.equal(financialSummary(db,m4).status,'AL_DIA');assert.equal(financialSummary(db,m4).monthsDue,0);assert.equal(benefitAccess(db,m4).parking,true);
 assert.equal(db.prepare("SELECT name FROM members WHERE email='qa0@example.test'").get().name,'SOCIO QA 0');
+db.prepare('UPDATE members SET active=0,is_board=0 WHERE id=?').run(m3.id);
+assert.equal(setBoardMembersByRut(db,[m3.rut]),1,'La sincronización debe reconocer al integrante del Directorio');
+const syncedBoard=db.prepare('SELECT active,is_board FROM members WHERE id=?').get(m3.id);
+assert.equal(syncedBoard.active,1,'Todo integrante vigente del Directorio debe quedar activo');
+assert.equal(syncedBoard.is_board,1,'La sincronización debe conservar la marca de Directorio');
 
 // Sala: 4h permitido, choque prohibido, múltiples bloques no superpuestos permitidos.
 const start=new Date(Date.now()+86400_000);start.setUTCMinutes(0,0,0);const end=new Date(start.getTime()+4*3600_000);const id1=reserveStudyRoom(db,{memberId:m1.id,start:start.toISOString(),end:end.toISOString()});assert.ok(id1>0);

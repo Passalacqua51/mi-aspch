@@ -167,6 +167,7 @@ function showLock(){
   const browserOk=!!window.PublicKeyCredential&&!!navigator.credentials;
   const canUse=browserOk&&!!state.security?.passkeySet&&!!state.security?.biometricAvailable;
   btn.classList.toggle('hidden',!canUse);
+  btn.disabled=!canUse;
   pinForm.classList.remove('hidden');
   setTimeout(()=>$('#unlock-pin')?.focus(),100);
 }

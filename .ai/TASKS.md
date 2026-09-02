@@ -30,6 +30,10 @@
 
 # Completadas recientemente
 
+- [x] Fijar como regla operativa el enlace de prueba del Directorio sin
+      reiniciarlo, verificar sus siete cuentas activas, reforzar `active=1` en
+      cada sincronización de Directorio y cubrir con pruebas el OTP único al
+      correo ingresado; habilitar Face ID/Passkeys para ese mismo hostname.
 - [x] Corregir en producción el bloqueo visual posterior al OTP: `.hidden`
       vuelve a ocultar la pantalla anterior en escritorio, el CSS quedó
       versionado por hash y las transiciones OTP/PIN/app aprobaron en Playwright

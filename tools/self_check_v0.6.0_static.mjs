@@ -80,6 +80,7 @@ const profileSource=app.slice(app.indexOf('async function renderProfile'),app.in
 assert.ok(profileSource.includes('Personalizar servicios')&&profileSource.includes('Modo simple')&&profileSource.includes('NOTIFICACIONES'),'Perfil debe limitarse a datos y preferencias');
 for(const text of ['SEGURIDAD DEL DISPOSITIVO','TU HISTORIAL','Actividad de tu cuenta','MENSUALIDAD'])assert.ok(!profileSource.includes(text),`Perfil no debe contener ${text}`);
 assert.ok(app.includes('async function renderSecurity')&&app.includes("api('/api/security/sessions')")&&server.includes("p==='/api/security/sessions'"),'Seguridad debe ser una vista independiente con sesiones');
+assert.ok(app.includes('btn.disabled=!canUse')&&index.includes('Usar Face ID / huella'),'El botón biométrico debe habilitarse cuando WebAuthn y una passkey estén disponibles');
 assert.ok(app.includes('tel:+56222358612')&&app.includes('tel:+56222359821')&&app.includes('mailto:aspch@aspch.org'),'Contacto debe usar teléfonos y correo ASPCH');
 const mobileServices=app.slice(app.indexOf('function renderMobileMore'),app.indexOf('function openMobileMenu'));
 for(const id of ['parking','booking','reservations'])assert.ok(!mobileServices.includes(`['${id}'`),`Servicios no debe duplicar ${id}`);

@@ -16,6 +16,9 @@ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mi-aspch-auth-'));
 const dataDir=path.join(tmp,'data');
 const memberEmail='member@example.test';
 const memberRut='12.345.678-5';
+const boardOldEmail='board-old@example.test';
+const boardNewEmail='board-new@example.test';
+const boardRut='13.456.789-9';
 const adminEmail='admin@example.test';
 const memberPin='2468';
 const adminPin='8642';
@@ -86,6 +89,8 @@ try{
   const now=new Date().toISOString();
   db.prepare(`INSERT INTO members(email,name,rut,role,active,is_board,updated_at)
     VALUES (?,?,?,?,1,0,?)`).run(memberEmail,'SOCIO AUTH QA',memberRut,'MEMBER',now);
+  db.prepare(`INSERT INTO members(email,name,rut,role,active,is_board,updated_at)
+    VALUES (?,?,?,?,1,1,?)`).run(boardOldEmail,'DIRECTORIO AUTH QA',boardRut,'MEMBER',now);
   db.prepare('UPDATE members SET phone=?,employer=? WHERE email=?').run('+56 9 1111 2222','LATAM Airlines',memberEmail);
   const statusFixtures=[
     ['moroso@example.test','SOCIO MOROSO QA','11.111.111-1',1,'MOROSO',3,180000],
@@ -182,6 +187,25 @@ try{
   const laterPersonalization=await request(base,'/api/profile/services',{method:'PUT',body:{services:{...firstPersonalization.json.uiPreferences.services,library:true,agenda:false},simpleMode:false},cookie:verified.cookie});
   assert.equal(laterPersonalization.response.status,200,'Perfil debe permitir cambiar la personalización posteriormente');assert.equal(laterPersonalization.json.uiPreferences.simpleMode,false);assert.equal(laterPersonalization.json.uiPreferences.services.library,true);assert.equal(laterPersonalization.json.uiPreferences.services.agenda,false);
   const persistedMe=await request(base,'/api/me',{cookie:verified.cookie});assert.equal(persistedMe.json.uiPreferences.simpleMode,false);assert.equal(persistedMe.json.uiPreferences.services.agenda,false,'La preferencia debe persistir por socio en SQLite');
+  const boardStart=await request(base,'/api/auth/register/start',{body:{rut:boardRut,email:boardNewEmail}});
+  assert.equal(boardStart.response.status,200,'Directorio debe poder usar el correo que ingresa');
+  assert.equal(boardStart.json.emailChanged,false,'Directorio no debe recibir ni requerir OTP en el correo histórico');
+  const boardWriter=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'));
+  const boardMember=boardWriter.prepare('SELECT id FROM members WHERE rut=?').get(boardRut);
+  const boardPurposes=boardWriter.prepare('SELECT purpose FROM otp_codes WHERE member_id=? AND used_at IS NULL ORDER BY id').all(boardMember.id).map(row=>row.purpose);
+  assert.deepEqual(boardPurposes,['register_primary'],'Directorio debe generar un único OTP al correo ingresado');
+  boardWriter.prepare('INSERT INTO otp_codes(email,member_id,purpose,code_hash,expires_at,created_at) VALUES (?,?,?,?,?,?)')
+    .run(boardNewEmail,boardMember.id,'register_primary',otpHash(boardNewEmail,otp),expires,new Date().toISOString());
+  boardWriter.close();
+  const boardVerified=await request(base,'/api/auth/register/verify',{body:{rut:boardRut,email:boardNewEmail,code:otp}});
+  assert.equal(boardVerified.response.status,200,'El único OTP de Directorio debe completar el acceso');
+  assert.ok(boardVerified.cookie,'El OTP de Directorio debe emitir sesión');
+  const boardCheck=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'),{readOnly:true});
+  const verifiedBoardMember=boardCheck.prepare('SELECT email,active,is_board FROM members WHERE id=?').get(boardMember.id);
+  assert.equal(verifiedBoardMember.email,boardNewEmail,'Directorio debe conservar el correo elegido');
+  assert.equal(verifiedBoardMember.active,1,'Directorio debe conservar acceso activo');
+  assert.equal(verifiedBoardMember.is_board,1,'Directorio debe conservar su marca');
+  boardCheck.close();
   const payrollMembership=await request(base,'/api/membership',{cookie:verified.cookie});assert.equal(payrollMembership.response.status,200);assert.equal(payrollMembership.json.paymentMethod,'PAYROLL');assert.equal(payrollMembership.json.transfer,null,'LATAM no debe recibir datos de transferencia');assert.equal(payrollMembership.json.membership.message,'Pago mediante descuento por planilla');
   const employerDb=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'));employerDb.prepare('UPDATE members SET employer=? WHERE id=?').run('Empleador QA',member.id);employerDb.close();
   const transferMembership=await request(base,'/api/membership',{cookie:verified.cookie});assert.equal(transferMembership.response.status,200);assert.equal(transferMembership.json.paymentMethod,'TRANSFER');assert.equal(transferMembership.json.transfer?.configured,true,'Otros empleadores deben conservar transferencia');

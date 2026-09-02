@@ -1,3 +1,17 @@
+# Regla de prueba y acceso del Directorio — 2026-09-02
+
+- Conservado sin reinicio el enlace público vigente hacia producción 8085.
+- Documentada en AGENTS, SERVICES y DECISIONS la prohibición de reemplazar el
+  enlace o crear otro Quick Tunnel silenciosamente.
+- Verificados siete integrantes del Directorio, todos activos y AL_DIA.
+- La sincronización de Directorio ahora reafirma `is_board=1, active=1`.
+- Añadida cobertura HTTP del OTP único al correo ingresado y de la actualización
+  local de ese correo, sin autorización del correo histórico.
+- Alineado WebAuthn al enlace vigente: Face ID/Passkeys aparece disponible en el
+  endpoint público; se recreó solo la app y cloudflared conservó proceso y URL.
+- Corregido el botón de Face ID/huella para habilitarse realmente cuando existe
+  una passkey compatible, con aserción estática contra la regresión.
+
 # Transición OTP → PIN en producción — 2026-09-02
 
 - Confirmado en SQLite que el OTP real fue aceptado, el correo se actualizó y

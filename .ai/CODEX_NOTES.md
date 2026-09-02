@@ -1,5 +1,29 @@
 # Notas de Codex para ChatGPT
 
+## 2026-09-02 — Regla permanente para pruebas del Directorio
+
+El enlace `https://reviewer-stopping-wages-roland.trycloudflare.com` continúa
+activo sobre producción 8085 y no se reinició. La unidad usa un Quick Tunnel
+con `Restart=always`; por ello el hostname exacto depende de conservar el
+proceso. AGENTS, SERVICES y DECISIONS prohíben reiniciarlo, sustituirlo o
+publicar otra URL silenciosamente. Un enlace realmente durable tras reinicios
+requiere una migración explícita a un hostname administrado.
+
+SQLite confirma siete integrantes del Directorio, todos activos y AL_DIA. La
+sincronización ahora fija `is_board=1, active=1` para la nómina vigente. La
+prueba HTTP aislada verifica que un director con correo distinto genera solo
+`register_primary` al correo ingresado, no pide correo histórico, completa el
+registro con un OTP y conserva `active=1`.
+
+Las cinco variables de origen público y WebAuthn se alinearon al enlace vigente
+y se recreó solo `mi-aspch`; el PID de cloudflared no cambió. El endpoint público
+informa `biometricReady=true`, `biometricMode=passkey` y la misma URL pública.
+Las passkeys del hostname anterior, si existieran, deben registrarse nuevamente.
+Además, `showLock()` ahora elimina `disabled` del botón biométrico cuando
+`canUse=true`; antes podía mostrarlo pero la propia función de click retornaba
+sin iniciar WebAuthn. Hay una cuenta de Directorio con una passkey existente,
+por lo que deberá enrolarla nuevamente bajo el hostname vigente.
+
 ## 2026-09-02 — Bloqueo visual después del OTP
 
 La evidencia SQLite del intento real mostró OTP consumido, cambio de correo

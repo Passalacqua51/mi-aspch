@@ -2,6 +2,31 @@
 
 Última actualización: 2026-09-02 UTC
 
+## Prueba estable del Directorio
+
+- El enlace canónico vigente es
+  `https://reviewer-stopping-wages-roland.trycloudflare.com`, servido por
+  `cloudflared-tunnel.service` hacia producción `8085`. Está operativo y no se
+  reinició ni reemplazó.
+- Es un Quick Tunnel: la URL depende del proceso actual. Por orden del usuario,
+  ningún agente debe reiniciarlo, recrearlo o sustituirlo ni publicar otra URL
+  silenciosamente. Una permanencia independiente de reinicios requiere una
+  migración futura y autorizada a un hostname administrado.
+- Los siete integrantes actuales del Directorio tienen `is_board=1`,
+  `active=1` y estado financiero local `AL_DIA`.
+- La sincronización del Directorio ahora reafirma `active=1` para toda persona
+  presente en su fuente vigente.
+- El flujo de Directorio mantiene un único OTP dirigido exclusivamente al correo
+  ingresado, actualiza ese correo local al validar y no consulta el histórico.
+- Face ID/huella está habilitado mediante Passkeys/WebAuthn para el mismo enlace:
+  `/api/config` informa `biometricReady=true` y `biometricMode=passkey`. El
+  hostname es el RP ID; una passkey anterior de otro dominio debe registrarse de
+  nuevo desde Seguridad después de entrar con OTP y PIN.
+- Se corrigió el control del botón biométrico: cuando el navegador, el origen y
+  una passkey son compatibles, deja de estar deshabilitado y permite iniciar la
+  autenticación. Existe una cuenta de Directorio con passkey del hostname
+  anterior que deberá volver a registrarla en el enlace vigente.
+
 ## Transición OTP → PIN corregida en producción
 
 - Un intento real de Directorio confirmó que el OTP fue consumido, el correo

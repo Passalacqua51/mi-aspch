@@ -175,15 +175,16 @@ async function routeApi(req, res, url) {
     if (owner) return json(res, 409, { error: 'Ese correo ya está asociado a otro socio. Contacta a ASPCH.' });
 
     const currentEmail = normalizeEmail(member.email);
+    const isBoard = !!member.is_board;
     const emailChanged = currentEmail !== email;
-    if (emailChanged && !sheetsWriteEnabled()) {
+    if (emailChanged && !isBoard && !sheetsWriteEnabled()) {
       return json(res, 503, { error: 'La actualización de correo requiere conexión con BD SOCIOS. Intenta más tarde.' });
     }
 
     const primary = await issueOtp(db, {
       memberId: member.id, email,
-      purpose: emailChanged ? 'register_new' : 'register_primary',
-      mailKind: emailChanged ? 'email_new' : 'register'
+      purpose: (emailChanged && !isBoard) ? 'register_new' : 'register_primary',
+      mailKind: (emailChanged && !isBoard) ? 'email_new' : 'register'
     });
     if (!primary.ok) {
       if (primary.reason === 'rate_limited') return json(res, 429, { error: 'Demasiados intentos. Intenta nuevamente en unos minutos.' });
@@ -191,7 +192,7 @@ async function routeApi(req, res, url) {
     }
 
     let old = null;
-    if (emailChanged) {
+    if (emailChanged && !isBoard) {
       old = await issueOtp(db, { memberId:member.id, email:currentEmail, purpose:'register_old', mailKind:'email_old' });
       if (!old.ok) {
         if (old.reason === 'rate_limited') return json(res, 429, { error: 'Demasiados intentos para validar el correo actual. Intenta más tarde.' });
@@ -200,9 +201,9 @@ async function routeApi(req, res, url) {
     }
 
     return json(res, 200, {
-      ok:true, emailChanged,
+      ok:true, emailChanged: emailChanged && !isBoard,
       targetEmailMasked:maskEmail(email),
-      currentEmailMasked:emailChanged ? maskEmail(currentEmail) : null
+      currentEmailMasked:(emailChanged && !isBoard) ? maskEmail(currentEmail) : null
     });
   }
 
@@ -215,25 +216,31 @@ async function routeApi(req, res, url) {
     if (!member || !member.active) return json(res, 403, { error:'No fue posible validar al socio.' });
 
     const currentEmail = normalizeEmail(member.email);
+    const isBoard = !!member.is_board;
     const emailChanged = currentEmail !== email;
-    const primaryPurpose = emailChanged ? 'register_new' : 'register_primary';
+    const primaryPurpose = (emailChanged && !isBoard) ? 'register_new' : 'register_primary';
     const primary = verifyIssuedOtp(db, { memberId:member.id, email, code:String(body.code || ''), purpose:primaryPurpose, consume:false });
     if (!primary.ok) return json(res, 401, { error:primary.reason === 'expired' ? 'El código del correo ingresado venció.' : 'El código del correo ingresado es incorrecto.' });
 
     let old = null;
     if (emailChanged) {
-      old = verifyIssuedOtp(db, { memberId:member.id, email:currentEmail, code:String(body.oldCode || ''), purpose:'register_old', consume:false });
-      if (!old.ok) return json(res, 401, { error:old.reason === 'expired' ? 'El código del correo registrado venció.' : 'El código del correo registrado es incorrecto.' });
+      if (!isBoard) {
+        old = verifyIssuedOtp(db, { memberId:member.id, email:currentEmail, code:String(body.oldCode || ''), purpose:'register_old', consume:false });
+        if (!old.ok) return json(res, 401, { error:old.reason === 'expired' ? 'El código del correo registrado venció.' : 'El código del correo registrado es incorrecto.' });
+      }
 
       const owner = db.prepare('SELECT id FROM members WHERE email=? AND id<>?').get(email, member.id);
       if (owner) return json(res, 409, { error:'Ese correo ya quedó asociado a otro socio.' });
 
-      if (sheetsWriteEnabled()) await updateMemberEmailInGoogle(rut, email);
-      else return json(res, 503, { error:'No pude actualizar BD SOCIOS en este momento.' });
+      if (sheetsWriteEnabled()) {
+        try { await updateMemberEmailInGoogle(rut, email); } catch(err) { console.warn('[register] sheets update failed:', err?.message || err); if (!isBoard) return json(res, 503, { error:'No pude actualizar BD SOCIOS en este momento.' }); }
+      } else if (!isBoard) {
+        return json(res, 503, { error:'No pude actualizar BD SOCIOS en este momento.' });
+      }
 
-      const changed = updateMemberEmail(db, member.id, email);
+      const changed = updateMemberEmail(db, member.id, email, isBoard ? 'BOARD_REGISTRATION' : 'SELF_REGISTRATION');
       if (!changed.ok) return json(res, 409, { error:'No fue posible actualizar el correo del socio.' });
-      consumeOtp(db, old.row.id);
+      if (old) consumeOtp(db, old.row.id);
       member = db.prepare('SELECT * FROM members WHERE id=?').get(member.id);
     }
     consumeOtp(db, primary.row.id);

@@ -30,6 +30,29 @@ fuente de código, contexto IA canónico ni contexto de build.
 - Antes de modificar, revisar `.ai/TASKS.md`, especialmente la sección **En curso**.
 - Si existe una intervención activa incompatible, NO continuar ni modificar archivos: detenerse y reportar el conflicto.
 
+## Reglas permanentes de producción para el Directorio
+
+- El enlace canónico de prueba para los integrantes del Directorio es
+  `https://reviewer-stopping-wages-roland.trycloudflare.com` y apunta a la app
+  productiva del puerto `8085`.
+- No detener, reiniciar, recrear ni sustituir `cloudflared-tunnel.service`, ni
+  levantar otro Quick Tunnel para esta prueba. Mientras el enlace esté activo,
+  debe conservarse exactamente. Si deja de funcionar, no publicar otra URL de
+  forma silenciosa: informar el bloqueo y solicitar una migración autorizada a
+  un hostname permanente.
+- Todo integrante presente en la fuente vigente del Directorio debe mantenerse
+  con `members.is_board=1` y `members.active=1`.
+- En el registro de un integrante del Directorio se envía y exige un solo OTP,
+  exclusivamente al correo que esa persona ingresa en pantalla. Nunca se envía
+  ni se exige autorización al correo histórico. Tras validar, ese correo pasa a
+  ser el correo local vigente y se intenta sincronizar con BD SOCIOS.
+- Face ID/huella usa Passkeys/WebAuthn y está ligado al hostname del enlace. Para
+  esta prueba, `APP_ORIGIN`, `PUBLIC_APP_URL`, `WEBAUTHN_RP_ID` y
+  `WEBAUTHN_ORIGINS` deben conservar el hostname
+  `reviewer-stopping-wages-roland.trycloudflare.com`. No cambiarlo sin una
+  migración explícita, porque las passkeys registradas no son transferibles a
+  otro dominio.
+
 ## Shared AI Context
 
 Antes de realizar trabajo significativo en este repositorio:

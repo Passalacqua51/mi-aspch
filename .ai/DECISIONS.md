@@ -1,5 +1,42 @@
 # Registro de decisiones
 
+## 2026-09-02 — Enlace y acceso exclusivos para pruebas del Directorio
+
+### Decisión
+
+El enlace canónico de prueba del Directorio es
+`https://reviewer-stopping-wages-roland.trycloudflare.com`, conectado a
+producción `8085`. No se reinicia, recrea ni sustituye su unidad
+`cloudflared-tunnel.service`, ni se levanta otro Quick Tunnel, mientras este
+enlace esté vigente. Si falla, se informa antes de cualquier cambio de URL.
+
+Toda persona presente en la nómina vigente del Directorio se mantiene activa.
+Su registro usa un único OTP enviado exclusivamente al correo ingresado en
+pantalla; el correo histórico no recibe ni autoriza nada. Al validar se adopta
+el correo ingresado localmente y se intenta sincronizar BD SOCIOS.
+
+Face ID/huella se ofrece mediante Passkeys/WebAuthn y utiliza
+`reviewer-stopping-wages-roland.trycloudflare.com` como RP ID y origen. Ese
+hostname no se cambia durante la prueba: las credenciales WebAuthn pertenecen al
+dominio donde fueron creadas y deben volver a registrarse si el dominio cambia.
+
+### Razón
+
+Los directores deben probar la misma app productiva mediante una URL conocida,
+sin depender del correo histórico ni quedar inactivos por una sincronización de
+socios anterior.
+
+### Restricción operativa
+
+La URL actual pertenece a un Quick Tunnel y solo puede conservarse mientras
+permanezca vivo ese proceso. Hacerla durable tras reinicios exige una migración
+separada y autorizada a un hostname administrado; ningún agente debe ocultar
+esa limitación generando otra URL.
+
+### Estado
+
+Activa
+
 ## 2026-09-02 — `hidden` gobierna las pantallas de autenticación
 
 ### Decisión
