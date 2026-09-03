@@ -642,7 +642,7 @@ async function routeApi(req, res, url) {
     const from = validDate(url.searchParams.get('from')) || mondayOf(todayChile());
     const to = validDate(url.searchParams.get('to')) || addDays(from, 4);
     const occupancies = calendarReadEnabled() ? await calendarPrivacyView(member, from, to) : [];
-    return json(res, 200, { simulators: config.simulators.map(({ id,label,photoUrl,priceClp,requestUrl }) => ({ id,label,photoUrl:photoUrl||null,priceClp:priceClp??(id==='a320pro'?config.simulatorA320ProPrice:null),requestUrl:requestUrl||((id==='a320pro')?config.simulatorA320ProRequestUrl:null) })), from, to, occupancies,
+    return json(res, 200, { simulators: config.simulators.map(({ id,label,photoUrl,priceClp,requestUrl }) => ({ id,label,photoUrl:photoUrl||null,priceClp:priceClp??(id==='a320pro'?config.simulatorA320ProPrice:null),requestUrl:(PREVIEW_MODE&&id==='a320pro')?config.simulatorA320ProRequestUrl:(requestUrl||((id==='a320pro')?config.simulatorA320ProRequestUrl:null)) })), from, to, occupancies,
       cancellationEnabled:config.simulatorCancelEnabled && calendarWriteEnabled(), requestAllowed:access.simulatorRequest,
       restrictionReason:access.reason, a320RequestUrl:access.simulatorRequest?config.simulatorRequestUrl:null,
       a320ProPriceClp:config.simulatorA320ProPrice,a320ProRequestUrl:config.simulatorA320ProRequestUrl,a320ProRates:config.simulatorA320ProRates });
