@@ -78,7 +78,8 @@ const config = {
   dailyBackupHour:Math.max(0,Math.min(23,Number(process.env.DAILY_BACKUP_HOUR||3))),
   dailyBackupMinute:Math.max(0,Math.min(59,Number(process.env.DAILY_BACKUP_MINUTE||15))),
   simulatorA320ProPrice:positiveIntegerOrNull(process.env.SIMULATOR_A320PRO_PRICE_CLP),
-  simulatorA320ProRequestUrl:safeHttpsUrl(process.env.SIMULATOR_REQUEST_A320PRO_URL)
+  simulatorA320ProRequestUrl:PREVIEW_MODE ? (safeHttpsUrl(process.env.SIMULATOR_REQUEST_A320PRO_URL) || 'https://forms.gle/qzXaCUJgmTyufdKQA') : safeHttpsUrl(process.env.SIMULATOR_REQUEST_A320PRO_URL),
+  simulatorA320ProRates:PREVIEW_MODE ? parseA320ProRates(process.env.SIMULATOR_A320PRO_RATES_JSON) : []
 };
 
 function officialPublicAsset(candidates){
@@ -92,7 +93,10 @@ function officialPublicAsset(candidates){
 }
 const OFFICIAL_RESOURCES = Object.freeze({
   ifalpa:officialPublicAsset(['ifalpa-emergency.png','assets/ifalpa-emergency.png','ifalpa.png']),
-  emergency:officialPublicAsset(['emergency-contacts.png','assets/emergency-contacts.png','emergencia.png'])
+  emergency:officialPublicAsset(['emergency-contacts.png','assets/emergency-contacts.png','emergencia.png']),
+  emergencyProtocolUrl:PREVIEW_MODE?'https://www.aspch.org/wp-content/uploads/2022/10/ASPCH-EN-CASO-DE-ACCIDENTE-O-INCIDENTE.pdf':null,
+  emergencyPhone:PREVIEW_MODE?'tel:+56992371806':null,
+  ifalpaPhone:PREVIEW_MODE?'tel:+441202653110':null
 });
 
 const ADMIN_PUSH_TEMPLATES = Object.freeze({
@@ -196,7 +200,7 @@ async function routeApi(req, res, url) {
         conveniosUrl:config.conveniosUrl,simulatorA320RequestUrl:config.simulatorRequestUrl,
         simulatorA320ProPriceClp:config.simulatorA320ProPrice,
         simulatorA320ProRequestUrl:config.simulatorA320ProRequestUrl,
-        officialResources:{ifalpa:OFFICIAL_RESOURCES.ifalpa,emergency:OFFICIAL_RESOURCES.emergency}
+        officialResources:{...OFFICIAL_RESOURCES}
       },
       push:{enabled:pushEnabled(),publicKey:pushEnabled()?vapidPublicKey():null},
       advisors:{legal:{name:'Abogado Tito Muñoz',phone:'+56 9 9196 4314',tel:'tel:+56991964314'},tax:{name:'Contador Manuel Paillafil',phone:'+56 9 9237 1806',tel:'tel:+56992371806'}},
@@ -532,7 +536,7 @@ async function routeApi(req, res, url) {
   }
 
   if (req.method === 'POST' && p === '/api/parking/reserve') {
-    if(!benefitAccess(db,member).parking)return json(res,403,{error:'Este beneficio está temporalmente limitado por tu estado de membresía.',code:'MEMBERSHIP_RESTRICTED'});
+    const access=benefitAccess(db,member);if(!access.parking)return json(res,403,{error:membershipRestrictionMessage(access,'Este estacionamiento'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const body = await readJson(req);
     const date = validDate(body.date);
     const spaceId = String(body.spaceId || '');
@@ -587,7 +591,7 @@ async function routeApi(req, res, url) {
   }
 
   if (req.method === 'POST' && p === '/api/parking/check-in') {
-    if(!benefitAccess(db,member).parking)return json(res,403,{error:'Este beneficio está temporalmente limitado por tu estado de membresía.',code:'MEMBERSHIP_RESTRICTED'});
+    const access=benefitAccess(db,member);if(!access.parking)return json(res,403,{error:membershipRestrictionMessage(access,'Este estacionamiento'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const body = await readJson(req);
     const date = validDate(body.date) || todayChile();
     if (date !== todayChile()) return json(res, 400, { error: 'Solo puedes marcar llegada en la fecha de hoy.' });
@@ -634,14 +638,14 @@ async function routeApi(req, res, url) {
 
   if (req.method === 'GET' && p === '/api/simulators') {
     const access=benefitAccess(db,member);
-    if(!access.simulatorView)return json(res,403,{error:'Tu cuenta no está activa como socio ASPCH.'});
+    if(!access.simulatorView)return json(res,403,{error:membershipRestrictionMessage(access,'Los simuladores'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const from = validDate(url.searchParams.get('from')) || mondayOf(todayChile());
     const to = validDate(url.searchParams.get('to')) || addDays(from, 4);
     const occupancies = calendarReadEnabled() ? await calendarPrivacyView(member, from, to) : [];
     return json(res, 200, { simulators: config.simulators.map(({ id,label,photoUrl,priceClp,requestUrl }) => ({ id,label,photoUrl:photoUrl||null,priceClp:priceClp??(id==='a320pro'?config.simulatorA320ProPrice:null),requestUrl:requestUrl||((id==='a320pro')?config.simulatorA320ProRequestUrl:null) })), from, to, occupancies,
       cancellationEnabled:config.simulatorCancelEnabled && calendarWriteEnabled(), requestAllowed:access.simulatorRequest,
       restrictionReason:access.reason, a320RequestUrl:access.simulatorRequest?config.simulatorRequestUrl:null,
-      a320ProPriceClp:config.simulatorA320ProPrice,a320ProRequestUrl:config.simulatorA320ProRequestUrl });
+      a320ProPriceClp:config.simulatorA320ProPrice,a320ProRequestUrl:config.simulatorA320ProRequestUrl,a320ProRates:config.simulatorA320ProRates });
   }
 
   if (req.method === 'POST' && p === '/api/simulators/cancel') {
@@ -752,12 +756,12 @@ async function routeApi(req, res, url) {
   if(req.method==='DELETE'&&p==='/api/push/subscribe'){const body=await readJson(req);return json(res,200,{ok:true,removed:removePushSubscription(db,{memberId:member.id,endpoint:body.endpoint})})}
 
   if(req.method==='GET'&&p==='/api/study-room'){
-    const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:'La Sala de estudios no está disponible mientras tu membresía esté morosa.',code:'MEMBERSHIP_RESTRICTED'});
+    const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:membershipRestrictionMessage(access,'La Sala de estudios'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const from=url.searchParams.get('from')||new Date().toISOString(),to=url.searchParams.get('to')||new Date(Date.now()+14*86400_000).toISOString();
     return json(res,200,{...studyRoomAvailability(db,{from,to,memberId:member.id}),maxHours:4});
   }
   if(req.method==='POST'&&p==='/api/study-room/reserve'){
-    const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:'La Sala de estudios no está disponible mientras tu membresía esté morosa.',code:'MEMBERSHIP_RESTRICTED'});
+    const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:membershipRestrictionMessage(access,'La Sala de estudios'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const body=await readJson(req);const start=body.date&&body.startTime?chileLocalIso(body.date,body.startTime):body.start;const end=body.date&&body.endTime?chileLocalIso(body.date,body.endTime):body.end;const id=reserveStudyRoom(db,{memberId:member.id,start,end});audit(db,{actorId:member.id,subjectId:member.id,action:'STUDY_RESERVED',entityType:'study_reservation',entityId:id,details:{start,end}});return json(res,201,{ok:true,id});
   }
   if(req.method==='DELETE'&&p==='/api/study-room/reserve'){
@@ -769,7 +773,7 @@ async function routeApi(req, res, url) {
   }
   if(req.method==='GET'&&p==='/api/study-room/waitlist')return json(res,200,{waitlist:memberStudyWaitlist(db,member.id)});
   if(req.method==='POST'&&p==='/api/study-room/waitlist'){
-    const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:'La Sala de estudios no está disponible mientras tu membresía esté morosa.',code:'MEMBERSHIP_RESTRICTED'});
+    const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:membershipRestrictionMessage(access,'La Sala de estudios'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const body=await readJson(req);const start=body.date&&body.startTime?chileLocalIso(body.date,body.startTime):body.start;const end=body.date&&body.endTime?chileLocalIso(body.date,body.endTime):body.end;
     const id=addStudyWaitlist(db,{memberId:member.id,start,end});return json(res,201,{ok:true,id,message:'Te avisaremos si ese bloque se libera. No se reserva automáticamente.'});
   }
@@ -1954,12 +1958,12 @@ async function membershipSummary(member) {
   const financial=financialSummary(db,member);
   let status=exempt?'EXENTO':(paid?'AL_DIA':'PENDIENTE');
   if(financial?.status==='MOROSO')status='MOROSO';
-  if(financial?.status==='CONGELADO')status='EXENTO';
+  if(financial?.status==='CONGELADO')status='CONGELADO';
   if(financial?.status==='DESAFILIADO')status='DESAFILIADO';
   const payroll=isLatamPayrollEmployer(member.employer);
   let message=exempt?'Esta categoría está exenta de mensualidad.':(paid?'Mensualidad del mes registrada como pagada.':payroll?'Pago mediante descuento por planilla':'Puedes pagar mediante transferencia bancaria usando los datos de ASPCH.');
   if(financial?.status==='MOROSO')message=`Tienes ${financial.monthsDue} ${financial.monthsDue===1?'mes pendiente':'meses pendientes'}. Por favor regulariza lo antes posible o comunícate con nosotros.`;
-  if(financial?.status==='CONGELADO')message='Tu membresía está congelada y exenta de pago durante el período informado por ASPCH.';
+  if(financial?.status==='CONGELADO')message='Tu membresía está congelada por el período informado por ASPCH. Los beneficios de reserva quedan pausados; comunícate con nosotros si necesitas orientación.';
   if(financial?.status==='DESAFILIADO')message='Tu registro figura como desafiliado. Comunícate con ASPCH si necesitas revisar tu situación.';
   return {
     year,month,
@@ -2262,6 +2266,22 @@ function safeHttpsUrl(value){
 function positiveIntegerOrNull(value){
   const number=Number(value);
   return Number.isSafeInteger(number)&&number>0?number:null;
+}
+function parseA320ProRates(raw){
+  try{
+    const values=JSON.parse(raw||'null');
+    if(Array.isArray(values)&&values.length){
+      const rates=values.map(value=>({hours:Number(value.hours),priceClp:positiveIntegerOrNull(value.priceClp)}))
+        .filter(value=>Number.isSafeInteger(value.hours)&&value.hours>0&&value.priceClp);
+      if(rates.length)return rates;
+    }
+  }catch{}
+  return [{hours:2,priceClp:75000},{hours:4,priceClp:100000}];
+}
+function membershipRestrictionMessage(access,service){
+  if(access?.reason==='CONGELADO')return `${service} están pausados mientras tu membresía está congelada. Comunícate con ASPCH para conocer tu situación.`;
+  if(access?.reason==='MOROSO')return `${service} están temporalmente restringidos por cuotas pendientes. Regulariza tu situación para volver a utilizarlos.`;
+  return `${service} no está disponible para esta cuenta.`;
 }
 function loadEnv(file){if(!fs.existsSync(file))return;for(const line of fs.readFileSync(file,'utf8').split(/\r?\n/)){if(!line||/^\s*#/.test(line))continue;const m=line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);if(!m)continue;let v=m[2];if((v.startsWith('"')&&v.endsWith('"'))||(v.startsWith("'")&&v.endsWith("'")))v=v.slice(1,-1);if(process.env[m[1]]===undefined)process.env[m[1]]=v}}
 function bool(v,d=false){if(v==null)return d;return['1','true','yes','si','sí','on'].includes(String(v).toLowerCase())}

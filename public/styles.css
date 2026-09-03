@@ -621,6 +621,8 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 .home-active-row .eyebrow{color:var(--green)}
 .home-vote-row{border-color:color-mix(in srgb,var(--amber) 40%,var(--line))}
 .home-vote-row .home-row-icon{background:color-mix(in srgb,var(--amber-soft) 80%,var(--surface))}
+.home-emergency-card{margin-top:12px;border-color:color-mix(in srgb,var(--amber) 45%,var(--line));background:color-mix(in srgb,var(--amber-soft) 35%,var(--surface))}
+.home-emergency-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.home-emergency-head h3{margin:6px 0 0;font-size:17px}.home-emergency-card p{margin:10px 0;color:var(--muted);font-size:13px}.home-emergency-card .toolbar,.official-resource-actions{display:flex;gap:8px;flex-wrap:wrap}
 .home-vote-row .eyebrow{color:var(--amber)}
 
 .home-quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -648,6 +650,7 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 .contact-card strong{font-size:13px}
 .contact-card span{font-size:11px;color:var(--muted)}
 .contact-card .button.compact{padding:6px 10px;font-size:11px}
+.official-resources{display:grid;gap:10px;margin-top:14px}.official-resources h3{margin:0}.official-resources p{margin:0;color:var(--muted);font-size:12px;line-height:1.45}.official-resources img{max-width:100%;border-radius:12px}
 
 /* Logo institucional oficial: siempre usa el PNG original, sin variantes. */
 .sidebar-logo,.credential-logo,.setup-logo{display:block;max-width:100%;height:auto;object-fit:contain;background:transparent;border-radius:0;padding:0}
@@ -673,6 +676,7 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 /* Reservas unificadas */
 .booking-hub{max-width:720px;margin:0 auto}.booking-hero{text-align:center}.booking-hero h2{margin:8px 0 5px}.booking-hero p{margin:0;color:var(--muted)}
 .booking-options{display:grid;gap:12px;margin-top:14px}.booking-choice{width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;text-align:left;color:var(--text);cursor:pointer}.booking-choice-icon{width:50px;height:50px;border-radius:15px;background:var(--blue-soft);display:grid;place-items:center;font-size:23px}.booking-choice>span:nth-child(2){display:flex;flex-direction:column;gap:4px}.booking-choice strong{font-size:16px}.booking-choice small{color:var(--muted);line-height:1.35}.booking-choice em{font-style:normal;color:var(--blue);font-size:12px;font-weight:800}.booking-choice:hover{border-color:var(--blue);background:var(--surface-2)}
+.sim-rate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.sim-rate-card{display:grid;gap:3px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}.sim-rate-card strong{font-size:13px}.sim-rate-card span{font-size:16px;font-weight:800;color:var(--blue)}
 
 /* Preferencias visuales por socio */
 .service-preferences-card{max-height:calc(100dvh - 32px);overflow-y:auto}.service-preferences-card h2{margin-bottom:6px}.service-preferences-card>p{margin:0 0 14px}.service-pref-list{display:grid;gap:8px}.service-pref-group{border:1px solid var(--line);border-radius:16px;background:var(--surface-2);overflow:hidden}.service-pref-group>.service-pref-row{border:0;border-radius:0;background:transparent}.service-pref-row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:48px;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);font-size:13px;font-weight:750}.service-pref-row span{display:flex;align-items:center;gap:10px}.service-pref-row i{width:23px;text-align:center;font-style:normal;font-size:17px}.service-pref-row.nested{margin:0 10px 8px 28px;min-height:42px;background:var(--surface);font-size:12px}.service-pref-row.disabled{opacity:.5}.service-pref-row input{width:22px;height:22px;accent-color:var(--blue);flex:none}.service-pref-fixed{font-size:11px!important;color:var(--muted);text-align:center;margin:12px 0 0!important}.service-pref-actions{display:grid;gap:8px;margin-top:13px}.service-personalization-card .button{width:100%;margin-top:8px}

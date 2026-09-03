@@ -63,9 +63,7 @@ async function boot(){
     state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
     if(!state.security?.pinSet)return showPinSetup();
     const localUnlockMarker=sessionStorage.getItem('miAspchUnlocked')==='1';
-    const unlockedUntil=Date.parse(state.security?.unlockedUntil||'');
-    const unlockWindowValid=state.security?.unlocked===true&&Number.isFinite(unlockedUntil)&&unlockedUntil>Date.now();
-    if(!unlockWindowValid){
+    if(window.shouldGateOnReopen({security:state.security,localUnlockMarker})){
       if(localUnlockMarker)sessionStorage.removeItem('miAspchUnlocked');
       return showLock();
     }
@@ -290,8 +288,8 @@ async function go(view){
   if(view==='admin')view='developer';
   if(ADMIN_VIEWS.has(view)&&state.member?.role!=='ADMIN')view='home';
   if(simpleModeEnabled()&&!window.IS_ADMIN_PANEL&&!['credential','parking','contact'].includes(view))view='credential';
-  if(state.access?.reason==='MOROSO'&&['booking','reservations','simulators','studyroom'].includes(view)){
-    state.view=view;renderNav();$('#page-title').textContent=view==='booking'?'Reservas':({reservations:'Mi agenda',simulators:'Turnos de simulador',studyroom:'Sala de estudios'}[view]||'Reservas');renderMorosoBenefitBlock(view);return;
+  if(['MOROSO','CONGELADO'].includes(state.access?.reason)&&['booking','reservations','simulators','studyroom'].includes(view)){
+    state.view=view;renderNav();$('#page-title').textContent=view==='booking'?'Reservas':({reservations:'Mi agenda',simulators:'Turnos de simulador',studyroom:'Sala de estudios'}[view]||'Reservas');renderRestrictedBenefitBlock(view,state.access.reason);return;
   }
   state.view=view;renderNav();
   const titles={home:'Inicio',booking:'Reservas',reservations:'Mi agenda',credential:'Credencial digital',security:'Seguridad',membership:'Mensualidad',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Contacto y asesorías',contact:'Contacto',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
@@ -300,9 +298,12 @@ async function go(view){
   try{if(!routes[view])return go('home');await routes[view]()}catch(err){console.error(`[Mi ASPCH] No se pudo renderizar ${view}:`,err);if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message||'No fue posible cargar esta sección.')}</div>`}
 }
 
-function renderMorosoBenefitBlock(view){
+function renderRestrictedBenefitBlock(view,reason=state.access?.reason){
   const label=view==='simulators'?'Simuladores':view==='studyroom'?'Sala de estudios':'Reservas';
-  $('#view').innerHTML=`<div class="benefit-preview-shell moroso-benefit-block"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">${escapeHtml(label.toUpperCase())}</span><h2>Servicio no disponible por cuotas pendientes</h2><p>Regulariza tu situación para volver a utilizar este servicio.</p><button class="button primary" data-go="membership">Información para regularizar</button></div><div class="benefit-preview-content" inert aria-hidden="true"><div class="card booking-hero"><h2>${escapeHtml(label)}</h2><p>Contenido temporalmente bloqueado.</p></div></div></div>`;
+  const frozen=reason==='CONGELADO';
+  const title=frozen?'Servicio pausado por membresía congelada':'Servicio no disponible por cuotas pendientes';
+  const copy=frozen?'Este servicio queda pausado mientras tu membresía está congelada. Comunícate con ASPCH si necesitas orientación.':'Regulariza tu situación para volver a utilizar este servicio.';
+  $('#view').innerHTML=`<div class="benefit-preview-shell ${frozen?'congelado-benefit-block':'moroso-benefit-block'} restricted-benefit-block"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">${escapeHtml(label.toUpperCase())}</span><h2>${title}</h2><p>${copy}</p><button class="button primary" data-go="membership">${frozen?'Ver información de membresía':'Información para regularizar'}</button></div><div class="benefit-preview-content" inert aria-hidden="true"><div class="card booking-hero"><h2>${escapeHtml(label)}</h2><p>Contenido temporalmente bloqueado.</p></div></div></div>`;
   $('[data-go="membership"]')?.addEventListener('click',()=>go('membership'));
 }
 
@@ -345,6 +346,10 @@ function homeMembershipRow(pay){
       subtitle=months>0?`Pagos pendientes · ${months} ${months===1?'mes':'meses'}`:'Pagos pendientes';
       badgeClass='amber';
       badgeText='Regularizar →';
+    }else if(status==='CONGELADO'){
+      subtitle='Beneficios pausados · membresía congelada';
+      badgeClass='blue';
+      badgeText='Revisar →';
     }else if(status==='PENDIENTE'){
       subtitle='Pendiente de pago';
       badgeClass='amber';
@@ -404,6 +409,12 @@ async function renderHome(){
     </div>
     <span class="badge ${state.member?.active?'green':'amber'}">${state.member?.active?'Vigente':'Revisar'} →</span>
   </div>`;
+  const official=state.config?.features?.officialResources||{};
+  const emergencyCard=`<section class="card home-emergency-card" data-testid="home-emergency">
+    <div class="home-emergency-head"><div><span class="eyebrow">🚨 EMERGENCIA / IFALPA</span><h3>Protocolo oficial de emergencia</h3></div><span class="badge amber">Ayuda</span></div>
+    <p>Accede al protocolo ASPCH y a los contactos H24 verificados.</p>
+    <div class="toolbar">${official.emergencyProtocolUrl?`<a class="button primary compact" href="${escapeHtml(official.emergencyProtocolUrl)}" target="_blank" rel="noopener noreferrer">Abrir protocolo PDF ↗</a>`:''}${official.emergencyPhone?`<a class="button ghost compact" href="${escapeHtml(official.emergencyPhone)}">Emergencia ASPCH</a>`:''}${official.ifalpaPhone?`<a class="button ghost compact" href="${escapeHtml(official.ifalpaPhone)}">Llamar IFALPA</a>`:''}<button class="button ghost compact" type="button" data-go="contact">Más contactos</button></div>
+  </section>`;
 
   // 2.1 Votación oficial activa, si existe
   let voteCard = '';
@@ -479,6 +490,7 @@ async function renderHome(){
   $('#view').innerHTML=`${greeting}
   ${unavailableNotice}
   ${credentialCard}
+  ${emergencyCard}
   ${voteCard}
   ${simulatorCard}
   ${parkingCard}
@@ -598,7 +610,9 @@ async function renderParking(date=state.parking?.date||today()){
   const allowed=data.access?.allowed??state.access?.parking??true;
   const dates=Array.from({length:7},(_,i)=>addDays(weekStart,i)),group87=data.spaces.filter(s=>s.building==='87'),group103=data.spaces.filter(s=>s.building==='103'),mine=data.mineReservation;
   const syncLabel=data.sync?.live?'<span class="parking-sync-status ok">● Sincronizado con ESTACIONAMIENTOS ASPCH</span>':(data.sync?.enabled?'<span class="parking-sync-status warn">● Sincronización temporalmente no disponible</span>':'');
-  const previewStart=!allowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>Estacionamiento bloqueado</h2><p>Puedes ver los cupos disponibles detrás de esta pantalla, pero no reservar mientras tu membresía esté morosa.</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
+  const restrictedReason=data.access?.reason||state.access?.reason;
+  const restrictedCopy=restrictedReason==='CONGELADO'?'Puedes ver los cupos disponibles detrás de esta pantalla, pero las reservas están pausadas mientras tu membresía está congelada.':'Puedes ver los cupos disponibles detrás de esta pantalla, pero no reservar mientras tu membresía esté morosa.';
+  const previewStart=!allowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>${restrictedReason==='CONGELADO'?'Estacionamiento pausado':'Estacionamiento bloqueado'}</h2><p>${restrictedCopy}</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
   const previewEnd=!allowed?'</div></div>':'';
   $('#view').innerHTML=`${previewStart}<div class="parking-head card"><div><span class="eyebrow">ESTACIONAMIENTO</span><h2>Reserva aquí tu estacionamiento</h2>${syncLabel}<div class="parking-legend"><span><i class="free-dot"></i>Libre · toca para reservar</span><span><i class="occupied-dot"></i>Ocupado</span><span><i class="mine-dot"></i>Tu reserva</span></div></div><label class="date-picker">Otra fecha<input id="parking-date" type="date" min="${today()}" value="${data.date}"></label></div>
   <div class="parking-week-toolbar"><button id="parking-prev-week" class="button ghost">←</button><strong>${weekLabel(weekStart)}</strong><button id="parking-next-week" class="button ghost">→</button></div>
@@ -701,8 +715,11 @@ function renderSimulatorsFromCache(){
   const price=selectedSimulator.priceClp||((selectedSimulator.id==='a320pro')?data.a320ProPriceClp:null);
   const requestUrl=selectedSimulator.requestUrl||((selectedSimulator.id==='a320pro')?data.a320ProRequestUrl:null);
   const simulatorPhoto=selectedSimulator.photoUrl?`<img class="simulator-photo" src="${escapeHtml(selectedSimulator.photoUrl)}" alt="${escapeHtml(selectedSimulator.label||'Simulador')}">`:'<div class="simulator-photo-placeholder" role="img" aria-label="Foto no disponible">📷 Foto oficial no disponible en Preview</div>';
-  const proRequest=selectedSimulator.id==='a320pro'?`<div class="sim-request-panel"><div><strong>Solicitud A320Pro</strong><span>${price?`Precio: ${escapeHtml(formatClpClient(price))}`:'Precio no disponible en Preview'}</span></div>${requestUrl?`<form id="a320pro-request-form" class="sim-request-form"><label>Fecha preferida<input name="date" type="date" min="${today()}" required></label><label>Turno<select name="period"><option value="AM">AM</option><option value="PM">PM</option></select></label><label>Observaciones<textarea name="notes" maxlength="300" placeholder="Información opcional"></textarea></label><button class="button primary" type="submit">Continuar al formulario oficial ↗</button></form>`:'<p class="hint">La URL oficial de solicitud A320Pro aún no está configurada en Preview.</p>'}</div>`:'';
-  const previewStart=!requestAllowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>Solicitud de turnos bloqueada</h2><p>Puedes ver la agenda detrás de esta pantalla, pero no solicitar ni operar turnos mientras tu membresía esté morosa.</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
+  const proRates=Array.isArray(data.a320ProRates)?data.a320ProRates:[];
+  const proRateCards=proRates.map(rate=>`<div class="sim-rate-card" data-testid="a320pro-rate-${rate.hours}"><strong>${escapeHtml(String(rate.hours))} horas</strong><span>${escapeHtml(formatClpClient(rate.priceClp))}</span></div>`).join('');
+  const proRequest=selectedSimulator.id==='a320pro'?`<div class="sim-request-panel"><div><strong>Solicitud A320Pro</strong><span>${price?`Precio de referencia: ${escapeHtml(formatClpClient(price))}`:'Tarifas oficiales'}</span></div>${proRateCards?`<div class="sim-rate-grid">${proRateCards}</div>`:''}${requestUrl?`<form id="a320pro-request-form" class="sim-request-form"><label>Duración<select name="hours">${proRates.map(rate=>`<option value="${rate.hours}">${rate.hours} horas · ${escapeHtml(formatClpClient(rate.priceClp))}</option>`).join('')}</select></label><label>Fecha preferida<input name="date" type="date" min="${today()}" required></label><label>Observaciones<textarea name="notes" maxlength="300" placeholder="Información opcional"></textarea></label><button class="button primary" type="submit">Continuar al formulario oficial ↗</button></form>`:'<p class="hint">La URL oficial de solicitud A320Pro aún no está configurada en Preview.</p>'}</div>`:'';
+  const restrictedCopy=data.restrictionReason==='CONGELADO'?'Puedes ver la agenda detrás de esta pantalla, pero solicitar turnos está pausado mientras tu membresía está congelada.':'Puedes ver la agenda detrás de esta pantalla, pero no solicitar ni operar turnos mientras tu membresía esté morosa.';
+  const previewStart=!requestAllowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>${data.restrictionReason==='CONGELADO'?'Solicitud de turnos pausada':'Solicitud de turnos bloqueada'}</h2><p>${restrictedCopy}</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
   const previewEnd=!requestAllowed?'</div></div>':'';
   $('#view').innerHTML=`${previewStart}<div class="section-head simulator-head"><div><h3>Simuladores</h3></div></div>
   <div class="week-toolbar"><button id="prev-week" class="button ghost">←</button><button id="this-week" class="button ghost">Semana actual</button><strong>${weekLabel(data.from)}</strong><button id="next-week" class="button ghost">→</button></div>
@@ -714,7 +731,7 @@ function renderSimulatorsFromCache(){
   $('#a320pro-request-form')?.addEventListener('submit',e=>{
     e.preventDefault();
     if(!requestUrl)return;
-    const form=e.currentTarget,query=new URLSearchParams({date:form.elements.date.value,period:form.elements.period.value,notes:form.elements.notes.value||''});
+    const form=e.currentTarget,query=new URLSearchParams({hours:form.elements.hours.value,date:form.elements.date.value,notes:form.elements.notes.value||''});
     window.open(`${requestUrl}${requestUrl.includes('?')?'&':'?'}${query}`,'_blank','noopener');
   });
 }
@@ -751,7 +768,7 @@ async function cancelSimulatorTurn(eventRef){
 
 
 async function renderStudyRoom(){
-  if(state.access?.studyRoom===false){$('#view').innerHTML=`<div class="card restricted-benefit"><span class="eyebrow">📖 SALA DE ESTUDIOS</span><h2>Beneficio temporalmente restringido</h2><p>Los socios morosos no pueden reservar la Sala de estudios. Regulariza tu membresía para recuperar este beneficio.</p><button class="button primary" data-go="profile">Ver membresía</button></div>`;$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));return}
+  if(state.access?.studyRoom===false){const frozen=state.access?.reason==='CONGELADO';$('#view').innerHTML=`<div class="card restricted-benefit"><span class="eyebrow">📖 SALA DE ESTUDIOS</span><h2>${frozen?'Beneficio pausado por membresía congelada':'Beneficio temporalmente restringido'}</h2><p>${frozen?'La Sala de estudios queda pausada durante el período informado por ASPCH. Comunícate con nosotros si necesitas orientación.':'Los socios morosos no pueden reservar la Sala de estudios. Regulariza tu membresía para recuperar este beneficio.'}</p><button class="button primary" data-go="profile">Ver membresía</button></div>`;$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));return}
   const from=new Date().toISOString(),to=new Date(Date.now()+21*86400_000).toISOString();const [data,waitData]=await Promise.all([api(`/api/study-room?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),api('/api/study-room/waitlist')]);
   const mine=data.reservations.filter(r=>r.mine),occupied=data.reservations.filter(r=>!r.mine),waitlist=waitData.waitlist||[];
   $('#view').innerHTML=`<div class="card study-hero"><span class="eyebrow">📖 SALA DE ESTUDIOS</span><h2>Reserva tu bloque</h2><p>Una sala · bloques de hasta 4 horas · puedes mantener varias reservas futuras · cancelación disponible siempre.</p>
@@ -855,9 +872,9 @@ function renderContact(){
     return `<a class="card contact-card contact-whatsapp" href="https://wa.me/${escapeHtml(number)}" target="_blank" rel="noopener noreferrer"><span class="contact-icon">💬</span><div><strong>${escapeHtml(x.name)}</strong><span>${escapeHtml(x.phone)}</span></div><span class="button primary compact">WhatsApp</span></a>`;
   }).join('');
   const official=state.config?.features?.officialResources||{};
-  const officialCards=`<section class="card official-resources"><span class="eyebrow">🚨 EMERGENCIA / IFALPA</span><h3>Recursos oficiales</h3>${official.ifalpa?`<img src="${escapeHtml(official.ifalpa)}" alt="Recurso oficial IFALPA">`:'<p>El asset oficial IFALPA no está disponible en Preview; la integración queda preparada para incorporarlo sin usar sustitutos.</p>'}${official.emergency?`<img src="${escapeHtml(official.emergency)}" alt="Recurso oficial de emergencia">`:'<p>El asset oficial de emergencia no está disponible en Preview; no se muestran teléfonos ni material no verificado.</p>'}</section>`;
+  const officialCards=`<section class="card official-resources"><span class="eyebrow">🚨 EMERGENCIA / IFALPA</span><h3>Recursos oficiales</h3>${official.ifalpa?`<img src="${escapeHtml(official.ifalpa)}" alt="Recurso oficial IFALPA">`:'<p>El asset oficial IFALPA no está disponible en Preview; la integración queda preparada para incorporarlo sin usar sustitutos.</p>'}${official.emergency?`<img src="${escapeHtml(official.emergency)}" alt="Recurso oficial de emergencia">`:'<p>El asset oficial de emergencia no está disponible en Preview; no se muestran teléfonos ni material no verificado.</p>'}${official.emergencyProtocolUrl?`<a class="button primary compact" href="${escapeHtml(official.emergencyProtocolUrl)}" target="_blank" rel="noopener noreferrer">Abrir protocolo oficial PDF ↗</a>`:''}</section>`;
   $('#view').innerHTML = `<div class="card contact-hero">
-    <h2>Contacto</h2><p>Canales oficiales de ASPCH y asesorías disponibles.</p>
+    <p>Canales oficiales de ASPCH y asesorías disponibles.</p>
   </div>
   <div class="contact-channels-grid" style="margin-top:1.5rem;">
     <a class="card contact-card" href="tel:+56222358612"><span class="contact-icon">☎️</span><div><strong>Oficina ASPCH 1</strong><span>2 2235 8612</span></div><span class="button primary compact">Llamar</span></a>
@@ -904,7 +921,8 @@ async function renderMembership(){
   const pay=await api('/api/membership');state.membership=pay.membership;const q=pay.membership?.quote||{},financial=pay.membership?.financial||state.access?.financial||{};
   const months=Number(financial.monthsDue||0),backedAmount=financial.amountDueAvailable===true&&Number.isFinite(Number(financial.amountDue))&&Number(financial.amountDue)>0;
   const debt=financial.status==='MOROSO'?`<div class="debt-inline"><strong>${months>0?`${months} ${months===1?'cuota pendiente':'cuotas pendientes'}`:'Cuotas pendientes'}</strong>${backedAmount?`<span>Monto respaldado: ${escapeHtml(formatClpClient(financial.amountDue))}</span>`:'<span>El monto exacto no está disponible en la fuente validada.</span>'}</div>`:'';
-  const payment=pay.paymentMethod==='PAYROLL'?'<div class="transfer-box payroll"><strong>Pago mediante descuento por planilla</strong><p>Tu mensualidad se gestiona mediante descuento por planilla.</p></div>':pay.membership.status==='EXENTO'?'<div class="transfer-box exempt"><strong>✅ Sin pago mensual</strong><p>Tu categoría está exenta de mensualidad.</p></div>':transferHtml(pay.transfer);
+  const frozen=financial.status==='CONGELADO';
+  const payment=pay.paymentMethod==='PAYROLL'?'<div class="transfer-box payroll"><strong>Pago mediante descuento por planilla</strong><p>Tu mensualidad se gestiona mediante descuento por planilla.</p></div>':pay.membership.status==='EXENTO'?'<div class="transfer-box exempt"><strong>✅ Sin pago mensual</strong><p>Tu categoría está exenta de mensualidad.</p></div>':frozen?'<div class="transfer-box pending"><strong>Beneficios pausados temporalmente</strong><p>No debes realizar un pago mientras ASPCH mantenga congelada tu membresía.</p></div>':transferHtml(pay.transfer);
   $('#view').innerHTML=`<section id="membership-view" class="security-page"><div class="card membership-card"><span class="eyebrow">💳 MENSUALIDAD</span><div class="membership-title"><span class="membership-category-icon">${escapeHtml(q.icon||'💳')}</span><div><h2>${escapeHtml(q.monthlyDisplay||q.formula||'Por definir')}</h2><p>${escapeHtml(q.label||'Socio ASPCH')}</p></div></div>${membershipStatusBadge(pay.membership.status)}${debt}<div class="profile-grid compact-grid">${field('📅 Periodicidad',pay.membership.periodicity||'Mensual')}${field('📌 Estado',membershipStatusLabel(pay.membership.status))}${q.formula?field('🧮 Cálculo',q.formula):''}</div>${payment}<p class="hint">${escapeHtml(pay.membership.message||'')}</p></div></section>`;
   $('#copy-transfer')?.addEventListener('click',()=>copyTransfer(pay.transfer));
 }
