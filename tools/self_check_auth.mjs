@@ -108,6 +108,10 @@ try{
     const inserted=db.prepare(`INSERT INTO members(email,name,rut,phone,employer,role,active,is_board,updated_at) VALUES (?,?,?,?,?,'MEMBER',?,0,?)`).run(email,name,rut,'+56 9 0000 0000','Empleador QA',active,now);
     db.prepare(`INSERT INTO member_financial_status(member_id,rut,source_status,financial_status,months_due,amount_due,source_year,source_updated_at,synced_at,deactivated_by_financial) VALUES (?,?,?,?,?,?,2026,?,?,?)`).run(Number(inserted.lastInsertRowid),rut,status,status,months,amount,now,now,status==='DESAFILIADO'?1:0);
   }
+  for(const email of ['moroso@example.test','congelado@example.test']){
+    const fixture=db.prepare('SELECT * FROM members WHERE email=?').get(email);
+    setPin(db,sessionMember(db,fixture),'2468');
+  }
   const morosoFixture=db.prepare('SELECT id FROM members WHERE email=?').get('moroso@example.test'),futureDate=new Date(Date.now()+86400_000).toISOString().slice(0,10),studyStart=new Date(Date.now()+90000_000),studyEnd=new Date(studyStart.getTime()+3600_000);
   db.prepare(`INSERT INTO parking_spaces(id,label,building,board_only,active,sort_order,updated_at) VALUES ('QA-1','QA 1','87',0,1,1,?)`).run(now);
   db.prepare(`INSERT INTO parking_spaces(id,label,building,board_only,active,sort_order,updated_at) VALUES ('QA-BOARD','QA DIRECTORIO','103',1,1,2,?)`).run(now);

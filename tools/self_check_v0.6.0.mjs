@@ -31,7 +31,7 @@ for(const [index,status,months,amount,managed] of financialFixture){
     VALUES (?,?,?,?,?,?,?,?,?,?)`).run(member.id,member.rut,status,status,months,amount,2026,now,now,managed);
 }
 const m0=db.prepare("SELECT * FROM members WHERE email='qa0@example.test'").get();const f0=financialSummary(db,m0);assert.equal(f0.status,'MOROSO');assert.equal(f0.monthsDue,2);assert.equal(f0.amountDue,30000);assert.equal(benefitAccess(db,m0).parking,false);assert.equal(benefitAccess(db,m0).simulatorView,false);assert.equal(benefitAccess(db,m0).studyRoom,false);
-const m1=db.prepare("SELECT * FROM members WHERE email='qa1@example.test'").get();assert.equal(financialSummary(db,m1).status,'CONGELADO');assert.equal(financialSummary(db,m1).monthsDue,0);assert.equal(benefitAccess(db,m1).parking,true);
+const m1=db.prepare("SELECT * FROM members WHERE email='qa1@example.test'").get();assert.equal(financialSummary(db,m1).status,'CONGELADO');assert.equal(financialSummary(db,m1).monthsDue,0);assert.equal(benefitAccess(db,m1).parking,false);assert.equal(benefitAccess(db,m1).simulatorView,false);assert.equal(benefitAccess(db,m1).studyRoom,false);
 const m2=db.prepare("SELECT * FROM members WHERE email='qa2@example.test'").get();assert.equal(financialSummary(db,m2).status,'MOROSO');assert.equal(db.prepare('SELECT active FROM members WHERE id=?').get(m2.id).active,1);
 const m3=db.prepare("SELECT * FROM members WHERE email='qa3@example.test'").get();assert.equal(financialSummary(db,m3).status,'DIRECTORIO');
 const m4=db.prepare("SELECT * FROM members WHERE email='qa4@example.test'").get();assert.equal(financialSummary(db,m4).status,'AL_DIA');assert.equal(financialSummary(db,m4).monthsDue,0);assert.equal(benefitAccess(db,m4).parking,true);
