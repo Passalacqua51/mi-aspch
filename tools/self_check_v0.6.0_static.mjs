@@ -98,7 +98,7 @@ assert.ok(app.includes("'admin-dashboard':'Métricas'")&&app.includes("primaryId
 assert.ok(server.includes("function hasBoardExperience(m){return !!m?.is_board||m?.role==='ADMIN'}")&&server.includes('isBoard:hasBoardExperience(m)'),'Informática debe ver la experiencia funcional del Directorio sin impersonación');
 assert.ok(app.includes('tel:+56222358612')&&app.includes('tel:+56222359821')&&app.includes('mailto:aspch@aspch.org'),'Contacto debe usar teléfonos y correo ASPCH');
 assert.ok(server.includes('Abogado Tito Muñoz')&&server.includes('Contador Manuel Paillafil')&&app.includes('officialResources'),'Contacto debe mostrar asesorías WhatsApp y dejar integración oficial de emergencia/IFALPA segura');
-assert.ok(app.includes('simulator-photo-placeholder')&&app.includes('a320pro-request-form')&&server.includes('simulatorA320ProPriceClp'),'Simuladores debe verificar fotos y exponer precio/formulario A320Pro solo cuando exista configuración');
+assert.ok(app.includes('simulator-photo-placeholder')&&app.includes('a320pro-request-link')&&server.includes('simulatorA320ProPriceClp'),'Simuladores debe verificar fotos y exponer precio/formulario A320Pro solo cuando exista configuración');
 assert.ok(server.includes("return [{hours:2,priceClp:75000},{hours:4,priceClp:100000}]")&&server.includes('qzXaCUJgmTyufdKQA')&&app.includes('a320ProRates'),'A320Pro debe exponer sus dos tarifas y el formulario oficial');
 assert.match(read('lib/v050.mjs'),/\['MOROSO','CONGELADO'\]\.includes/,'CONGELADO debe compartir restricciones backend con MOROSO');
 assert.ok(app.includes('Servicio pausado por membresía congelada'),'CONGELADO debe tener mensaje diferenciado');

@@ -293,9 +293,9 @@ async function go(view){
     state.view=view;renderNav();$('#page-title').textContent=view==='booking'?'Reservas':({reservations:'Mi agenda',simulators:'Turnos de simulador',studyroom:'Sala de estudios'}[view]||'Reservas');renderRestrictedBenefitBlock(view,state.access.reason);return;
   }
   state.view=view;renderNav();
-  const titles={home:'Inicio',booking:'Reservas',reservations:'Mi agenda',credential:'Credencial digital',security:'Seguridad',membership:'Mensualidad',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Contacto y asesorías',contact:'Contacto',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
+  const titles={home:'Inicio',emergency:'Emergencia / IFALPA',booking:'Reservas',reservations:'Mi agenda',credential:'Credencial digital',security:'Seguridad',membership:'Mensualidad',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Contacto y asesorías',contact:'Contacto',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
   $('#page-title').textContent=titles[view]||'Mi ASPCH';const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
-  const routes={home:()=>renderHome(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-reservations':()=>renderAdminReservations(),'admin-votes':()=>renderAdminVotes(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
+  const routes={home:()=>renderHome(),emergency:()=>renderEmergency(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-reservations':()=>renderAdminReservations(),'admin-votes':()=>renderAdminVotes(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
   try{if(!routes[view])return go('home');await routes[view]()}catch(err){console.error(`[Mi ASPCH] No se pudo renderizar ${view}:`,err);if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message||'No fue posible cargar esta sección.')}</div>`}
 }
 
@@ -410,12 +410,16 @@ async function renderHome(){
     </div>
     <span class="badge ${state.member?.active?'green':'amber'}">${state.member?.active?'Vigente':'Revisar'} →</span>
   </div>`;
-  const official=state.config?.features?.officialResources||{};
-  const emergencyCard=`<section class="card home-emergency-card" data-testid="home-emergency">
-    <div class="home-emergency-head"><div><span class="eyebrow">🚨 EMERGENCIA / IFALPA</span><h3>Protocolo oficial de emergencia</h3></div><span class="badge amber">Ayuda</span></div>
-    <p>Accede al protocolo ASPCH y a los contactos H24 verificados.</p>
-    <div class="toolbar">${official.emergencyProtocolUrl?`<a class="button primary compact" href="${escapeHtml(official.emergencyProtocolUrl)}" target="_blank" rel="noopener noreferrer">Abrir protocolo PDF ↗</a>`:''}${official.emergencyPhone?`<a class="button ghost compact" href="${escapeHtml(official.emergencyPhone)}">Emergencia ASPCH</a>`:''}${official.ifalpaPhone?`<a class="button ghost compact" href="${escapeHtml(official.ifalpaPhone)}">Llamar IFALPA</a>`:''}<button class="button ghost compact" type="button" data-go="contact">Más contactos</button></div>
-  </section>`;
+  const emergencyCard=`<div class="card home-row-card home-emergency-row" data-go="emergency" data-testid="home-emergency">
+    <div class="home-row-left">
+      <span class="home-row-icon">🚨</span>
+      <div class="home-row-copy">
+        <strong>Emergencia / IFALPA</strong>
+        <span>Protocolo y contactos H24 · Toca para abrir</span>
+      </div>
+    </div>
+    <span class="badge amber">H24 →</span>
+  </div>`;
 
   // 2.1 Votación oficial activa, si existe
   let voteCard = '';
@@ -717,8 +721,8 @@ function renderSimulatorsFromCache(){
   const requestUrl=selectedSimulator.requestUrl||((selectedSimulator.id==='a320pro')?data.a320ProRequestUrl:null);
   const simulatorPhoto=selectedSimulator.photoUrl?`<img class="simulator-photo" src="${escapeHtml(selectedSimulator.photoUrl)}" alt="${escapeHtml(selectedSimulator.label||'Simulador')}">`:'<div class="simulator-photo-placeholder" role="img" aria-label="Foto no disponible">📷 Foto oficial no disponible en Preview</div>';
   const proRates=Array.isArray(data.a320ProRates)&&data.a320ProRates.length?data.a320ProRates:A320PRO_PREVIEW_RATES;
-  const proRateCards=proRates.map(rate=>`<div class="sim-rate-card" data-testid="a320pro-rate-${rate.hours}"><strong>${escapeHtml(String(rate.hours))} horas</strong><span>${escapeHtml(formatClpClient(rate.priceClp))}</span></div>`).join('');
-  const proRequest=selectedSimulator.id==='a320pro'?`<div class="sim-request-panel"><div><strong>Solicitud A320Pro</strong><span>${price?`Precio de referencia: ${escapeHtml(formatClpClient(price))}`:'Tarifas oficiales'}</span></div>${proRateCards?`<div class="sim-rate-grid">${proRateCards}</div>`:''}${requestUrl?`<form id="a320pro-request-form" class="sim-request-form"><label>Duración<select name="hours">${proRates.map(rate=>`<option value="${rate.hours}">${rate.hours} horas · ${escapeHtml(formatClpClient(rate.priceClp))}</option>`).join('')}</select></label><label>Fecha preferida<input name="date" type="date" min="${today()}" required></label><label>Observaciones<textarea name="notes" maxlength="300" placeholder="Información opcional"></textarea></label><button class="button primary" type="submit">Continuar al formulario oficial ↗</button></form>`:'<p class="hint">La URL oficial de solicitud A320Pro aún no está configurada en Preview.</p>'}</div>`:'';
+  const proRateCards=proRates.map(rate=>`<div class="sim-rate-card" data-testid="a320pro-rate-${rate.hours}"><strong>${escapeHtml(String(rate.hours))} horas</strong> <span class="sim-rate-price">${escapeHtml(formatClpClient(rate.priceClp))}</span></div>`).join('');
+  const proRequest=selectedSimulator.id==='a320pro'?`<div class="sim-request-panel" data-testid="a320pro-request-panel"><div class="section-head compact"><div><strong>Solicitud A320Pro</strong></div></div>${proRateCards?`<div class="sim-rate-grid">${proRateCards}</div>`:''}<p class="sim-request-note">Las solicitudes se realizan mediante el formulario oficial.</p>${requestUrl?`<a id="a320pro-request-link" class="button primary" href="${escapeHtml(requestUrl)}" target="_blank" rel="noopener noreferrer">Abrir formulario oficial ↗</a>`:'<p class="hint">La URL oficial de solicitud A320Pro aún no está configurada en Preview.</p>'}</div>`:'';
   const restrictedCopy=data.restrictionReason==='CONGELADO'?'Puedes ver la agenda detrás de esta pantalla, pero solicitar turnos está pausado mientras tu membresía está congelada.':'Puedes ver la agenda detrás de esta pantalla, pero no solicitar ni operar turnos mientras tu membresía esté morosa.';
   const previewStart=!requestAllowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>${data.restrictionReason==='CONGELADO'?'Solicitud de turnos pausada':'Solicitud de turnos bloqueada'}</h2><p>${restrictedCopy}</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
   const previewEnd=!requestAllowed?'</div></div>':'';
@@ -729,12 +733,6 @@ function renderSimulatorsFromCache(){
   ${isA320?`<div class="sim-request-bar"><div><strong>A320 Touch</strong></div>${requestButton}</div>`:''}${proRequest}
   <div class="sim-grid-card">${simulatorGridHtml(data,state.simFilter)}</div>${previewEnd}`;
   $$('.sim-tab').forEach(b=>b.onclick=()=>{state.simFilter=b.dataset.sim;renderSimulatorsFromCache()});$('#prev-week').onclick=()=>changeWeek(-7);$('#next-week').onclick=()=>changeWeek(7);$('#this-week').onclick=()=>{state.simWeek=mondayOf(today());renderSimulators()};$$('.sim-cancel').forEach(b=>b.onclick=()=>cancelSimulatorTurn(b.dataset.event));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
-  $('#a320pro-request-form')?.addEventListener('submit',e=>{
-    e.preventDefault();
-    if(!requestUrl)return;
-    const form=e.currentTarget,query=new URLSearchParams({hours:form.elements.hours.value,date:form.elements.date.value,notes:form.elements.notes.value||''});
-    window.open(`${requestUrl}${requestUrl.includes('?')?'&':'?'}${query}`,'_blank','noopener');
-  });
 }
 
 function changeWeek(n){state.simWeek=addDays(state.simWeek,n);renderSimulators()}
@@ -872,15 +870,40 @@ function renderContact(){
     const number=String(x.phone).replace(/\D/g,'');
     return `<a class="card contact-card contact-whatsapp" href="https://wa.me/${escapeHtml(number)}" target="_blank" rel="noopener noreferrer"><span class="contact-icon">💬</span><div><strong>${escapeHtml(x.name)}</strong><span>${escapeHtml(x.phone)}</span></div><span class="button primary compact">WhatsApp</span></a>`;
   }).join('');
-  const official=state.config?.features?.officialResources||{};
-  const officialCards=`<section class="card official-resources"><span class="eyebrow">🚨 EMERGENCIA / IFALPA</span><h3>Recursos oficiales</h3>${official.ifalpa?`<img src="${escapeHtml(official.ifalpa)}" alt="Recurso oficial IFALPA">`:'<p>El asset oficial IFALPA no está disponible en Preview; la integración queda preparada para incorporarlo sin usar sustitutos.</p>'}${official.emergency?`<img src="${escapeHtml(official.emergency)}" alt="Recurso oficial de emergencia">`:'<p>El asset oficial de emergencia no está disponible en Preview; no se muestran teléfonos ni material no verificado.</p>'}${official.emergencyProtocolUrl?`<a class="button primary compact" href="${escapeHtml(official.emergencyProtocolUrl)}" target="_blank" rel="noopener noreferrer">Abrir protocolo oficial PDF ↗</a>`:''}</section>`;
   $('#view').innerHTML = `<div class="contact-channels-grid" style="margin-top:0;">
     <a class="card contact-card" href="tel:+56222358612"><span class="contact-icon">☎️</span><div><strong>Oficina ASPCH 1</strong><span>2 2235 8612</span></div><span class="button primary compact">Llamar</span></a>
     <a class="card contact-card" href="tel:+56222359821"><span class="contact-icon">☎️</span><div><strong>Oficina ASPCH 2</strong><span>2 2235 9821</span></div><span class="button primary compact">Llamar</span></a>
     <a class="card contact-card" href="mailto:aspch@aspch.org"><span class="contact-icon">✉️</span><div><strong>Correo</strong><span>aspch@aspch.org</span></div><span class="button ghost compact">Enviar correo</span></a>
     <a class="card contact-card" href="https://maps.apple.com/?q=Padre+Mariano+103,+Providencia" target="_blank" rel="noopener noreferrer"><span class="contact-icon">📍</span><div><strong>Dirección</strong><span>Padre Mariano 103, oficina 405</span></div><span class="button ghost compact">Ver dirección</span></a>
     ${whatsApp}${advisorCards}
-  </div>${officialCards}`;
+  </div>`;
+}
+function renderEmergency(){
+  const official=state.config?.features?.officialResources||{};
+  const legal=state.config?.advisors?.legal||{name:'Abogado Tito Muñoz',phone:'+56 9 9196 4314',tel:'tel:+56991964314'};
+  const legalNumber=String(legal.phone||'').replace(/\D/g,'');
+  const ifalpaAsset=official.ifalpa?`<img src="${escapeHtml(official.ifalpa)}" alt="Recurso oficial IFALPA">`:'<p class="hint">El asset oficial IFALPA no está disponible en Preview; la integración queda preparada para incorporarlo sin usar sustitutos.</p>';
+  const emergencyAsset=official.emergency?`<img src="${escapeHtml(official.emergency)}" alt="Recurso oficial de emergencia">`:'<p class="hint">El asset oficial de emergencia no está disponible en Preview; no se muestran teléfonos ni material no verificado.</p>';
+  $('#view').innerHTML = `<section class="emergency-page">
+    <div class="card emergency-hero-card">
+      <span class="eyebrow">🚨 ATENCIÓN H24</span>
+      <h2>Emergencia / IFALPA</h2>
+      <p>Protocolo institucional de actuación en caso de incidente o accidente, líneas de asistencia 24/7 y asesoría legal de urgencia.</p>
+      ${official.emergencyProtocolUrl?`<div class="toolbar" style="margin-top:12px;"><a class="button primary" href="${escapeHtml(official.emergencyProtocolUrl)}" target="_blank" rel="noopener noreferrer">Abrir protocolo PDF ↗</a></div>`:''}
+    </div>
+    <div class="contact-channels-grid" style="margin-top:14px;">
+      ${official.emergencyPhone?`<a class="card contact-card" href="${escapeHtml(official.emergencyPhone)}"><span class="contact-icon">🚨</span><div><strong>Emergencia ASPCH H24</strong><span>Asistencia y coordinación</span></div><span class="button primary compact">Llamar</span></a>`:''}
+      ${official.ifalpaPhone?`<a class="card contact-card" href="${escapeHtml(official.ifalpaPhone)}"><span class="contact-icon">🌐</span><div><strong>IFALPA H24</strong><span>Línea internacional de emergencia</span></div><span class="button primary compact">Llamar</span></a>`:''}
+      <a class="card contact-card" href="${escapeHtml(legal.tel||'tel:+56991964314')}"><span class="contact-icon">⚖️</span><div><strong>${escapeHtml(legal.name)}</strong><span>${escapeHtml(legal.phone)} · Asesor legal H24</span></div><span class="button primary compact">Llamar</span></a>
+      ${legalNumber?`<a class="card contact-card contact-whatsapp" href="https://wa.me/${escapeHtml(legalNumber)}" target="_blank" rel="noopener noreferrer"><span class="contact-icon">💬</span><div><strong>WhatsApp Legal</strong><span>${escapeHtml(legal.name)}</span></div><span class="button ghost compact">WhatsApp</span></a>`:''}
+    </div>
+    <section class="card official-resources" style="margin-top:14px;">
+      <span class="eyebrow">RECURSOS OFICIALES</span>
+      <h3>Documentación y afiches</h3>
+      ${ifalpaAsset}
+      ${emergencyAsset}
+    </section>
+  </section>`;
 }
 function renderAdvisors(){ return renderContact(); }
 async function renderConvenios(){const {agreements}=await api('/api/agreements');const official=state.config?.features?.conveniosUrl||'https://aspch.org/convenios/';$('#view').innerHTML=`<div class="card convenio-card"><span class="eyebrow">🤝 CONVENIOS ASPCH</span><h2>Beneficios para asociados</h2><p>Convenios administrados desde Mi ASPCH. La página oficial sigue disponible como fuente institucional.</p><a class="button ghost" href="${escapeHtml(official)}" target="_blank" rel="noopener noreferrer">Página oficial ↗</a></div><section class="section"><div class="agreement-grid">${agreements.length?agreements.map(a=>`<article class="card agreement-card">${a.logo_url?`<img src="${escapeHtml(a.logo_url)}" alt="">`:''}<span class="eyebrow">CONVENIO</span><h3>${escapeHtml(a.title)}</h3>${a.benefit?`<strong>${escapeHtml(a.benefit)}</strong>`:''}<p>${escapeHtml(a.description||'')}</p>${a.valid_until?`<span class="hint">Vigencia: ${escapeHtml(a.valid_until)}</span>`:''}<a class="button primary" href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer">Ver convenio ↗</a></article>`).join(''):'<div class="card empty">No hay convenios cargados.</div>'}</div></section>`}
