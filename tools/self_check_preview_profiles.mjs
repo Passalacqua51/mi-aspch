@@ -11,7 +11,7 @@ const profiles=[
   {label:'MODO SIMPLE',name:'Cap. Sofía Simple',role:'MEMBER',active:true,board:false,financial:'AL_DIA',membership:'AL_DIA',simple:true,parking:true},
   {label:'FO CPT',name:'FO Felipe Operaciones',role:'MEMBER',active:true,board:false,financial:'AL_DIA',membership:'AL_DIA',simple:false,parking:true},
   {label:'DIRECTORIO',name:'Cap. Daniela Directorio',role:'MEMBER',active:true,board:true,financial:'DIRECTORIO',membership:'EXENTO',simple:false,parking:true},
-  {label:'CONGELADO',name:'FO Camilo Congelado',role:'MEMBER',active:true,board:false,financial:'CONGELADO',membership:'EXENTO',simple:false,parking:true},
+  {label:'CONGELADO',name:'FO Camilo Congelado',role:'MEMBER',active:true,board:false,financial:'CONGELADO',membership:'CONGELADO',simple:false,parking:false},
   {label:'DESAFILIADO',name:'Diego Desafiliado',role:'MEMBER',active:false,board:false,financial:'DESAFILIADO',membership:'DESAFILIADO',simple:false,parking:false},
   {label:'INFORMÁTICA',name:'INFORMÁTICA PREVIEW',email:'informatica@aspch.org',role:'ADMIN',active:true,board:true,financial:'AL_DIA',membership:'EXENTO',simple:false,parking:true}
 ];
@@ -57,7 +57,7 @@ for(const expected of profiles){
   assert.equal(me.membership.status,expected.membership);
   assert.equal(me.access.financial.status,expected.financial);
   assert.equal(me.access.parking,expected.parking);
-  assert.equal(me.access.simulatorView,expected.financial==='MOROSO'?false:expected.active);
+  assert.equal(me.access.simulatorView,['MOROSO','CONGELADO'].includes(expected.financial)?false:expected.active);
   assert.equal(me.uiPreferences.configured,true);
   assert.equal(me.uiPreferences.simpleMode,expected.simple);
   assert.equal(me.security.pinSet,true);
