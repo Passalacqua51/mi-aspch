@@ -13,7 +13,7 @@ const profiles=[
   {label:'DIRECTORIO',name:'Cap. Daniela Directorio',role:'MEMBER',active:true,board:true,financial:'DIRECTORIO',membership:'EXENTO',simple:false,parking:true},
   {label:'CONGELADO',name:'FO Camilo Congelado',role:'MEMBER',active:true,board:false,financial:'CONGELADO',membership:'EXENTO',simple:false,parking:true},
   {label:'DESAFILIADO',name:'Diego Desafiliado',role:'MEMBER',active:false,board:false,financial:'DESAFILIADO',membership:'DESAFILIADO',simple:false,parking:false},
-  {label:'INFORMÁTICA',name:'INFORMÁTICA PREVIEW',email:'informatica@aspch.org',role:'ADMIN',active:true,board:false,financial:'AL_DIA',membership:'AL_DIA',simple:false,parking:true}
+  {label:'INFORMÁTICA',name:'INFORMÁTICA PREVIEW',email:'informatica@aspch.org',role:'ADMIN',active:true,board:true,financial:'AL_DIA',membership:'EXENTO',simple:false,parking:true}
 ];
 
 const anonymous=await fetch(`${baseUrl}/api/me`);

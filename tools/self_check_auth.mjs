@@ -9,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openDb } from '../lib/db.mjs';
 import { initV050 } from '../lib/v050.mjs';
 import { initV060 } from '../lib/v060.mjs';
-import { createSession, memberFromRequest, setPin } from '../lib/auth.mjs';
+import { createSession, memberFromRequest, sessionCookieName, setPin } from '../lib/auth.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mi-aspch-auth-'));
@@ -30,7 +30,7 @@ process.env.SESSION_SECRET=sessionSecret;
 
 function sessionMember(db,member){
   const created=createSession(db,member);
-  return memberFromRequest(db,{headers:{cookie:`mi_aspch_session=${created.token}`}});
+  return memberFromRequest(db,{headers:{cookie:`${sessionCookieName()}=${created.token}`}});
 }
 function countSessions(){
   const check=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'));
