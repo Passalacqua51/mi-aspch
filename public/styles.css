@@ -621,7 +621,8 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 .home-active-row .eyebrow{color:var(--green)}
 .home-vote-row{border-color:color-mix(in srgb,var(--amber) 40%,var(--line))}
 .home-vote-row .home-row-icon{background:color-mix(in srgb,var(--amber-soft) 80%,var(--surface))}
-.home-emergency-row{border-color:color-mix(in srgb,var(--amber) 45%,var(--line));cursor:pointer}
+.home-emergency-row{border-color:color-mix(in srgb,var(--amber) 45%,var(--line));cursor:pointer;margin-top:28px;margin-bottom:8px}
+.home-emergency-row:active{transform:scale(.98)}
 .home-emergency-row .home-row-icon{background:color-mix(in srgb,var(--amber-soft) 80%,var(--surface))}
 .emergency-page{max-width:720px;margin:0 auto}
 .emergency-hero-card{display:grid;gap:6px;padding:20px 18px}
@@ -679,11 +680,16 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 /* Reservas unificadas */
 .booking-hub{max-width:720px;margin:0 auto}.booking-hero{text-align:center}.booking-hero h2{margin:8px 0 5px}.booking-hero p{margin:0;color:var(--muted)}
 .booking-options{display:grid;gap:12px;margin-top:14px}.booking-choice{width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;text-align:left;color:var(--text);cursor:pointer}.booking-choice-icon{width:50px;height:50px;border-radius:15px;background:var(--blue-soft);display:grid;place-items:center;font-size:23px}.booking-choice>span:nth-child(2){display:flex;flex-direction:column;gap:4px}.booking-choice strong{font-size:16px}.booking-choice small{color:var(--muted);line-height:1.35}.booking-choice em{font-style:normal;color:var(--blue);font-size:12px;font-weight:800}.booking-choice:hover{border-color:var(--blue);background:var(--surface-2)}
-.sim-rate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
-.sim-rate-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);text-align:center}
-.sim-rate-card strong{font-size:14px;color:var(--text)}
-.sim-rate-card .sim-rate-price{font-size:16px;font-weight:800;color:var(--blue)}
-.sim-request-note{margin:10px 0 12px;color:var(--muted);font-size:13px;line-height:1.4}
+.a320pro-compact-card{padding:14px 16px;margin:12px 0;display:grid;gap:10px}
+.a320pro-compact-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.a320pro-title{font-size:15px;font-weight:750;color:var(--text)}
+.a320pro-subtitle{font-size:12px;color:var(--muted);font-weight:600}
+.a320pro-rates-list{display:grid;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.a320pro-rate-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;background:transparent;border:0;border-radius:0}
+.a320pro-rate-row:not(:last-child){border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+.a320pro-rate-hours{font-size:13px;color:var(--text);font-weight:600}
+.a320pro-rate-sep{color:var(--muted);font-size:12px;margin:0 4px}
+.a320pro-rate-price{font-size:15px;font-weight:800;color:var(--blue)}
 
 /* Preferencias visuales por socio */
 .service-preferences-card{max-height:calc(100dvh - 32px);overflow-y:auto}.service-preferences-card h2{margin-bottom:6px}.service-preferences-card>p{margin:0 0 14px}.service-pref-list{display:grid;gap:8px}.service-pref-group{border:1px solid var(--line);border-radius:16px;background:var(--surface-2);overflow:hidden}.service-pref-group>.service-pref-row{border:0;border-radius:0;background:transparent}.service-pref-row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:48px;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);font-size:13px;font-weight:750}.service-pref-row span{display:flex;align-items:center;gap:10px}.service-pref-row i{width:23px;text-align:center;font-style:normal;font-size:17px}.service-pref-row.nested{margin:0 10px 8px 28px;min-height:42px;background:var(--surface);font-size:12px}.service-pref-row.disabled{opacity:.5}.service-pref-row input{width:22px;height:22px;accent-color:var(--blue);flex:none}.service-pref-fixed{font-size:11px!important;color:var(--muted);text-align:center;margin:12px 0 0!important}.service-pref-actions{display:grid;gap:8px;margin-top:13px}.service-personalization-card .button{width:100%;margin-top:8px}

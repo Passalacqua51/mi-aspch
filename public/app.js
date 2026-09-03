@@ -495,13 +495,13 @@ async function renderHome(){
   $('#view').innerHTML=`${greeting}
   ${unavailableNotice}
   ${credentialCard}
-  ${emergencyCard}
   ${voteCard}
   ${simulatorCard}
   ${parkingCard}
   ${specialNotice}
   ${membershipCard}
-  ${contactDiscreet}`;
+  ${contactDiscreet}
+  ${emergencyCard}`;
 
   $$('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
   showDebtAlert(pay.membership);
@@ -721,8 +721,8 @@ function renderSimulatorsFromCache(){
   const requestUrl=selectedSimulator.requestUrl||((selectedSimulator.id==='a320pro')?data.a320ProRequestUrl:null);
   const simulatorPhoto=selectedSimulator.photoUrl?`<img class="simulator-photo" src="${escapeHtml(selectedSimulator.photoUrl)}" alt="${escapeHtml(selectedSimulator.label||'Simulador')}">`:'<div class="simulator-photo-placeholder" role="img" aria-label="Foto no disponible">📷 Foto oficial no disponible en Preview</div>';
   const proRates=Array.isArray(data.a320ProRates)&&data.a320ProRates.length?data.a320ProRates:A320PRO_PREVIEW_RATES;
-  const proRateCards=proRates.map(rate=>`<div class="sim-rate-card" data-testid="a320pro-rate-${rate.hours}"><strong>${escapeHtml(String(rate.hours))} horas</strong> <span class="sim-rate-price">${escapeHtml(formatClpClient(rate.priceClp))}</span></div>`).join('');
-  const proRequest=selectedSimulator.id==='a320pro'?`<div class="sim-request-panel" data-testid="a320pro-request-panel"><div class="section-head compact"><div><strong>Solicitud A320Pro</strong></div></div>${proRateCards?`<div class="sim-rate-grid">${proRateCards}</div>`:''}<p class="sim-request-note">Las solicitudes se realizan mediante el formulario oficial.</p>${requestUrl?`<a id="a320pro-request-link" class="button primary" href="${escapeHtml(requestUrl)}" target="_blank" rel="noopener noreferrer">Abrir formulario oficial ↗</a>`:'<p class="hint">La URL oficial de solicitud A320Pro aún no está configurada en Preview.</p>'}</div>`:'';
+  const proRateRows=proRates.map(rate=>`<div class="a320pro-rate-row sim-rate-card" data-testid="a320pro-rate-${rate.hours}"><span class="a320pro-rate-hours">${escapeHtml(String(rate.hours))} horas</span> <span class="a320pro-rate-sep">—</span> <strong class="a320pro-rate-price">${escapeHtml(formatClpClient(rate.priceClp))}</strong></div>`).join('');
+  const proRequest=selectedSimulator.id==='a320pro'?`<div class="card sim-request-panel a320pro-compact-card" data-testid="a320pro-request-panel"><div class="a320pro-compact-head"><strong class="a320pro-title">A320Pro</strong><span class="a320pro-subtitle">Tarifas oficiales</span></div><div class="a320pro-rates-list">${proRateRows}</div>${requestUrl?`<a id="a320pro-request-link" class="button primary" href="${escapeHtml(requestUrl)}" target="_blank" rel="noopener noreferrer">Abrir formulario oficial ↗</a>`:'<p class="hint">La URL oficial de solicitud A320Pro aún no está configurada en Preview.</p>'}</div>`:'';
   const restrictedCopy=data.restrictionReason==='CONGELADO'?'Puedes ver la agenda detrás de esta pantalla, pero solicitar turnos está pausado mientras tu membresía está congelada.':'Puedes ver la agenda detrás de esta pantalla, pero no solicitar ni operar turnos mientras tu membresía esté morosa.';
   const previewStart=!requestAllowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>${data.restrictionReason==='CONGELADO'?'Solicitud de turnos pausada':'Solicitud de turnos bloqueada'}</h2><p>${restrictedCopy}</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
   const previewEnd=!requestAllowed?'</div></div>':'';
