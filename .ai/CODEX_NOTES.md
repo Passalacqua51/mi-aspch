@@ -19,6 +19,22 @@ sirven fotos solo desde archivos locales existentes; A320Pro expone precio y
 formulario solo con configuración oficial. No hay assets locales IFALPA o de
 emergencia, así que se dejó placeholder/integración pendiente y se documentó.
 
+## 2026-09-03 — Reproducción de self-checks
+
+Se reprodujeron los tres reportes. `setPin` recibía `member=null` porque el
+fixture usaba una cookie fija distinta de `SESSION_COOKIE_NAME`; `2ad8c72`
+ya lo corrigió usando `sessionCookieName()`. `preview_profiles` también quedó
+corregido en `2ad8c72` para esperar `isBoard=true` en INFORMÁTICA, coherente con
+la autorización efectiva del rol ADMIN.
+
+`staticcheck` fallaba dentro de la imagen porque `.dockerignore` excluye
+`.env.example` deliberadamente. Se ajustó el test para tratarlo como fixture
+opcional, manteniendo sus aserciones cuando se ejecuta desde el checkout.
+Preview 8086 está desplegado y healthy con `mi-aspch-preview:local`; los hashes
+servidos de `app.js` y `sw.js` coinciden con el source. E2E browser no es
+ejecutable en el entorno actual porque Playwright no está instalado ni en host
+ni en la imagen Preview.
+
 ## 2026-09-02 — Regla permanente para pruebas del Directorio
 
 El enlace `https://reviewer-stopping-wages-roland.trycloudflare.com` continúa

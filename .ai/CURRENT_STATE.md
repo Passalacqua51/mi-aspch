@@ -21,6 +21,13 @@
   ADMIN+PIN permanecen intactos.
 - Se rotaron hashes de `app.js`, `styles.css` y namespace del Service Worker
   únicamente en el código fuente; no se reconstruyó ni promovió 8086/8085.
+- El self-check de autenticación usa ahora el nombre de cookie configurado
+  (`sessionCookieName()`), evitando `member=null` cuando Preview usa su cookie
+  aislada. El self-check de perfiles refleja que ADMIN tiene experiencia
+  efectiva de Directorio (`isBoard=true`).
+- `staticcheck` tolera la ausencia de `.env.example` dentro de imágenes Docker:
+  el archivo se excluye intencionalmente por `.dockerignore`; sus invariantes se
+  validan cuando el archivo está disponible en el checkout fuente.
 
 Última actualización: 2026-09-03 UTC
 

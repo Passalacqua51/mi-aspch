@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
 const read=f=>fs.readFileSync(path.join(root,f),'utf8');
-const server=read('server.mjs'),app=read('public/app.js'),index=read('public/index.html'),css=read('public/styles.css'),env=read('.env.example'),pkg=JSON.parse(read('package.json')),v060=read('lib/v060.mjs'),google=read('lib/google.mjs'),auth=read('lib/auth.mjs'),db=read('lib/db.mjs'),push=read('lib/push.mjs'),sw=read('public/sw.js');
+const readOptional=f=>fs.existsSync(path.join(root,f))?read(f):'';
+const server=read('server.mjs'),app=read('public/app.js'),index=read('public/index.html'),css=read('public/styles.css'),env=readOptional('.env.example'),pkg=JSON.parse(read('package.json')),v060=read('lib/v060.mjs'),google=read('lib/google.mjs'),auth=read('lib/auth.mjs'),db=read('lib/db.mjs'),push=read('lib/push.mjs'),sw=read('public/sw.js');
 const manifest=read('public/manifest.webmanifest'),officialLogo=fs.readFileSync(path.join(root,'public','logo-aspch-original.png'));
 const pngSize=file=>{const b=fs.readFileSync(path.join(root,'public',file));return[b.readUInt32BE(16),b.readUInt32BE(20)]};
 assert.equal(crypto.createHash('sha256').update(officialLogo).digest('hex'),'e0512f1fd75c2f5d74c566268c9deb16459b4b596c9460e0befff8a59063282f','El logo institucional debe permanecer idéntico al PNG oficial');
@@ -15,7 +16,7 @@ assert.ok(index.includes('rel="apple-touch-icon" sizes="180x180" href="/apple-to
 assert.ok(!app.includes('welcome-logo'),'Inicio debe mostrar solo el saludo, sin logo dentro del hero');
 assert.equal(pkg.version,'0.6.16');
 assert.match(server,/const VERSION = '0\.6\.16'/);
-assert.match(env,/GOOGLE_SHEETS_READ=true/);assert.match(env,/GOOGLE_CALENDAR_WRITE=false/);assert.match(env,/GOOGLE_GMAIL_OTP_SEND=false/);assert.match(env,/GOOGLE_GMAIL_NOTIFICATION_SEND=false/);
+if(env){assert.match(env,/GOOGLE_SHEETS_READ=true/);assert.match(env,/GOOGLE_CALENDAR_WRITE=false/);assert.match(env,/GOOGLE_GMAIL_OTP_SEND=false/);assert.match(env,/GOOGLE_GMAIL_NOTIFICATION_SEND=false/)}
 assert.match(google,/gmailOtpSendEnabled/);assert.match(google,/gmailNotificationSendEnabled/);
 for(const r of ['/api/votes','/api/votes/cast','/api/reservations','/api/history','/api/admin/dashboard','/api/admin/reservations','/api/admin/notifications','/api/admin/integrations','/api/admin/security','/api/admin/audit','/api/admin/system','/api/admin/members/list','/api/admin/modules','/api/admin/votes/update','/api/admin/votes/delete','/api/admin/backup','/api/admin/diagnostics','/api/admin/members','/api/admin/jobs/run','/api/admin/cache/clear'])assert.ok(server.includes(r),`Falta ${r}`);
 assert.match(server,/memberActionMatch=p\.match\([^\n]+actions/,'Falta la ruta de acciones maestras de socio');

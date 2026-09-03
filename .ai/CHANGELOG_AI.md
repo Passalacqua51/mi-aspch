@@ -9,6 +9,8 @@
   existe asset oficial local.
 - Retirados endpoints de autenticación por correo legado y rotado el
   cache-busting de Preview.
+- Self-checks corregidos para cookie Preview configurable, expectativa ADMIN de
+  Directorio y ausencia legítima de `.env.example` en imágenes Docker.
 
 # Regla de prueba y acceso del Directorio — 2026-09-02
 
