@@ -2207,7 +2207,7 @@ function serveStatic(req,res,pathname){
   else if(pathname==='/' || pathname==='/mobile') pathname='/index.html';
   let target=path.normalize(path.join(PUBLIC_DIR,pathname)); if(!target.startsWith(PUBLIC_DIR))return json(res,403,{error:'Ruta inválida.'});
   if(!fs.existsSync(target)||fs.statSync(target).isDirectory())target=path.join(PUBLIC_DIR,'index.html');
-  const ext=path.extname(target).toLowerCase(); const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.ico':'image/x-icon'}[ext]||'application/octet-stream';
+  const ext=path.extname(target).toLowerCase(); const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.ico':'image/x-icon'}[ext]||'application/octet-stream';
   const cacheControl=ext==='.html'||(PREVIEW_MODE&&ext==='.js')?'no-store':'public, max-age=3600';
   res.statusCode=200;res.setHeader('Content-Type',mime);res.setHeader('Cache-Control',cacheControl); if(req.method==='HEAD')return res.end();
   fs.createReadStream(target).pipe(res);

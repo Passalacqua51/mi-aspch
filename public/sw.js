@@ -1,5 +1,5 @@
-const CACHE='mi-aspch-v0.6.16-preview-2';
-const STATIC=['/','/informatica','/index.html','/admin.html','/styles.css','/auth-gate.js','/app.js','/manifest.webmanifest','/logo-aspch-original.png','/icon-192.png','/icon-512.png','/apple-touch-icon.png'];
+const CACHE='mi-aspch-v0.6.16-pwa-4';
+const STATIC=['/','/informatica','/index.html','/admin.html','/styles.css','/auth-gate.js','/app.js','/manifest.json','/manifest.webmanifest','/logo-aspch-original.png','/icon-192.png','/icon-512.png','/apple-touch-icon.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==location.origin||u.pathname.startsWith('/api/'))return;if(u.pathname==='/test-notificaciones.html'){e.respondWith(Response.redirect(new URL('/',location.origin).href,302));return}e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match('/index.html'))))});

@@ -28,7 +28,6 @@ $('#unlock-form').addEventListener('submit',unlock); $('#biometric-button').addE
 initUiMode();
 installEditableNumericInputs();
 state.notifyPrefs=loadNotificationPrefs();
-syncAdminEntryVisibility();
 document.addEventListener('input',e=>{const form=e.target.closest?.('.auth-form');if(form)clearFormError(form)});
 // En modo iPhone se comporta como una app instalada: sin pinch/double-tap zoom accidental.
 for(const evt of ['gesturestart','gesturechange','gestureend']){
@@ -164,7 +163,6 @@ function showLockButtonState(){if($('#lock-screen').classList.contains('hidden')
 async function lockNow(){if(!state.security?.pinSet&&!state.security?.passkeySet){toast('Primero configura un PIN o Face ID/huella en Seguridad.');return go('security')}try{await api('/api/security/lock',{method:'POST',body:{}});state.security.unlocked=false;sessionStorage.removeItem('miAspchUnlocked');showLock()}catch(e){toast(e.message,true)}}
 async function doLogout(){sessionStorage.removeItem('miAspchUnlocked');try{await api('/api/auth/logout',{method:'POST',body:{}})}catch{}location.reload()}
 function showAuth(){$('#auth-screen').classList.remove('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');showAuthStep('identity');if(window.IS_ADMIN_PANEL)prepareAdminLogin()}
-function syncAdminEntryVisibility(){$('#admin-login-link')?.classList.toggle('hidden',window.IS_ADMIN_PANEL)}
 function prepareAdminLogin(){
   const identity=$('#login-rut'),label=$('#login-rut-label'),title=$('#auth-screen .auth-clean-title');
   if(!identity||!state.config?.adminEmail)return;
