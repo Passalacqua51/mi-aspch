@@ -1,5 +1,23 @@
 # Registro de decisiones
 
+## 2026-09-03 — Preview: Push administrativo acotado y assets verificados
+
+### Decisión
+
+La consola ADMIN solo puede enviar plantillas Push allowlist a dos audiencias:
+Directorio activo o Informática en el dispositivo actual. No acepta texto libre,
+IDs arbitrarios, broadcast general ni mutaciones de negocio; cada destinatario
+informa `SENT`, `FAILED` o `NO_SUBSCRIPTION` y el envío queda auditado.
+
+Las fotos de simuladores y los recursos de emergencia/IFALPA solo se sirven si
+existe un archivo local verificado dentro de `public/`. En Preview no existen
+esos assets oficiales, por lo que la interfaz muestra placeholders y deja la
+integración pendiente sin inventar material ni teléfonos.
+
+### Estado
+
+Activa solo en Preview 8086; sin promoción a producción
+
 ## 2026-09-02 — Enlace y acceso exclusivos para pruebas del Directorio
 
 ### Decisión

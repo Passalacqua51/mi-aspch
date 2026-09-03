@@ -1,3 +1,15 @@
+# Preview 8086 — 2026-09-03
+
+- Navegación mobile estable con cuatro acciones en Modo simple y boot semántico
+  basado en `unlocked_until`/`sessionStorage`.
+- Consentimiento Push explícito antes de suscribir y consola ADMIN acotada a
+  plantillas allowlist para Directorio o Informática/dispositivo.
+- Contactos WhatsApp con nombres reales configurados, formulario y precio
+  A320Pro configurables, y placeholders para fotos/IFALPA/emergencia cuando no
+  existe asset oficial local.
+- Retirados endpoints de autenticación por correo legado y rotado el
+  cache-busting de Preview.
+
 # Regla de prueba y acceso del Directorio — 2026-09-02
 
 - Conservado sin reinicio el enlace público vigente hacia producción 8085.

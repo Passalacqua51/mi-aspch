@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import QRCode from 'qrcode';
 import { fileURLToPath } from 'node:url';
 import { openDb, upsertMember, upsertParkingSpaces, setBoardMembersByRut, normalizeRut, isValidRut, updateMemberEmail, updatePreferredName } from './lib/db.mjs';
-import { requestOtp, verifyOtp, memberFromRequest, logout, normalizeEmail, isUnlocked, setPin, unlockWithPin, lockSession, issueOtp, verifyIssuedOtp, consumeOtp, createSession, createSessionWithPin } from './lib/auth.mjs';
+import { memberFromRequest, logout, normalizeEmail, isUnlocked, setPin, unlockWithPin, lockSession, issueOtp, verifyIssuedOtp, consumeOtp, createSession, createSessionWithPin } from './lib/auth.mjs';
 import { googleEnabled, googleCapabilities, sheetsReadEnabled, sheetsWriteEnabled, calendarReadEnabled, calendarWriteEnabled, gmailOtpSendEnabled, gmailNotificationSendEnabled, sheetsGet, sheetsAppend, sheetsUpdate, ensureSheet, listCalendarEvents, deleteCalendarEvent, sendWorkspaceEmail } from './lib/google.mjs';
 import { webauthnRequestInfo, webauthnSummary, registrationOptions, finishRegistration, authenticationOptions, finishAuthentication, removeAllPasskeys } from './lib/webauthn.mjs';
 import { initV050, financialSummary, benefitAccess, latestFinancialSync, studyRoomAvailability, reserveStudyRoom, cancelStudyRoom, createMarketplaceListing, publicMarketplace, marketplaceImage, marketplaceOwnerAction, marketplaceOwnerEdit, moderateMarketplace, expireMarketplace, listActivities, adminActivities, createActivity, setActivityStatus, dueNotificationText } from './lib/v050.mjs';
@@ -76,8 +76,50 @@ const config = {
   financialSyncMinutes: Math.max(1,Number(process.env.FINANCIAL_SYNC_MINUTES||5)),
   backupRetention:Math.max(3,Number(process.env.BACKUP_RETENTION||14)),
   dailyBackupHour:Math.max(0,Math.min(23,Number(process.env.DAILY_BACKUP_HOUR||3))),
-  dailyBackupMinute:Math.max(0,Math.min(59,Number(process.env.DAILY_BACKUP_MINUTE||15)))
+  dailyBackupMinute:Math.max(0,Math.min(59,Number(process.env.DAILY_BACKUP_MINUTE||15))),
+  simulatorA320ProPrice:positiveIntegerOrNull(process.env.SIMULATOR_A320PRO_PRICE_CLP),
+  simulatorA320ProRequestUrl:safeHttpsUrl(process.env.SIMULATOR_REQUEST_A320PRO_URL)
 };
+
+function officialPublicAsset(candidates){
+  for(const candidate of candidates){
+    const relative=String(candidate||'').replace(/^\/+/,'');
+    if(!relative||relative.includes('..'))continue;
+    const file=path.join(PUBLIC_DIR,relative);
+    if(fs.existsSync(file)&&fs.statSync(file).isFile())return `/${relative}`;
+  }
+  return null;
+}
+const OFFICIAL_RESOURCES = Object.freeze({
+  ifalpa:officialPublicAsset(['ifalpa-emergency.png','assets/ifalpa-emergency.png','ifalpa.png']),
+  emergency:officialPublicAsset(['emergency-contacts.png','assets/emergency-contacts.png','emergencia.png'])
+});
+
+const ADMIN_PUSH_TEMPLATES = Object.freeze({
+  parking_reminder: {
+    label:'Recordatorio de estacionamiento',
+    kind:'parking',
+    title:'¿Sigues usando el estacionamiento?',
+    body:'Confirma si mantienes ocupado tu cupo o si ya lo desocupaste.',
+    url:'/?view=parking&parkingPrompt=1',
+    actions:[{action:'keep-parking',title:'Sí, sigo aquí'},{action:'vacate-parking',title:'No, ya desocupé'}]
+  },
+  membership_status: {
+    label:'Estado de membresía',
+    kind:'membership',
+    title:'Mi ASPCH · Membresía',
+    body:'Revisa el estado actualizado de tu membresía en Mi ASPCH.',
+    url:'/?view=membership'
+  },
+  simulator_reminder: {
+    label:'Recordatorio de simulador',
+    kind:'simulators',
+    title:'Mi ASPCH · Turno de simulador',
+    body:'Revisa tus próximos turnos de simulador en Mi ASPCH.',
+    url:'/?view=simulators'
+  }
+});
+const ADMIN_PUSH_AUDIENCES = Object.freeze(new Set(['BOARD','SELF']));
 
 const PREVIEW_PROFILES = Object.freeze([
   { key:'ACTIVO',label:'ACTIVO',email:'preview.activo@preview.invalid',name:'Cap. Alicia Activa',preferredName:'Alicia',rut:'99000001-8',birthDate:'1984-04-12',phone:'+56900000001',employer:'LATAM Airlines',category:'Línea Aérea',position:'CPT B787',role:'MEMBER',active:true,isBoard:false,financialStatus:'AL_DIA',monthsDue:0,amountDue:0,paid:true,simpleMode:false },
@@ -149,7 +191,13 @@ async function routeApi(req, res, url) {
         whatsappUrl: whatsappUrl('', 'Hola ASPCH, necesito ayuda con Mi ASPCH.')
       },
       adminEmail:config.adminEmail,
-      features:{studyRoom:true,marketplace:true,activities:true,agreements:true,librarySearch:true,myReservations:true,conveniosUrl:config.conveniosUrl,simulatorA320RequestUrl:config.simulatorRequestUrl},
+      features:{
+        studyRoom:true,marketplace:true,activities:true,agreements:true,librarySearch:true,myReservations:true,
+        conveniosUrl:config.conveniosUrl,simulatorA320RequestUrl:config.simulatorRequestUrl,
+        simulatorA320ProPriceClp:config.simulatorA320ProPrice,
+        simulatorA320ProRequestUrl:config.simulatorA320ProRequestUrl,
+        officialResources:{ifalpa:OFFICIAL_RESOURCES.ifalpa,emergency:OFFICIAL_RESOURCES.emergency}
+      },
       push:{enabled:pushEnabled(),publicKey:pushEnabled()?vapidPublicKey():null},
       advisors:{legal:{name:'Abogado Tito Muñoz',phone:'+56 9 9196 4314',tel:'tel:+56991964314'},tax:{name:'Contador Manuel Paillafil',phone:'+56 9 9237 1806',tel:'tel:+56992371806'}},
       biometricReady: w.available,
@@ -255,31 +303,6 @@ async function routeApi(req, res, url) {
       requiresPinSetup:!member.pin_hash,
       member:publicMember(member)
     });
-  }
-
-  if (req.method === 'POST' && p === '/api/auth/request-code') {
-    const body = await readJson(req);
-    const email = normalizeEmail(body.email);
-    let member = db.prepare('SELECT id FROM members WHERE email=? AND active=1').get(email);
-    if (!member && sheetsReadEnabled()) {
-      await syncMembersFromGoogle(); await syncBoardFromGoogle();
-      member = db.prepare('SELECT id FROM members WHERE email=? AND active=1').get(email);
-    }
-    if (!member) return json(res, 403, { error: 'Este correo no figura como socio habilitado.' });
-    const result = await requestOtp(db, email);
-    if (!result.ok) {
-      if (result.reason === 'rate_limited') return json(res, 429, { error: 'Demasiados intentos. Intenta más tarde.' });
-      return json(res, 403, { error: 'No fue posible autorizar ese correo.' });
-    }
-    return json(res, 200, { ok: true, delivered: result.delivered });
-  }
-
-  if (req.method === 'POST' && p === '/api/auth/verify-code') {
-    const body = await readJson(req);
-    const result = verifyOtp(db, body.email, String(body.code || ''));
-    if (!result.ok) return json(res, 401, { error: result.reason === 'expired' ? 'El código venció.' : 'Código incorrecto.' });
-    setSessionCookie(req, res, result.token);
-    return json(res, 200, { ok: true, member: publicMember(result.member) });
   }
 
   if (req.method === 'POST' && p === '/api/auth/logout') {
@@ -615,9 +638,10 @@ async function routeApi(req, res, url) {
     const from = validDate(url.searchParams.get('from')) || mondayOf(todayChile());
     const to = validDate(url.searchParams.get('to')) || addDays(from, 4);
     const occupancies = calendarReadEnabled() ? await calendarPrivacyView(member, from, to) : [];
-    return json(res, 200, { simulators: config.simulators.map(({ id,label }) => ({ id,label })), from, to, occupancies,
+    return json(res, 200, { simulators: config.simulators.map(({ id,label,photoUrl,priceClp,requestUrl }) => ({ id,label,photoUrl:photoUrl||null,priceClp:priceClp??(id==='a320pro'?config.simulatorA320ProPrice:null),requestUrl:requestUrl||((id==='a320pro')?config.simulatorA320ProRequestUrl:null) })), from, to, occupancies,
       cancellationEnabled:config.simulatorCancelEnabled && calendarWriteEnabled(), requestAllowed:access.simulatorRequest,
-      restrictionReason:access.reason, a320RequestUrl:access.simulatorRequest?config.simulatorRequestUrl:null });
+      restrictionReason:access.reason, a320RequestUrl:access.simulatorRequest?config.simulatorRequestUrl:null,
+      a320ProPriceClp:config.simulatorA320ProPrice,a320ProRequestUrl:config.simulatorA320ProRequestUrl });
   }
 
   if (req.method === 'POST' && p === '/api/simulators/cancel') {
@@ -899,13 +923,28 @@ async function routeApi(req, res, url) {
     if(req.method==='GET'&&p==='/api/admin/members')return json(res,200,{members:adminMemberSearch(db,url.searchParams.get('q')||'')});
     if(req.method==='POST'&&p==='/api/admin/member/sessions/revoke'){const body=await readJson(req);const target=Number(body.memberId);if(!target)return json(res,400,{error:'Socio inválido.'});const removed=target===member.id?invalidateOtherSessions(db,{memberId:target,currentSessionId:member.session_id,actorId:member.id}):invalidateMemberSessions(db,{memberId:target,actorId:member.id});return json(res,200,{ok:true,removed})}
     if(req.method==='POST'&&p==='/api/admin/member/credential'){const body=await readJson(req);const target=Number(body.memberId);if(!db.prepare('SELECT 1 FROM members WHERE id=?').get(target))return json(res,404,{error:'Socio no encontrado.'});setCredentialRevoked(db,{memberId:target,revoked:body.revoked===true,reason:body.reason,actorId:member.id});return json(res,200,{ok:true})}
-    if(req.method==='POST'&&p==='/api/admin/push/test-self'){const body=await readJson(req);const r=await sendMemberPush(db,member.id,{key:`admin-self-test:${Date.now()}`,kind:'general',title:String(body.title||'Mi ASPCH · Prueba developer').slice(0,100),body:String(body.body||'Notificación de prueba enviada solo a Informática ASPCH.').slice(0,350),url:'/?view=admin',force:true});audit(db,{actorId:member.id,subjectId:member.id,action:'ADMIN_PUSH_SELF_TEST',entityType:'push',details:{sent:r.sent}});return json(res,200,r)}
     if(req.method==='POST'&&p==='/api/admin/push/send'){
-      const body=await readJson(req),target=Number(body.memberId||0),title=String(body.title||'Mi ASPCH').slice(0,100),text=String(body.body||'').slice(0,350),kind=String(body.kind||'general').slice(0,50),targetUrl=String(body.url||'/?view=home').slice(0,300);
-      if(!text)return json(res,400,{error:'Mensaje obligatorio.'});
-      if(body.dryRun!==false)return json(res,200,{ok:true,dryRun:true,target:target||'ALL',eligible:target?Number(db.prepare('SELECT COUNT(*) n FROM push_subscriptions WHERE member_id=?').get(target).n):Number(db.prepare('SELECT COUNT(DISTINCT member_id) n FROM push_subscriptions').get().n)});
-      let sent=0,recipients=0;if(target){const r=await sendMemberPush(db,target,{key:`admin-push:${Date.now()}:${target}`,kind,title,body:text,url:targetUrl,force:true});sent+=r.sent;recipients=1}else{if(String(body.confirm||'')!=='ENVIAR A TODOS')return json(res,400,{error:'Para enviar a todos escribe exactamente ENVIAR A TODOS.'});const ids=db.prepare('SELECT DISTINCT member_id FROM push_subscriptions').all();for(const x of ids){const r=await sendMemberPush(db,x.member_id,{key:`admin-broadcast:${Date.now()}:${x.member_id}`,kind,title,body:text,url:targetUrl,force:true});sent+=r.sent;recipients++}}
-      audit(db,{actorId:member.id,action:'ADMIN_PUSH_SENT',entityType:'push',details:{target:target||'ALL',recipients,sent,title}});return json(res,200,{ok:true,recipients,sent});
+      const body=await readJson(req);
+      const templateId=String(body.template||'').trim();
+      const template=ADMIN_PUSH_TEMPLATES[templateId];
+      const audience=String(body.audience||'').toUpperCase();
+      if(!template||!ADMIN_PUSH_AUDIENCES.has(audience))return json(res,400,{error:'Selecciona una plantilla y un destinatario permitido.'});
+      const ids=audience==='SELF'
+        ? [{member_id:member.id}]
+        : db.prepare("SELECT id AS member_id FROM members WHERE role='MEMBER' AND is_board=1 AND active=1 ORDER BY id").all();
+      const dryRun=body.dryRun!==false;
+      if(dryRun){
+        const recipients=ids.map(row=>({memberId:Number(row.member_id),status:Number(db.prepare('SELECT COUNT(*) n FROM push_subscriptions WHERE member_id=?').get(row.member_id).n)?'READY':'NO_SUBSCRIPTION'}));
+        return json(res,200,{ok:true,dryRun:true,template:templateId,audience,recipients,eligible:recipients.filter(row=>row.status==='READY').length});
+      }
+      const results=[];
+      for(const row of ids){
+        const result=await sendMemberPush(db,row.member_id,{key:`admin-template:${templateId}:${audience}:${Date.now()}:${row.member_id}`,...template,force:true});
+        results.push({memberId:Number(row.member_id),status:result.status||'FAILED'});
+      }
+      const summary={sent:results.filter(row=>row.status==='SENT').length,failed:results.filter(row=>row.status==='FAILED').length,noSubscription:results.filter(row=>row.status==='NO_SUBSCRIPTION').length};
+      audit(db,{actorId:member.id,action:'ADMIN_PUSH_TEMPLATE_SENT',entityType:'push',details:{template:templateId,audience,...summary}});
+      return json(res,200,{ok:true,template:templateId,audience,summary,recipients:results});
     }
     if(req.method==='POST'&&p==='/api/admin/marketplace/report/resolve'){const body=await readJson(req);if(!resolveMarketplaceReport(db,{id:Number(body.id),actorId:member.id,status:body.status,note:body.note}))return json(res,404,{error:'Reporte abierto no encontrado.'});return json(res,200,{ok:true})}
     if(req.method==='POST'&&p==='/api/admin/agreements'){const body=await readJson(req),isNew=!Number(body.id||0);const id=upsertAgreement(db,{...body,actorId:member.id});if(isNew&&String(body.status||'ACTIVE').toUpperCase()==='ACTIVE')await broadcastTopic('agreements',{keyBase:`agreement:${id}`,title:'Mi ASPCH · Nuevo convenio',body:String(body.title||'Nuevo convenio ASPCH').slice(0,220),url:'/?view=agreements'});return json(res,201,{ok:true,id})}
@@ -2202,15 +2241,27 @@ function parseSimulators(raw){
       // Compatibilidad con el .env de v0.1.1: migra automáticamente sim3/sim4.
       if(id==='sim3'||/simulador\s*3/i.test(label)){id='b787';label='Boeing 787';match=['BOEING 787','B787','787',...match]}
       if(id==='sim4'||/simulador\s*4/i.test(label)){id='c172';label='Cessna 172';match=['CESSNA 172','CESSNA172','C172',...match]}
-      return{id,label,match};
+      const photo=String(s.photo||s.photoUrl||'').trim().replace(/^\/+/,'');
+      const photoUrl=photo&&!photo.includes('..')&&fs.existsSync(path.join(PUBLIC_DIR,photo))?`/${photo}`:null;
+      const requestUrl=safeHttpsUrl(s.requestUrl);
+      return{id,label,match,photoUrl,priceClp:positiveIntegerOrNull(s.priceClp)};
     });
   }catch{}
   return[
-    {id:'a320',label:'A320',match:['A320']},
-    {id:'a320pro',label:'A320Pro',match:['A320PRO','A320 PRO']},
-    {id:'b787',label:'Boeing 787',match:['BOEING 787','B787','787']},
-    {id:'c172',label:'Cessna 172',match:['CESSNA 172','CESSNA172','C172']}
+    {id:'a320',label:'A320',match:['A320'],photoUrl:null,priceClp:null},
+    {id:'a320pro',label:'A320Pro',match:['A320PRO','A320 PRO'],photoUrl:null,priceClp:null},
+    {id:'b787',label:'Boeing 787',match:['BOEING 787','B787','787'],photoUrl:null,priceClp:null},
+    {id:'c172',label:'Cessna 172',match:['CESSNA 172','CESSNA172','C172'],photoUrl:null,priceClp:null}
   ]
+}
+function safeHttpsUrl(value){
+  const raw=String(value||'').trim();
+  if(!raw)return null;
+  try{const url=new URL(raw);return url.protocol==='https:'?url.toString():null}catch{return null}
+}
+function positiveIntegerOrNull(value){
+  const number=Number(value);
+  return Number.isSafeInteger(number)&&number>0?number:null;
 }
 function loadEnv(file){if(!fs.existsSync(file))return;for(const line of fs.readFileSync(file,'utf8').split(/\r?\n/)){if(!line||/^\s*#/.test(line))continue;const m=line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);if(!m)continue;let v=m[2];if((v.startsWith('"')&&v.endsWith('"'))||(v.startsWith("'")&&v.endsWith("'")))v=v.slice(1,-1);if(process.env[m[1]]===undefined)process.env[m[1]]=v}}
 function bool(v,d=false){if(v==null)return d;return['1','true','yes','si','sí','on'].includes(String(v).toLowerCase())}

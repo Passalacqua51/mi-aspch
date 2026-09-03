@@ -1,5 +1,9 @@
 # Pendientes
 
+- [ ] Incorporar, tras verificación documental, los assets oficiales de
+      emergencia/IFALPA y los datos oficiales de precio/formulario A320Pro en
+      Preview; no usar sustitutos ni activar URLs no verificadas.
+
 - [ ] Con privilegios sudo renovados, deshabilitar y enmascarar la unidad
       histórica `cloudflared-tunnel.service`; hoy no alcanza Preview porque
       apunta a localhost y el puerto 8086 escucha exclusivamente en Tailscale.

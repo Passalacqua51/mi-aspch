@@ -148,6 +148,11 @@ try{
     assert.equal(result.cookie,'',`${route} no debe emitir cookie`);
     assert.equal(countSessions(),0,`${route} no debe crear sesión`);
   }
+  for(const route of ['/api/auth/request-code','/api/auth/verify-code']){
+    const result=await request(base,route,{body:{email:memberEmail,code:otp}});
+    assert.equal(result.response.status,404,`${route} legado debe responder 404`);
+    assert.equal(result.cookie,'',`${route} legado no debe emitir cookie`);
+  }
   const retiredFinancialUpload=await request(base,'/api/financial-source/upload',{method:'PUT',body:{test:true}});
   assert.equal(retiredFinancialUpload.response.status,403,'La carga XLSM con token debe permanecer deshabilitada');
   assert.equal(fs.existsSync(path.join(tmp,'missing.xlsm')),false,'La ruta XLSM retirada no debe crear ni reemplazar archivos');
@@ -261,7 +266,6 @@ try{
   const adminFinancialUpload=await request(base,'/api/admin/financial-upload',{method:'PUT',body:{test:true},cookie:adminLogin.cookie});
   assert.equal(adminFinancialUpload.response.status,403,'ADMIN tampoco debe poder cargar XLSM desde Control Maestro');
 
-  const beforeMemberReads=readOnlySnapshot();
   const adminReservations=await request(base,'/api/admin/reservations',{cookie:adminLogin.cookie});
   assert.equal(adminReservations.response.status,200,'ADMIN debe poder leer Reservas');
   assert.ok(adminReservations.json.summary?.parkingActive>=1,'Reservas debe resumir estacionamientos activos');
@@ -285,6 +289,20 @@ try{
   assert.equal(adminNotifications.json.push?.status,'DESHABILITADO','Push debe permanecer deshabilitado en QA');assert.equal(adminNotifications.json.gmailOtp?.status,'DESHABILITADO','Gmail OTP debe permanecer deshabilitado en QA');
   assert.equal(adminNotifications.json.push?.subscriptions,1);assert.equal(adminNotifications.json.push?.devicesWithError,1);assert.equal(adminNotifications.json.push?.delivered24h,1);assert.equal(adminNotifications.json.push?.failed24h,1);
   assert.equal(adminNotifications.json.push?.deadCleanupAvailable,false,'No debe inventarse una limpieza Push administrativa');assert.equal(JSON.stringify(adminNotifications.json).includes('qa-sensitive'),false,'Notificaciones no debe exponer endpoints, claves ni payloads');assertNoSecrets(adminNotifications.json,'Notificaciones ADMIN');
+  const pushBefore=readOnlySnapshot();
+  const invalidPushTemplate=await request(base,'/api/admin/push/send',{body:{template:'texto-libre',audience:'SELF',dryRun:false},cookie:adminLogin.cookie});
+  assert.equal(invalidPushTemplate.response.status,400,'Push ADMIN debe aceptar solo plantillas allowlist');
+  const pushDryRun=await request(base,'/api/admin/push/send',{body:{template:'parking_reminder',audience:'SELF'},cookie:adminLogin.cookie});
+  assert.equal(pushDryRun.response.status,200,'Push ADMIN debe permitir simular el dispositivo propio');
+  assert.equal(pushDryRun.json.dryRun,true);assert.equal(pushDryRun.json.audience,'SELF');assert.equal(pushDryRun.json.recipients?.length,1);
+  const pushBoardDryRun=await request(base,'/api/admin/push/send',{body:{template:'parking_reminder',audience:'BOARD'},cookie:adminLogin.cookie});
+  assert.equal(pushBoardDryRun.response.status,200);assert.equal(pushBoardDryRun.json.audience,'BOARD');assert.ok(Array.isArray(pushBoardDryRun.json.recipients));
+  assert.deepEqual(readOnlySnapshot(),pushBefore,'La simulación Push no debe mutar datos ni auditoría');
+  const pushSend=await request(base,'/api/admin/push/send',{body:{template:'simulator_reminder',audience:'SELF',dryRun:false},cookie:adminLogin.cookie});
+  assert.equal(pushSend.response.status,200,'Push ADMIN debe devolver un resultado controlado');
+  assert.equal(pushSend.json.summary?.noSubscription,1,'Sin suscripción debe quedar explícito y no intentar un envío externo en Preview');
+  assert.equal(pushSend.json.summary?.failed,0);
+  const beforeMemberReads=readOnlySnapshot();
   const adminSecurity=await request(base,'/api/admin/security',{cookie:adminLogin.cookie});
   assert.equal(adminSecurity.response.status,200,'ADMIN debe poder leer Seguridad');assert.equal(adminSecurity.json.admin?.configured,true);assert.equal(adminSecurity.json.admin?.pinConfigured,true);
   assert.equal(adminSecurity.json.attempts?.sourceAvailable,false,'Seguridad debe declarar la ausencia de telemetría persistida de intentos');assert.equal(adminSecurity.json.accountBlocks?.sourceAvailable,false,'Seguridad no debe inventar bloqueos persistidos');

@@ -1,5 +1,24 @@
 # Notas de Codex para ChatGPT
 
+## 2026-09-03 — Requisitos Preview 8086
+
+Se preparó únicamente el código fuente para Preview. La navegación mobile
+mantiene cuatro acciones incluso en Modo simple; el arranque respeta
+`unlocked_until` y limpia el marcador `sessionStorage` vencido. El consentimiento
+Push del Directorio ya no suscribe automáticamente cuando el permiso nativo
+estaba concedido: primero muestra `Sí, activar` / `No, gracias`.
+
+La consola ADMIN de Push quedó limitada a plantillas oficiales y audiencias
+Directorio activo o Informática/dispositivo actual. El endpoint no admite texto
+libre, IDs de socios ni broadcast general, y devuelve estados enviada/falló/sin
+suscripción. Se retiraron `request-code`/`verify-code` legado sin alterar
+RUT+OTP ni ADMIN+PIN.
+
+Contacto usa WhatsApp con nombres y números configurados. Los simuladores
+sirven fotos solo desde archivos locales existentes; A320Pro expone precio y
+formulario solo con configuración oficial. No hay assets locales IFALPA o de
+emergencia, así que se dejó placeholder/integración pendiente y se documentó.
+
 ## 2026-09-02 — Regla permanente para pruebas del Directorio
 
 El enlace `https://reviewer-stopping-wages-roland.trycloudflare.com` continúa

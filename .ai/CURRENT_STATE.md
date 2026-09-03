@@ -1,6 +1,28 @@
 # Estado actual
 
-Última actualización: 2026-09-02 UTC
+## Cambios preparados para Preview 8086 — 2026-09-03
+
+- El boot de la PWA valida `security.unlockedUntil` junto con la sesión local y
+  limpia `sessionStorage` cuando la ventana de desbloqueo expiró.
+- El consentimiento Push del Directorio siempre precede a la suscripción,
+  incluso si el navegador ya tenía permiso nativo; la negativa elimina la
+  suscripción del dispositivo.
+- La consola ADMIN usa únicamente plantillas Push reales y audiencias
+  `Directorio activo` o `Informática · este dispositivo`, con estados de envío
+  explícitos y sin broadcast general.
+- Contacto incorpora WhatsApp ASPCH y las asesorías reales configuradas
+  (Abogado Tito Muñoz y Contador Manuel Paillafil).
+- A320Pro admite precio/URL oficial configurables y formulario local; sin esos
+  datos Preview muestra integración pendiente. Simuladores sin foto local
+  verificada muestran placeholder.
+- No se encontró asset oficial local de emergencia ni IFALPA; la integración
+  queda preparada y la UI lo informa. No se añadieron sustitutos.
+- Los endpoints de autenticación legado por correo fueron retirados; RUT+OTP y
+  ADMIN+PIN permanecen intactos.
+- Se rotaron hashes de `app.js`, `styles.css` y namespace del Service Worker
+  únicamente en el código fuente; no se reconstruyó ni promovió 8086/8085.
+
+Última actualización: 2026-09-03 UTC
 
 ## Prueba estable del Directorio
 

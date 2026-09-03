@@ -13,7 +13,7 @@
   <link rel="manifest" href="/manifest.webmanifest?v=43760df9cbceeb0a">
   <link rel="icon" href="/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/styles.css?v=07653f77db459fc6">
+  <link rel="stylesheet" href="/styles.css?v=aeb689e4257e7145">
 
 <style>
   body, html { max-width: 100% !important; margin: 0; padding: 0; background: var(--bg); height: 100vh; }
@@ -52,17 +52,17 @@
   <main id="auth-screen" class="auth-screen hidden">
     <section class="auth-clean-card">
       <div class="auth-logo-wrap"><img class="auth-logo" src="/logo-aspch-original.png" alt="Asociación de Pilotos de Chile"></div>
-      <h1 class="auth-clean-title">Bienvenido</h1>
+      <h1 class="auth-clean-title">Acceso Informática</h1>
       <form id="identity-form" class="auth-clean-form">
-        <label id="login-rut-label" class="clean-label">RUT
-          <input id="login-rut" class="clean-input" type="text" inputmode="text" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="12.345.678-5">
+        <label id="login-rut-label" class="clean-label hidden">Cuenta
+          <input id="login-rut" class="clean-input" type="text" inputmode="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="informatica@aspch.org">
         </label>
-        <label id="login-email-label" class="clean-label">Correo electrónico
-          <input id="login-email" class="clean-input" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="nombre@correo.cl" required>
+        <label id="login-email-label" class="clean-label">Clave de Informática
+          <input id="login-email" class="clean-input" type="password" inputmode="numeric" autocomplete="current-password" spellcheck="false" placeholder="••••" required>
         </label>
         <button class="button primary clean-btn" type="submit">Continuar</button>
         <p class="auth-error hidden" role="alert"></p>
-        <p id="identity-help" class="hint hidden"></p>
+        <p id="identity-help" class="hint">Ingresa tu PIN de Informática para continuar.</p>
       </form>
       <form id="code-form" class="auth-clean-form hidden">
         <button type="button" id="back-identity" class="link-button clean-link">← Cambiar RUT o correo</button>
@@ -157,6 +157,6 @@
     </aside>
   </div>
 
-  <script src="/app.js?v=b3753bcd3c83dd54" defer></script>
+  <script src="/app.js?v=570cc178ef01375b" defer></script>
 </body>
 </html>

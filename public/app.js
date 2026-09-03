@@ -27,6 +27,7 @@ $('#unlock-form').addEventListener('submit',unlock); $('#biometric-button').addE
 initUiMode();
 installEditableNumericInputs();
 state.notifyPrefs=loadNotificationPrefs();
+syncAdminEntryVisibility();
 document.addEventListener('input',e=>{const form=e.target.closest?.('.auth-form');if(form)clearFormError(form)});
 // En modo iPhone se comporta como una app instalada: sin pinch/double-tap zoom accidental.
 for(const evt of ['gesturestart','gesturechange','gestureend']){
@@ -61,10 +62,14 @@ async function boot(){
     const data=await api('/api/me');
     state.member=data.member;state.membership=data.membership;state.access=data.access;state.security=data.security;state.modules=data.modules||null;state.uiPreferences=normalizedUiPreferences(data.uiPreferences);
     if(!state.security?.pinSet)return showPinSetup();
-    if(state.security?.pinSet && !state.security?.unlocked){
+    const localUnlockMarker=sessionStorage.getItem('miAspchUnlocked')==='1';
+    const unlockedUntil=Date.parse(state.security?.unlockedUntil||'');
+    const unlockWindowValid=state.security?.unlocked===true&&Number.isFinite(unlockedUntil)&&unlockedUntil>Date.now();
+    if(!unlockWindowValid){
+      if(localUnlockMarker)sessionStorage.removeItem('miAspchUnlocked');
       return showLock();
     }
-    sessionStorage.setItem('miAspchUnlocked','1');
+    if(!localUnlockMarker)sessionStorage.setItem('miAspchUnlocked','1');
     loginSuccess();
   }catch{showAuth()}
 }
@@ -160,6 +165,7 @@ function showLockButtonState(){if($('#lock-screen').classList.contains('hidden')
 async function lockNow(){if(!state.security?.pinSet&&!state.security?.passkeySet){toast('Primero configura un PIN o Face ID/huella en Seguridad.');return go('security')}try{await api('/api/security/lock',{method:'POST',body:{}});state.security.unlocked=false;sessionStorage.removeItem('miAspchUnlocked');showLock()}catch(e){toast(e.message,true)}}
 async function doLogout(){sessionStorage.removeItem('miAspchUnlocked');try{await api('/api/auth/logout',{method:'POST',body:{}})}catch{}location.reload()}
 function showAuth(){$('#auth-screen').classList.remove('hidden');$('#lock-screen').classList.add('hidden');$('#app-shell').classList.add('hidden');showAuthStep('identity');if(window.IS_ADMIN_PANEL)prepareAdminLogin()}
+function syncAdminEntryVisibility(){$('#admin-login-link')?.classList.toggle('hidden',window.IS_ADMIN_PANEL)}
 function prepareAdminLogin(){
   const identity=$('#login-rut'),label=$('#login-rut-label'),title=$('#auth-screen .auth-clean-title');
   if(!identity||!state.config?.adminEmail)return;
@@ -235,7 +241,7 @@ function renderNav(){
     $$('[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));return;
   }
   const primaryIds=['home','parking','booking','profile'];
-  if(simpleModeEnabled())primaryIds.splice(0,primaryIds.length,'credential','parking','contact');
+  if(simpleModeEnabled())primaryIds.splice(0,primaryIds.length,'credential','parking','contact','profile');
   const primary=allItems.filter(x=>primaryIds.includes(x[0]));
   const secondary=simpleModeEnabled()?[]:allItems.filter(x=>!primaryIds.includes(x[0])&&navigationItemVisible(x[0]));
   const items=[...primary,...secondary];
@@ -652,8 +658,6 @@ async function removeBrowserPushSubscription(){
 function promptNotificationConsent(){
   if(!state.member?.isBoard||localStorage.getItem(notificationConsentKey()))return Promise.resolve();
   if(!('Notification'in window)||!('serviceWorker'in navigator)||!('PushManager'in window)){localStorage.setItem(notificationConsentKey(),'unsupported');return Promise.resolve()}
-  if(Notification.permission==='granted'){return syncPushSubscription().then(()=>localStorage.setItem(notificationConsentKey(),'yes')).catch(()=>{})}
-  if(Notification.permission==='denied'){localStorage.setItem(notificationConsentKey(),'no');return Promise.resolve()}
   return new Promise(resolve=>{
     $('.notification-consent-overlay')?.remove();
     const overlay=document.createElement('div');overlay.className='setup-overlay notification-consent-overlay';overlay.innerHTML=`<section class="card setup-card" role="dialog" aria-modal="true" aria-labelledby="notification-consent-title"><span class="eyebrow">🔔 NOTIFICACIONES</span><h2 id="notification-consent-title">¿Quieres recibir notificaciones?</h2><p>Podemos avisarte sobre estacionamientos, reservas y novedades importantes. Puedes cambiar esta decisión después en tu perfil.</p><div class="toolbar"><button class="button primary" id="notification-consent-yes" type="button">Sí, activar</button><button class="button ghost" id="notification-consent-no" type="button">No, gracias</button></div></section>`;document.body.append(overlay);
@@ -692,15 +696,27 @@ async function renderSimulators(){
 }
 function renderSimulatorsFromCache(){
   const data=state.simulators,isA320=state.simFilter==='a320',requestAllowed=data.requestAllowed!==false;
+  const selectedSimulator=data.simulators.find(sim=>sim.id===state.simFilter)||{};
   const requestButton=isA320?`<a class="button primary ${requestAllowed?'':'disabled-link'}" ${requestAllowed?`href="${escapeHtml(data.a320RequestUrl||state.config?.features?.simulatorA320RequestUrl||'https://forms.gle/qzXaCUJgmTyufdKQA')}" target="_blank" rel="noopener noreferrer"`:'aria-disabled="true"'}>Solicitar turno A320 Touch ↗</a>`:'';
+  const price=selectedSimulator.priceClp||((selectedSimulator.id==='a320pro')?data.a320ProPriceClp:null);
+  const requestUrl=selectedSimulator.requestUrl||((selectedSimulator.id==='a320pro')?data.a320ProRequestUrl:null);
+  const simulatorPhoto=selectedSimulator.photoUrl?`<img class="simulator-photo" src="${escapeHtml(selectedSimulator.photoUrl)}" alt="${escapeHtml(selectedSimulator.label||'Simulador')}">`:'<div class="simulator-photo-placeholder" role="img" aria-label="Foto no disponible">📷 Foto oficial no disponible en Preview</div>';
+  const proRequest=selectedSimulator.id==='a320pro'?`<div class="sim-request-panel"><div><strong>Solicitud A320Pro</strong><span>${price?`Precio: ${escapeHtml(formatClpClient(price))}`:'Precio no disponible en Preview'}</span></div>${requestUrl?`<form id="a320pro-request-form" class="sim-request-form"><label>Fecha preferida<input name="date" type="date" min="${today()}" required></label><label>Turno<select name="period"><option value="AM">AM</option><option value="PM">PM</option></select></label><label>Observaciones<textarea name="notes" maxlength="300" placeholder="Información opcional"></textarea></label><button class="button primary" type="submit">Continuar al formulario oficial ↗</button></form>`:'<p class="hint">La URL oficial de solicitud A320Pro aún no está configurada en Preview.</p>'}</div>`:'';
   const previewStart=!requestAllowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>Solicitud de turnos bloqueada</h2><p>Puedes ver la agenda detrás de esta pantalla, pero no solicitar ni operar turnos mientras tu membresía esté morosa.</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
   const previewEnd=!requestAllowed?'</div></div>':'';
   $('#view').innerHTML=`${previewStart}<div class="section-head simulator-head"><div><h3>Simuladores</h3></div></div>
   <div class="week-toolbar"><button id="prev-week" class="button ghost">←</button><button id="this-week" class="button ghost">Semana actual</button><strong>${weekLabel(data.from)}</strong><button id="next-week" class="button ghost">→</button></div>
   <div class="simulator-tabs">${data.simulators.map(t=>`<button class="sim-tab ${state.simFilter===t.id?'active':''}" data-sim="${t.id}">${escapeHtml(t.label)}</button>`).join('')}</div>
-  ${isA320?`<div class="sim-request-bar"><div><strong>A320 Touch</strong></div>${requestButton}</div>`:''}
+  <div class="simulator-photo-wrap">${simulatorPhoto}</div>
+  ${isA320?`<div class="sim-request-bar"><div><strong>A320 Touch</strong></div>${requestButton}</div>`:''}${proRequest}
   <div class="sim-grid-card">${simulatorGridHtml(data,state.simFilter)}</div>${previewEnd}`;
   $$('.sim-tab').forEach(b=>b.onclick=()=>{state.simFilter=b.dataset.sim;renderSimulatorsFromCache()});$('#prev-week').onclick=()=>changeWeek(-7);$('#next-week').onclick=()=>changeWeek(7);$('#this-week').onclick=()=>{state.simWeek=mondayOf(today());renderSimulators()};$$('.sim-cancel').forEach(b=>b.onclick=()=>cancelSimulatorTurn(b.dataset.event));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  $('#a320pro-request-form')?.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(!requestUrl)return;
+    const form=e.currentTarget,query=new URLSearchParams({date:form.elements.date.value,period:form.elements.period.value,notes:form.elements.notes.value||''});
+    window.open(`${requestUrl}${requestUrl.includes('?')?'&':'?'}${query}`,'_blank','noopener');
+  });
 }
 
 function changeWeek(n){state.simWeek=addDays(state.simWeek,n);renderSimulators()}
@@ -832,15 +848,24 @@ async function castVoteUi(electionId,optionId,label='esta opción'){
 async function verifyVoteReceiptUi(electionId){const receipt=localStorage.getItem(`miAspchVoteReceipt:${electionId}`)||'';if(!receipt)return toast('Este dispositivo no conserva el comprobante.',true);try{const r=await api(`/api/votes/receipt?electionId=${electionId}&receipt=${encodeURIComponent(receipt)}`);toast(r.found?'Comprobante incluido en el escrutinio.':'Comprobante no encontrado.',!r.found)}catch(e){toast(e.message,true)}}
 
 function renderContact(){
+  const contact=state.config?.contact||{},advisors=state.config?.advisors||{};
+  const whatsApp=contact.whatsappNumber?`<a class="card contact-card contact-whatsapp" href="${escapeHtml(contact.whatsappUrl||`https://wa.me/${String(contact.whatsappNumber).replace(/\D/g,'')}`)}" target="_blank" rel="noopener noreferrer"><span class="contact-icon">💬</span><div><strong>WhatsApp ASPCH</strong><span>${escapeHtml(contact.whatsappNumber)}</span></div><span class="button primary compact">Escribir</span></a>`:'';
+  const advisorCards=Object.values(advisors).filter(x=>x?.name&&x?.phone&&x?.tel).map(x=>{
+    const number=String(x.phone).replace(/\D/g,'');
+    return `<a class="card contact-card contact-whatsapp" href="https://wa.me/${escapeHtml(number)}" target="_blank" rel="noopener noreferrer"><span class="contact-icon">💬</span><div><strong>${escapeHtml(x.name)}</strong><span>${escapeHtml(x.phone)}</span></div><span class="button primary compact">WhatsApp</span></a>`;
+  }).join('');
+  const official=state.config?.features?.officialResources||{};
+  const officialCards=`<section class="card official-resources"><span class="eyebrow">🚨 EMERGENCIA / IFALPA</span><h3>Recursos oficiales</h3>${official.ifalpa?`<img src="${escapeHtml(official.ifalpa)}" alt="Recurso oficial IFALPA">`:'<p>El asset oficial IFALPA no está disponible en Preview; la integración queda preparada para incorporarlo sin usar sustitutos.</p>'}${official.emergency?`<img src="${escapeHtml(official.emergency)}" alt="Recurso oficial de emergencia">`:'<p>El asset oficial de emergencia no está disponible en Preview; no se muestran teléfonos ni material no verificado.</p>'}</section>`;
   $('#view').innerHTML = `<div class="card contact-hero">
-    <h2>Contacto</h2>
+    <h2>Contacto</h2><p>Canales oficiales de ASPCH y asesorías disponibles.</p>
   </div>
   <div class="contact-channels-grid" style="margin-top:1.5rem;">
     <a class="card contact-card" href="tel:+56222358612"><span class="contact-icon">☎️</span><div><strong>Oficina ASPCH 1</strong><span>2 2235 8612</span></div><span class="button primary compact">Llamar</span></a>
     <a class="card contact-card" href="tel:+56222359821"><span class="contact-icon">☎️</span><div><strong>Oficina ASPCH 2</strong><span>2 2235 9821</span></div><span class="button primary compact">Llamar</span></a>
     <a class="card contact-card" href="mailto:aspch@aspch.org"><span class="contact-icon">✉️</span><div><strong>Correo</strong><span>aspch@aspch.org</span></div><span class="button ghost compact">Enviar correo</span></a>
     <a class="card contact-card" href="https://maps.apple.com/?q=Padre+Mariano+103,+Providencia" target="_blank" rel="noopener noreferrer"><span class="contact-icon">📍</span><div><strong>Dirección</strong><span>Padre Mariano 103, oficina 405</span></div><span class="button ghost compact">Ver dirección</span></a>
-  </div>`;
+    ${whatsApp}${advisorCards}
+  </div>${officialCards}`;
 }
 function renderAdvisors(){ return renderContact(); }
 async function renderConvenios(){const {agreements}=await api('/api/agreements');const official=state.config?.features?.conveniosUrl||'https://aspch.org/convenios/';$('#view').innerHTML=`<div class="card convenio-card"><span class="eyebrow">🤝 CONVENIOS ASPCH</span><h2>Beneficios para asociados</h2><p>Convenios administrados desde Mi ASPCH. La página oficial sigue disponible como fuente institucional.</p><a class="button ghost" href="${escapeHtml(official)}" target="_blank" rel="noopener noreferrer">Página oficial ↗</a></div><section class="section"><div class="agreement-grid">${agreements.length?agreements.map(a=>`<article class="card agreement-card">${a.logo_url?`<img src="${escapeHtml(a.logo_url)}" alt="">`:''}<span class="eyebrow">CONVENIO</span><h3>${escapeHtml(a.title)}</h3>${a.benefit?`<strong>${escapeHtml(a.benefit)}</strong>`:''}<p>${escapeHtml(a.description||'')}</p>${a.valid_until?`<span class="hint">Vigencia: ${escapeHtml(a.valid_until)}</span>`:''}<a class="button primary" href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer">Ver convenio ↗</a></article>`).join(''):'<div class="card empty">No hay convenios cargados.</div>'}</div></section>`}
@@ -1695,7 +1720,7 @@ async function renderDeveloper(){
 
   <details class="dev-section card" open><summary>🔔 Push developer</summary><div class="dev-section-body">
     <div class="grid two"><div><span class="eyebrow">ESTE DISPOSITIVO</span><h3>${o.push?.subscriptions||0} suscripciones registradas</h3><p>${o.push?.enabled?'VAPID configurado.':'VAPID no configurado.'}</p><div class="toolbar"><button class="button secondary" id="admin-enable-push">Activar push aquí</button><button class="button ghost" id="dev-test-self-push">Prueba a Informática</button></div></div>
-    <form id="dev-push-form" class="admin-form"><span class="eyebrow">ENVÍO CONTROLADO</span><input id="dev-push-member" type="number" min="1" placeholder="Member ID (vacío = todos)"><input id="dev-push-title" value="Mi ASPCH" placeholder="Título"><textarea id="dev-push-body" placeholder="Mensaje" required></textarea><input id="dev-push-url" value="/?view=home" placeholder="Ruta al tocar"><div class="toolbar"><button class="button ghost" type="button" id="dev-push-dry">Simular audiencia</button><button class="button primary" type="submit">Enviar</button></div><label class="danger-confirm"><input id="dev-push-all-confirm" placeholder="Para broadcast: ENVIAR A TODOS"></label></form></div>
+    <form id="dev-push-form" class="admin-form"><span class="eyebrow">ENVÍO CONTROLADO</span><label>Plantilla oficial<select id="dev-push-template" required><option value="parking_reminder">Recordatorio de estacionamiento</option><option value="membership_status">Estado de membresía</option><option value="simulator_reminder">Recordatorio de simulador</option></select></label><label>Destinatarios permitidos<select id="dev-push-audience" required><option value="SELF">Informática · este dispositivo</option><option value="BOARD">Directorio activo</option></select></label><p class="hint">Solo se envían plantillas reales a Directorio o a este dispositivo de Informática. No hay texto libre ni broadcast general.</p><div class="toolbar"><button class="button ghost" type="button" id="dev-push-dry">Simular audiencia</button><button class="button primary" type="submit">Enviar plantilla</button></div><output id="dev-push-result" class="hint" aria-live="polite"></output></form></div>
   </div></details>
 
   <details class="dev-section card" open><summary>👥 Inspector de socios y seguridad</summary><div class="dev-section-body">
@@ -1766,10 +1791,18 @@ function cap(label,on){return `<span class="cap ${on?'on':'off'}"><i></i>${label
 async function adminRunJob(job){try{const r=await api('/api/admin/jobs/run',{method:'POST',body:{job}});toast(`Job ${job}: OK`);if(job!=='notification_cycle')renderAdmin();return r}catch(e){toast(e.message,true)}}
 async function adminClearCache(){try{await api('/api/admin/cache/clear',{method:'POST',body:{}});toast('Cachés runtime vaciadas.')}catch(e){toast(e.message,true)}}
 async function adminToggleModule(module,enabled){const msg=enabled?'':(prompt('Mensaje que verán los socios mientras esté en mantenimiento:','Módulo temporalmente en mantenimiento. Intenta nuevamente más tarde.')||'Módulo temporalmente en mantenimiento.');if(!enabled&&!msg)return;try{await api('/api/admin/modules',{method:'POST',body:{module,enabled,message:msg}});toast(`${module}: ${enabled?'ON':'OFF'}`);renderAdmin()}catch(e){toast(e.message,true)}}
-async function adminPushSelfTest(){try{const r=await api('/api/admin/push/test-self',{method:'POST',body:{}});toast(`Push prueba: ${r.sent||0} enviado(s).`)}catch(e){toast(e.message,true)}}
-async function adminPushSend(dryRun){const memberId=Number($('#dev-push-member')?.value||0),title=$('#dev-push-title')?.value||'Mi ASPCH',body=$('#dev-push-body')?.value||'',url=$('#dev-push-url')?.value||'/?view=home',confirmText=$('#dev-push-all-confirm')?.value||'';if(!body.trim())return toast('Escribe el mensaje.',true);if(!dryRun&&!memberId&&!confirm('Vas a intentar enviar este push a TODOS los dispositivos elegibles. ¿Continuar?'))return;try{const r=await api('/api/admin/push/send',{method:'POST',body:{memberId:memberId||null,title,body,url,dryRun,confirm:confirmText}});toast(dryRun?`Audiencia estimada: ${r.eligible||0}`:`Push: ${r.sent||0} entrega(s), ${r.recipients||0} destinatario(s).`)}catch(e){toast(e.message,true)}}
-async function adminMemberSearchUi(e){e.preventDefault();const q=$('#dev-member-q').value.trim();try{const r=await api(`/api/admin/members?q=${encodeURIComponent(q)}`);const rows=r.members||[];$('#dev-member-results').innerHTML=rows.length?rows.map(adminMemberCard).join(''):'<div class="empty">Sin resultados.</div>';$$('.dev-member-sessions').forEach(b=>b.onclick=()=>adminRevokeMemberSessions(Number(b.dataset.id)));$$('.dev-member-credential').forEach(b=>b.onclick=()=>adminCredentialToggle(Number(b.dataset.id),b.dataset.revoked!=='true'));$$('.dev-member-push').forEach(b=>b.onclick=()=>{const id=Number(b.dataset.id);$('#dev-push-member').value=String(id);toast('Member ID cargado en Push developer.');window.scrollTo({top:0,behavior:'smooth'})})}catch(err){toast(err.message,true)}}
-function adminMemberCard(m){const st=m.financial_status||'SIN ESTADO';return `<article class="card dev-member-card"><div class="dev-member-head"><div><strong>${escapeHtml(m.name)}</strong><span>${escapeHtml(m.email||'')} · ${escapeHtml(m.rut||'sin RUT')}</span></div><span class="badge ${st==='MOROSO'?'amber':m.active?'green':'red'}">${escapeHtml(st)}</span></div><div class="profile-grid compact-grid">${field('Rol',m.role||'MEMBER')}${field('Institución',m.employer||'—')}${field('Cargo',m.position||'—')}${field('Sesiones',m.active_sessions||0)}${field('Push devices',m.push_devices||0)}${field('Deuda',m.amount_due?formatClpClient(m.amount_due):'—')}</div><div class="toolbar"><button class="button ghost dev-member-sessions" data-id="${m.id}">Revocar sesiones</button><button class="button ghost dev-member-credential" data-id="${m.id}" data-revoked="${m.credential_revoked?'true':'false'}">${m.credential_revoked?'Reactivar credencial':'Suspender credencial'}</button><button class="button secondary dev-member-push" data-id="${m.id}">Preparar Push</button></div></article>`}
+async function adminPushSelfTest(){try{const r=await api('/api/admin/push/send',{method:'POST',body:{template:'simulator_reminder',audience:'SELF',dryRun:false}});toast(`Push prueba: ${r.summary?.sent||0} enviada(s).`)}catch(e){toast(e.message,true)}}
+async function adminPushSend(dryRun){
+  const template=$('#dev-push-template')?.value||'',audience=$('#dev-push-audience')?.value||'SELF',resultBox=$('#dev-push-result');
+  try{
+    const r=await api('/api/admin/push/send',{method:'POST',body:{template,audience,dryRun}});
+    if(dryRun){if(resultBox)resultBox.textContent=`Audiencia: ${r.eligible||0} con suscripción · ${r.recipients?.length||0} destinatario(s) evaluado(s).`;return toast(`Audiencia con suscripción: ${r.eligible||0}`)}
+    const s=r.summary||{};if(resultBox)resultBox.textContent=`Enviada: ${s.sent||0} · Falló: ${s.failed||0} · Sin suscripción: ${s.noSubscription||0}.`;
+    toast(`Push: ${s.sent||0} enviada(s), ${s.failed||0} falló, ${s.noSubscription||0} sin suscripción.`,s.failed>0);
+  }catch(e){if(resultBox)resultBox.textContent=e.message;toast(e.message,true)}
+}
+async function adminMemberSearchUi(e){e.preventDefault();const q=$('#dev-member-q').value.trim();try{const r=await api(`/api/admin/members?q=${encodeURIComponent(q)}`);const rows=r.members||[];$('#dev-member-results').innerHTML=rows.length?rows.map(adminMemberCard).join(''):'<div class="empty">Sin resultados.</div>';$$('.dev-member-sessions').forEach(b=>b.onclick=()=>adminRevokeMemberSessions(Number(b.dataset.id)));$$('.dev-member-credential').forEach(b=>b.onclick=()=>adminCredentialToggle(Number(b.dataset.id),b.dataset.revoked!=='true'))}catch(err){toast(err.message,true)}}
+function adminMemberCard(m){const st=m.financial_status||'SIN ESTADO';return `<article class="card dev-member-card"><div class="dev-member-head"><div><strong>${escapeHtml(m.name)}</strong><span>${escapeHtml(m.email||'')} · ${escapeHtml(m.rut||'sin RUT')}</span></div><span class="badge ${st==='MOROSO'?'amber':m.active?'green':'red'}">${escapeHtml(st)}</span></div><div class="profile-grid compact-grid">${field('Rol',m.role||'MEMBER')}${field('Institución',m.employer||'—')}${field('Cargo',m.position||'—')}${field('Sesiones',m.active_sessions||0)}${field('Push devices',m.push_devices||0)}${field('Deuda',m.amount_due?formatClpClient(m.amount_due):'—')}</div><div class="toolbar"><button class="button ghost dev-member-sessions" data-id="${m.id}">Revocar sesiones</button><button class="button ghost dev-member-credential" data-id="${m.id}" data-revoked="${m.credential_revoked?'true':'false'}">${m.credential_revoked?'Reactivar credencial':'Suspender credencial'}</button></div></article>`}
 async function adminRevokeMemberSessions(id){if(!confirm('¿Revocar las sesiones activas de este usuario?'))return;try{const r=await api('/api/admin/member/sessions/revoke',{method:'POST',body:{memberId:id}});toast(`Sesiones revocadas: ${r.removed||0}`)}catch(e){toast(e.message,true)}}
 async function adminCredentialToggle(id,revoked){let reason='';if(revoked){reason=prompt('Motivo de suspensión de credencial:','Suspensión administrativa')||'';if(!reason)return}try{await api('/api/admin/member/credential',{method:'POST',body:{memberId:id,revoked,reason}});toast(revoked?'Credencial suspendida.':'Credencial reactivada.');$('#dev-member-search')?.requestSubmit()}catch(e){toast(e.message,true)}}
 async function adminResolveReport(id,status){const note=prompt(status==='RESOLVED'?'Nota de resolución (opcional):':'Motivo para descartar (opcional):','')||'';try{await api('/api/admin/marketplace/report/resolve',{method:'POST',body:{id,status,note}});toast('Reporte actualizado.');renderAdmin()}catch(e){toast(e.message,true)}}

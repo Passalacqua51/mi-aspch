@@ -497,6 +497,22 @@ body.member-helicopter .membership-card{border-color:color-mix(in srgb,var(--blu
 .sim-cancel{margin-top:7px;border:1px solid rgba(153,27,27,.25);background:rgba(255,255,255,.92);color:#991b1b;border-radius:10px;padding:6px 9px;font-size:11px;font-weight:800;cursor:pointer;line-height:1.1}
 .sim-cancel:active{transform:scale(.98)}
 @media(max-width:430px){.sim-cancel{width:100%;padding:7px 5px;font-size:10px}}
+.simulator-photo-wrap{margin:12px 0;min-height:92px;border-radius:16px;overflow:hidden;background:var(--surface-2);border:1px solid var(--line)}
+.simulator-photo{display:block;width:100%;max-height:180px;object-fit:cover}
+.simulator-photo-placeholder{min-height:92px;display:grid;place-items:center;padding:16px;color:var(--muted);font-size:12px;text-align:center}
+.sim-request-panel{display:grid;gap:12px;margin:12px 0;padding:15px;border:1px solid color-mix(in srgb,var(--blue) 24%,var(--line));border-radius:16px;background:var(--blue-soft)}
+.sim-request-panel>div{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.sim-request-panel>div span{font-size:12px;color:var(--muted)}
+.sim-request-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sim-request-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:750;color:var(--muted)}
+.sim-request-form label:last-of-type{grid-column:1/-1}
+.sim-request-form button{grid-column:1/-1}
+.official-resources{margin-top:16px}
+.official-resources h3{margin:7px 0}
+.official-resources p{color:var(--muted);font-size:12px;line-height:1.5}
+.official-resources img{display:block;width:100%;max-height:220px;object-fit:contain;border-radius:12px;background:#fff;margin:10px 0}
+.contact-whatsapp .contact-icon{color:#168b53}
+@media(max-width:600px){.sim-request-form{grid-template-columns:1fr}.sim-request-form label:last-of-type,.sim-request-form button{grid-column:auto}}
 
 /* =========================================================
    v0.5.0 · acceso financiero + Push + Sala + Mercado + Admin
