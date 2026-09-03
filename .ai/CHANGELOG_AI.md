@@ -1,5 +1,16 @@
 # Preview 8086 — 2026-09-03
 
+- Segunda pasada: A320Pro muestra 2 horas $75.000 y 4 horas $100.000 con el
+  formulario oficial conservado.
+- Reapertura con passkey vuelve al gate; sesión vigente sin passkey entra sin
+  gate. Se añadieron pruebas dirigidas para ambos casos.
+- CONGELADO comparte restricciones backend de MOROSO con mensaje diferenciado.
+- Inicio y Contacto exponen el protocolo PDF oficial de emergencia ASPCH y
+  acciones H24; se mantiene el reporte exacto de assets gráficos locales
+  ausentes.
+- Dockerfile comprueba Node 22 y `npm run check`; E2E real queda fijado en
+  390x844 y confirma que Push real está bloqueado.
+
 - Navegación mobile estable con cuatro acciones en Modo simple y boot semántico
   basado en `unlocked_until`/`sessionStorage`.
 - Consentimiento Push explícito antes de suscribir y consola ADMIN acotada a

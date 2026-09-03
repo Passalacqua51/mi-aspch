@@ -2,6 +2,19 @@
 
 ## Cambios preparados para Preview 8086 — 2026-09-03
 
+- Segunda pasada implementada: A320Pro muestra 2 horas por $75.000 y 4 horas
+  por $100.000 y conserva el formulario oficial
+  `https://forms.gle/qzXaCUJgmTyufdKQA`.
+- La reapertura real con passkey vuelve al gate aunque `unlocked_until` siga
+  vigente; sin passkey, una sesión vigente entra directamente.
+- CONGELADO comparte las restricciones backend de MOROSO para reservas y
+  muestra mensajes diferenciados y amables.
+- Inicio expone una tarjeta Emergencia/IFALPA con acciones al protocolo PDF
+  oficial ASPCH y teléfonos H24 verificados; no hay assets gráficos locales
+  oficiales de IFALPA/emergencia.
+- El Dockerfile valida Node 22 y ejecuta `npm run check` durante la build.
+- E2E Preview fue ampliado a viewport 390x844; Push real permanece bloqueado.
+
 - El boot de la PWA valida `security.unlockedUntil` junto con la sesión local y
   limpia `sessionStorage` cuando la ventana de desbloqueo expiró.
 - El consentimiento Push del Directorio siempre precede a la suscripción,

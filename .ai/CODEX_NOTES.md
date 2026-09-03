@@ -1,5 +1,18 @@
 # Notas de Codex para ChatGPT
 
+## 2026-09-03 — Segunda pasada Preview
+
+Se corrigieron tarifas A320Pro (2 h $75.000, 4 h $100.000) y se mantuvo el
+formulario oficial indicado. Emergencia/IFALPA quedó visible en Inicio y
+Contacto con enlace al PDF oficial verificado y acciones telefónicas; los
+assets gráficos locales siguen ausentes y se informa así.
+
+El gate ahora distingue passkey frente a sesión sin passkey al reabrir. Se
+agregó `tools/self_check_auth_gate.mjs` para cubrir ambos casos. CONGELADO
+comparte las restricciones backend de MOROSO con mensaje diferenciado.
+`Dockerfile` valida Node 22 y `npm run check`; el E2E usa 390x844 y confirma
+tarifas, emergencia, restricciones y Push bloqueado.
+
 ## 2026-09-03 — Requisitos Preview 8086
 
 Se preparó únicamente el código fuente para Preview. La navegación mobile

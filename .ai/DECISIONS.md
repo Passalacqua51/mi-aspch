@@ -18,6 +18,26 @@ integración pendiente sin inventar material ni teléfonos.
 
 Activa solo en Preview 8086; sin promoción a producción
 
+## 2026-09-03 — Segunda pasada Preview: tarifas, gate y emergencia
+
+### Decisión
+
+Preview muestra las tarifas A320Pro entregadas para esta prueba (2 horas
+$75.000 y 4 horas $100.000) y mantiene como único destino el formulario oficial
+`https://forms.gle/qzXaCUJgmTyufdKQA`. La reapertura de una sesión con passkey
+requiere volver al gate biométrico si no existe el marcador de la sesión actual;
+una sesión vigente sin passkey puede entrar sin pedir PIN nuevamente.
+
+CONGELADO usa las mismas restricciones de backend que MOROSO para
+Estacionamiento, Simuladores y Sala, pero con lenguaje diferenciado y amable.
+La tarjeta de Inicio y Contacto enlazan al protocolo oficial ASPCH en
+`https://www.aspch.org/wp-content/uploads/2022/10/ASPCH-EN-CASO-DE-ACCIDENTE-O-INCIDENTE.pdf`;
+no se inventan ni se agregan imágenes locales ausentes.
+
+### Estado
+
+Activa solo en Preview 8086; sin promoción a producción.
+
 ## 2026-09-02 — Enlace y acceso exclusivos para pruebas del Directorio
 
 ### Decisión
