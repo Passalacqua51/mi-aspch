@@ -38,6 +38,13 @@ function countSessions(){
   check.close();
   return n;
 }
+function sessionCookieFor(email){
+  const qa=openDb(dataDir);
+  const member=qa.prepare('SELECT * FROM members WHERE email=?').get(email);
+  const created=createSession(qa,member,{unlockedMs:60*60_000});
+  qa.close();
+  return `${sessionCookieName()}=${created.token}`;
+}
 function readOnlySnapshot(){
   const check=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'),{readOnly:true});
   const counts=Object.fromEntries(['members','member_financial_status','sessions','passkeys','otp_codes','push_subscriptions','parking_reservations','study_room_reservations','study_room_waitlist','notification_deliveries','audit_log'].map(table=>[table,Number(check.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n)]));
@@ -193,6 +200,14 @@ try{
   const laterPersonalization=await request(base,'/api/profile/services',{method:'PUT',body:{services:{...firstPersonalization.json.uiPreferences.services,library:true,agenda:false},simpleMode:false},cookie:verified.cookie});
   assert.equal(laterPersonalization.response.status,200,'Perfil debe permitir cambiar la personalización posteriormente');assert.equal(laterPersonalization.json.uiPreferences.simpleMode,false);assert.equal(laterPersonalization.json.uiPreferences.services.library,true);assert.equal(laterPersonalization.json.uiPreferences.services.agenda,false);
   const persistedMe=await request(base,'/api/me',{cookie:verified.cookie});assert.equal(persistedMe.json.uiPreferences.simpleMode,false);assert.equal(persistedMe.json.uiPreferences.services.agenda,false,'La preferencia debe persistir por socio en SQLite');
+  const morosoCookie=sessionCookieFor('moroso@example.test'),frozenCookie=sessionCookieFor('congelado@example.test');
+  const morosoSimulators=await request(base,'/api/simulators',{cookie:morosoCookie}),frozenSimulators=await request(base,'/api/simulators',{cookie:frozenCookie});
+  assert.equal(morosoSimulators.response.status,403);assert.equal(frozenSimulators.response.status,403,'CONGELADO debe tener las mismas restricciones backend que MOROSO');
+  assert.equal(morosoSimulators.json.reason,'MOROSO');assert.equal(frozenSimulators.json.reason,'CONGELADO');assert.match(frozenSimulators.json.error,/congelada/i);assert.doesNotMatch(frozenSimulators.json.error,/cuotas pendientes/i);
+  const morosoStudy=await request(base,'/api/study-room',{cookie:morosoCookie}),frozenStudy=await request(base,'/api/study-room',{cookie:frozenCookie});
+  assert.equal(morosoStudy.response.status,403);assert.equal(frozenStudy.response.status,403);assert.match(frozenStudy.json.error,/congelada/i);
+  const morosoParking=await request(base,'/api/parking/reserve',{body:{date:futureDate,spaceId:'QA-1'},cookie:morosoCookie}),frozenParking=await request(base,'/api/parking/reserve',{body:{date:futureDate,spaceId:'QA-1'},cookie:frozenCookie});
+  assert.equal(morosoParking.response.status,403);assert.equal(frozenParking.response.status,403);assert.match(frozenParking.json.error,/congelada/i);
   const boardStart=await request(base,'/api/auth/register/start',{body:{rut:boardRut,email:boardNewEmail}});
   assert.equal(boardStart.response.status,200,'Directorio debe poder usar el correo que ingresa');
   assert.equal(boardStart.json.emailChanged,false,'Directorio no debe recibir ni requerir OTP en el correo histórico');

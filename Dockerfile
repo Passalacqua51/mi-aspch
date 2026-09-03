@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 COPY . .
+RUN node --version | grep -E '^v22\.' && npm run check
 RUN mkdir -p /data /data/sipa-fotos /data/sipa-retratos /data/profile-fotos && chown -R node:node /data /app
 USER node
 ENV NODE_ENV=production DATA_DIR=/data SIPA_PHOTOS_DIR=/data/sipa-fotos SIPA_PORTRAITS_DIR=/data/sipa-retratos PROFILE_PHOTOS_DIR=/data/profile-fotos PORT=8080 SERVER_BIND_ADDRESS=0.0.0.0

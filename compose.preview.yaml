@@ -53,7 +53,6 @@ services:
       PARKING_SHEET_SYNC: "false"
       SIMULATOR_CANCEL_ENABLED: "false"
       FINANCIAL_UPDATE_BD_SOCIOS: "false"
-      PRESENTATION_ALLOW_REAL_WRITES: "false"
       APPLE_WALLET_ENABLED: "false"
       BACKUP_RETENTION: "3"
     command:

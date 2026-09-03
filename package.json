@@ -7,11 +7,12 @@
   "scripts": {
     "start": "node --no-warnings server.mjs",
     "dev": "node --no-warnings --watch server.mjs",
-    "check": "node --check server.mjs && node --check lib/db.mjs && node --check lib/google.mjs && node --check lib/auth.mjs && node --check lib/webauthn.mjs && node --check lib/push.mjs && node --check lib/v050.mjs && node --check lib/v060.mjs && node --check lib/financial-reader.mjs && node --check lib/financial-sync.mjs && node --check public/app.js && node --check public/lab.js && node --check public/sw.js && node --check tools/self_check_auth.mjs && node --check tools/financial_dry_run.mjs && node --check tools/refresh_preview_snapshot.mjs && node --check tools/self_check_financial_reader.mjs && node --check tools/self_check_financial_sync.mjs && node --check tools/self_check_preview_safety.mjs && node --check tools/self_check_preview_profiles.mjs && node --check tools/self_check_preview_browser.mjs",
+    "check": "node --check server.mjs && node --check lib/db.mjs && node --check lib/google.mjs && node --check lib/auth.mjs && node --check lib/webauthn.mjs && node --check lib/push.mjs && node --check lib/v050.mjs && node --check lib/v060.mjs && node --check lib/financial-reader.mjs && node --check lib/financial-sync.mjs && node --check public/app.js && node --check public/auth-gate.js && node --check public/lab.js && node --check public/sw.js && node --check tools/self_check_auth.mjs && node --check tools/self_check_auth_gate.mjs && node --check tools/financial_dry_run.mjs && node --check tools/refresh_preview_snapshot.mjs && node --check tools/self_check_financial_reader.mjs && node --check tools/self_check_financial_sync.mjs && node --check tools/self_check_preview_safety.mjs && node --check tools/self_check_preview_profiles.mjs && node --check tools/self_check_preview_browser.mjs",
     "selfcheck": "npm run corecheck && node --no-warnings tools/self_check_v0.6.0.mjs && node --no-warnings tools/self_check_auth.mjs && node --no-warnings tools/self_check_financial_reader.mjs && node --no-warnings tools/self_check_financial_sync.mjs && node --no-warnings tools/self_check_preview_safety.mjs",
     "financial:dry-run:test": "node --no-warnings tools/self_check_financial_reader.mjs && node --no-warnings tools/self_check_financial_sync.mjs",
     "preview:check": "node --no-warnings tools/self_check_preview_safety.mjs",
     "preview:profiles": "node --no-warnings tools/self_check_preview_profiles.mjs",
+    "auth-gate:test": "node --no-warnings tools/self_check_auth_gate.mjs",
     "staticcheck": "node tools/self_check_v0.6.0_static.mjs",
     "corecheck": "node --no-warnings tools/self_check_v0.6.0_core.mjs"
   },
