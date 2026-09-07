@@ -231,8 +231,17 @@ try{
   assert.equal(verifiedBoardMember.active,1,'Directorio debe conservar acceso activo');
   assert.equal(verifiedBoardMember.is_board,1,'Directorio debe conservar su marca');
   boardCheck.close();
-  const payrollMembership=await request(base,'/api/membership',{cookie:verified.cookie});assert.equal(payrollMembership.response.status,200);assert.equal(payrollMembership.json.paymentMethod,'PAYROLL');assert.equal(payrollMembership.json.transfer,null,'LATAM no debe recibir datos de transferencia');assert.equal(payrollMembership.json.membership.message,'Pago mediante descuento por planilla');
-  const employerDb=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'));employerDb.prepare('UPDATE members SET employer=? WHERE id=?').run('Empleador QA',member.id);employerDb.close();
+  const employerDb=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'));
+  for(const emp of ['LATAM Airlines','LATAM Grupo','LATAM Cargo','SKY Airlines','Sky Airlines']){
+    employerDb.prepare('UPDATE members SET employer=? WHERE id=?').run(emp,member.id);
+    const mPay=await request(base,'/api/membership',{cookie:verified.cookie});
+    assert.equal(mPay.response.status,200,`${emp} status`);
+    assert.equal(mPay.json.paymentMethod,'PAYROLL',`${emp} PAYROLL`);
+    assert.equal(mPay.json.transfer,null,`${emp} no debe recibir datos de transferencia`);
+    assert.equal(mPay.json.membership.message,'Pago mediante descuento por planilla',`${emp} mensaje`);
+  }
+  employerDb.prepare('UPDATE members SET employer=? WHERE id=?').run('Empleador QA',member.id);
+  employerDb.close();
   const transferMembership=await request(base,'/api/membership',{cookie:verified.cookie});assert.equal(transferMembership.response.status,200);assert.equal(transferMembership.json.paymentMethod,'TRANSFER');assert.equal(transferMembership.json.transfer?.configured,true,'Otros empleadores deben conservar transferencia');
   const extraSessionDb=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'));extraSessionDb.prepare('INSERT INTO sessions(token_hash,member_id,expires_at,unlocked_until,created_at) VALUES (?,?,?,?,?)').run('qa-extra-session-hash',member.id,new Date(Date.now()+3600_000).toISOString(),new Date(Date.now()+3600_000).toISOString(),new Date().toISOString());extraSessionDb.close();
   const ownSessions=await request(base,'/api/security/sessions',{cookie:verified.cookie});assert.equal(ownSessions.response.status,200);assert.equal(ownSessions.json.sessions.length,2);assert.equal(ownSessions.json.sessions.filter(x=>x.current).length,1);assertNoSecrets(ownSessions.json,'Sesiones del socio');

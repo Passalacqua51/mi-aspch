@@ -318,18 +318,20 @@ function showDebtAlert(membership){
 }
 
 
-function isLatamEmployer(value=''){
+function isPayrollEmployer(value=''){
   const employer=String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
-  return ['LATAM AIRLINES','LATAM GRUPO','LATAM CARGO'].some(name=>employer===name||employer.startsWith(`${name} `));
+  const payrollNames=['LATAM AIRLINES','LATAM GRUPO','LATAM CARGO','SKY AIRLINES','SKY AIRLINE','SKY'];
+  return payrollNames.some(name=>employer===name||employer.startsWith(`${name} `));
 }
+const isLatamEmployer=isPayrollEmployer;
 
 function homeMembershipRow(pay){
-  const isLatam=isLatamEmployer(state.member?.employer)||pay?.paymentMethod==='PAYROLL'||pay?.membership?.paymentMethod==='PAYROLL';
+  const isPayroll=isPayrollEmployer(state.member?.employer)||pay?.paymentMethod==='PAYROLL'||pay?.membership?.paymentMethod==='PAYROLL';
   let subtitle='Descuento por planilla';
   let badgeClass='blue';
   let badgeText='Planilla →';
 
-  if(!isLatam){
+  if(!isPayroll){
     const status=pay?.membership?.status||'PENDIENTE';
     const financial=pay?.membership?.financial||state.access?.financial;
     if(status==='EXENTO'){

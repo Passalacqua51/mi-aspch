@@ -741,7 +741,7 @@ async function routeApi(req, res, url) {
   }
 
   if (req.method === 'GET' && p === '/api/membership') {
-    const payroll=isLatamPayrollEmployer(member.employer);
+    const payroll=isPayrollEmployer(member.employer);
     return json(res, 200, { membership: await membershipSummary(member), payments: db.prepare('SELECT membership_year,membership_month,amount_clp,status,paid_at FROM membership_payments WHERE member_id=? ORDER BY membership_year DESC,membership_month DESC,id DESC').all(member.id), contact:{ whatsappNumber: WHATSAPP_NUMBER, whatsappUrl: whatsappUrl('', 'Hola ASPCH, necesito ayuda con Mi ASPCH.') }, transfer:payroll?null:transferSummary(), paymentMethod:payroll?'PAYROLL':'TRANSFER' });
   }
 
@@ -1956,11 +1956,11 @@ async function membershipSummary(member) {
   const plan=membershipPlanFor(member, uf);
   const exempt=plan.exempt===true || plan.monthlyClp===0;
   const financial=financialSummary(db,member);
-  let status=exempt?'EXENTO':(paid?'AL_DIA':'PENDIENTE');
+  const payroll=isPayrollEmployer(member.employer);
+  let status=exempt?'EXENTO':(paid||payroll?'AL_DIA':'PENDIENTE');
   if(financial?.status==='MOROSO')status='MOROSO';
   if(financial?.status==='CONGELADO')status='CONGELADO';
   if(financial?.status==='DESAFILIADO')status='DESAFILIADO';
-  const payroll=isLatamPayrollEmployer(member.employer);
   let message=exempt?'Esta categoría está exenta de mensualidad.':(paid?'Mensualidad del mes registrada como pagada.':payroll?'Pago mediante descuento por planilla':'Puedes pagar mediante transferencia bancaria usando los datos de ASPCH.');
   if(financial?.status==='MOROSO')message=`Tienes ${financial.monthsDue} ${financial.monthsDue===1?'mes pendiente':'meses pendientes'}. Por favor regulariza lo antes posible o comunícate con nosotros.`;
   if(financial?.status==='CONGELADO')message='Tu membresía está congelada por el período informado por ASPCH. Los beneficios de reserva quedan pausados; comunícate con nosotros si necesitas orientación.';
@@ -1972,10 +1972,12 @@ async function membershipSummary(member) {
     lastPaymentAt:paid?.paid_at||null
   };
 }
-function isLatamPayrollEmployer(value=''){
+export function isPayrollEmployer(value=''){
   const employer=String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
-  return ['LATAM AIRLINES','LATAM GRUPO','LATAM CARGO'].some(name=>employer===name||employer.startsWith(`${name} `));
+  const payrollNames=['LATAM AIRLINES','LATAM GRUPO','LATAM CARGO','SKY AIRLINES','SKY AIRLINE','SKY'];
+  return payrollNames.some(name=>employer===name||employer.startsWith(`${name} `));
 }
+export const isLatamPayrollEmployer = isPayrollEmployer;
 function normalizePhoneDigits(value=''){return String(value||'').replace(/\D+/g,'')}
 function whatsappUrl(topic='', text=''){
   const base = `https://wa.me/${WHATSAPP_NUMBER}`;

@@ -109,7 +109,7 @@ assert.ok(!server.includes("p === '/api/auth/request-code'")&&!server.includes("
 const mobileServices=app.slice(app.indexOf('function renderMobileMore'),app.indexOf('function openMobileMenu'));
 for(const id of ['parking','booking','reservations'])assert.ok(!mobileServices.includes(`['${id}'`),`Servicios no debe duplicar ${id}`);
 assert.ok(v060.includes("const MODULE_DEFAULTS=Object.freeze({activities:false,votes:false})"),'Cursos y Votaciones deben iniciar ocultos');
-assert.ok(server.includes("payroll?'PAYROLL':'TRANSFER'")&&server.includes('isLatamPayrollEmployer')&&app.includes('Pago mediante descuento por planilla'),'Mensualidad debe distinguir empleador LATAM real');
+assert.ok(server.includes("payroll?'PAYROLL':'TRANSFER'")&&server.includes('isPayrollEmployer')&&app.includes('Pago mediante descuento por planilla'),'Mensualidad debe distinguir empleador con descuento por planilla real');
 assert.match(server,/function normalizeProfilePhone[\s\S]{0,240}\^56\\d\{9\}\$[\s\S]{0,120}digits\.slice\(2\)/,'El teléfono editable debe persistirse sin el prefijo país 56');
 assert.ok(server.includes("action==='set-pin'")&&server.includes("action==='reset-pin'")&&app.includes("!['set-pin','reset-pin'].includes(action)"),'PIN ADMIN debe cambiarse o resetearse sin modal');
 assert.ok(!app.includes("const mobileIds=['home','reservations','parking','simulators','marketplace','profile']"),'No debe sobrevivir la navegación móvil antigua');
