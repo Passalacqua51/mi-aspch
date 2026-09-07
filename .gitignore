@@ -24,6 +24,9 @@ mi-aspch-google.json
 *.p12
 *.pfx
 *.jks
+cookies.txt
+*.cookie
+*.cookies
 
 # Databases and runtime state
 data/
@@ -70,3 +73,7 @@ yarn-error.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Analysis and agent cache
+graphify-out/
+.graphify/
