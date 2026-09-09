@@ -77,3 +77,6 @@ Thumbs.db
 # Analysis and agent cache
 graphify-out/
 .graphify/
+
+# Xcode user data
+**/xcuserdata/
