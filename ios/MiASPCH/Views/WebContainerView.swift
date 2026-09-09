@@ -17,7 +17,7 @@ struct WebContainerView: View {
 
     var body: some View {
         webContent
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .overlay(alignment: .bottom) {
                 if !model.navigation.primary.isEmpty {
                     NativeNavigationBar(model: model)
                         .padding(.bottom, 8)
