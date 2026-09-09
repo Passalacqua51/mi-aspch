@@ -368,7 +368,7 @@ async function routeApi(req, res, url) {
     const body = await readJson(req);
     const result = setPin(db, member, body.pin, body.currentPin);
     if (!result.ok) {
-      if (result.reason === 'format') return json(res, 400, { error: 'El PIN debe tener entre 4 y 6 dígitos.' });
+      if (result.reason === 'format') return json(res, 400, { error: 'El PIN debe tener 4 dígitos.' });
       return json(res, 401, { error: 'El PIN actual no es correcto.' });
     }
     member = requestMember(req);
@@ -853,7 +853,7 @@ async function routeApi(req, res, url) {
         db.exec('BEGIN IMMEDIATE');let sessionsRemoved=0;try{db.prepare('UPDATE members SET pin_salt=NULL,pin_hash=NULL,pin_updated_at=NULL,updated_at=? WHERE id=?').run(new Date().toISOString(),targetId);sessionsRemoved=Number(db.prepare('DELETE FROM sessions WHERE member_id=?').run(targetId).changes||0);db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
         audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PIN_RESET',entityType:'security',entityId:targetId,details:{sessionsRemoved,secretsExposed:false}});result={ok:true,sessionsRemoved};
       }else if(action==='set-pin'){
-        const pin=String(body.pin||'');if(!/^\d{4,6}$/.test(pin))return json(res,400,{error:'El PIN debe tener entre 4 y 6 dígitos.'});
+        const pin=String(body.pin||'');if(!/^\d{4}$/.test(pin))return json(res,400,{error:'El PIN debe tener 4 dígitos.'});
         const salt=crypto.randomBytes(16).toString('base64url'),hash=crypto.scryptSync(pin,salt,32).toString('base64url'),stamp=new Date().toISOString();
         db.exec('BEGIN IMMEDIATE');let sessionsRemoved=0;try{db.prepare('UPDATE members SET pin_salt=?,pin_hash=?,pin_updated_at=?,updated_at=? WHERE id=?').run(salt,hash,stamp,stamp,targetId);sessionsRemoved=Number(db.prepare('DELETE FROM sessions WHERE member_id=?').run(targetId).changes||0);db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
         audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PIN_CHANGED',entityType:'security',entityId:targetId,details:{sessionsRemoved,secretsExposed:false}});result={ok:true,sessionsRemoved};

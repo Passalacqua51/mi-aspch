@@ -428,3 +428,111 @@ Se completó la verificación integral en producción y pruebas automatizadas:
 - Batería de pruebas: `git diff --check`, `npm run check`, `self_check_v0.6.0_static.mjs`,
   `self_check_v0.6.0_core.mjs`, `self_check_auth.mjs` y smoke HTTP 100% aprobados.
 - Se conservaron intactos el túnel Cloudflare (PID 1089525), SQLite, `.env` y sesiones.
+
+
+## 2026-09-07 — Liquid Glass en capa iOS
+
+Cambios iOS en Views/WebContainerView.swift y Views/RootView.swift: NavigationStack con título compacto y menú Recargar; diagnóstico DEBUG trasladado a sheet; LoadingView no intercepta toques; fondo systemBackground y fallback accesible. Builds DEBUG/RELEASE firmados: BUILD SUCCEEDED. No cambios de backend, credenciales, cookies, URLs ni infraestructura. Sin commit.
+
+## 2026-09-07 — Navegación principal iOS nativa, sin commit
+
+Se modificaron únicamente Views/WebContainerView.swift, Web/MiASPCHWebView.swift
+ y Web/WebViewModel.swift dentro de iOS, más el contexto .ai requerido.
+Se respetaron los cambios previos staged/unstaged. No se modificó el proyecto
+Xcode, Signing, Bundle ID, AppIcon, URLs, Face ID, Push ni backend.
+
+Causa del header: NavigationStack + navigationTitle("Mi ASPCH") del cambio
+anterior. Eliminados del árbol. El header HTML duplicado sale del flujo solo
+mediante el adaptador local, trasladando sus acciones al menú inferior.
+
+Validación: DEBUG/RELEASE finales BUILD SUCCEEDED; tres pruebas XCTest sobre
+WKWebView real en Simulator con fixture offline que extrae go/renderNav de
+public/app.js, más UITest Face ID mediante biometría simulada del sistema.
+Cookie sintética, sessionStorage y contexto JS sobreviven siete cambios;
+selección web también actualiza la barra. Se valida bloqueo, modo simple,
+ADMIN, origen ajeno, safe area superior y ausencia de loops. Logs sin
+Publishing changes from within view updates. El único warning de build es
+extracción de metadatos AppIntents omitida por no depender de ese framework.
+
+El proyecto de tests se generó fuera del repo en /tmp/mi-aspch-navigation;
+ningún target/fixture/autenticación alternativa se añadió a la app entregada.
+La app se instaló y lanzó en iPhone 13; falta confirmación humana del Face ID
+físico y sesión web real. No hay runtime anterior disponible; el binario
+conserva MinimumOSVersion 17.6 y compila las ramas con #available.
+PDF picker y deep links web existentes quedan intactos; no se verificaron
+end-to-end. Push nativo en el estado recibido solo gestiona autorización;
+no se añadieron capacidades nuevas. git diff --check en archivos de esta
+intervención pasa; persiste una línea vacía preexistente al final de Push.
+
+## 2026-09-07 — Corrección de apariencia e icono, build 2
+
+El usuario confirmó que se refería al icono de inicio y al dispositivo «iPhone».
+El icono compilado e icono generado por ese dispositivo son correctos y no son
+placeholder. Se cambió la identidad del asset y build para renovar metadatos,
+sin afirmar que el fallo de caché esté confirmado. No se editó el PNG.
+La CSS remota coincide con public/styles.css y el logo web responde 200.
+La prueba base de dark/light en Simulator pasó; se añadió sincronización
+explícita SwiftUI → WKWebView y fondos dinámicos, más apariencia/build en DEBUG.
+Cuatro pruebas posteriores aprobadas, DEBUG y RELEASE BUILD SUCCEEDED.
+Build 2 instalada y abierta, icono generado sin placeholder. Pendiente
+validación visual física del usuario. Sin commit ni cambios de backend.
+
+## 2026-09-09 — Cierre parcial iOS pre-GitHub, sin commit
+
+Se retiró Liquid Glass exclusivamente de NativeNavigationBar porque producía
+refracción/lupa y deformaba la percepción del icono activo. La barra conserva la
+cápsula flotante, las cinco posiciones, el orden y las acciones existentes; usa
+material estándar, colores dinámicos y matchedGeometryEffect sin scaleEffect.
+
+Se corrigió la integración auth nativa/web: Face ID exitoso ya no solo oculta la
+capa SwiftUI, también marca el desbloqueo local en sessionStorage y llama el
+loginSuccess real de la página. El fallback PIN nativo dejó de depender del
+mundo WebKit aislado y ejecuta `/api/security/unlock` en el mundo de la página,
+actualizando state.security y mostrando Home en la misma WKWebView. No se guarda
+PIN local ni se agregan logs sensibles.
+
+Validación: XcodeRefreshCodeIssuesInFile sin issues en RootView, WebContainerView
+y WebViewModel; XcodeListNavigatorIssues sin issues; git diff --check aprobado
+antes de documentación; BuildProject MCP aprobado. `xcodebuild` Debug/Release
+falló solo en CompileAssetCatalogVariant thinned por CoreSimulator no disponible
+(`No available simulator runtimes for platform iphonesimulator`), incluso usando
+SDK iphoneos/destino genérico. No se pudo ejecutar la matriz física A-K desde
+esta sesión; queda pendiente con iPhone interactivo.
+
+Segunda pasada por reporte del usuario: se reforzó Dark Mode en la barra inferior
+con fondo secundario dinámico, selector más contrastado e iconos inactivos menos
+lavados. El snapshot nativo ahora incluye si `state.security.unlocked` está
+vigente; si la web está locked pero el servidor ya no está desbloqueado, no se
+muestra Face ID primero y se deja el PIN web existente, evitando el doble prompt.
+Si el servidor sigue desbloqueado y solo falta el gate local de reapertura, Face
+ID sincroniza sessionStorage y loginSuccess para entrar directo.
+
+Se retiró el texto `Sincronizado con ESTACIONAMIENTOS ASPCH` de `public/app.js`.
+Para Push nativo se creó `MiASPCH.entitlements` con aps-environment development,
+pero no se editó `project.pbxproj` porque Xcode está abierto; falta enlazar el
+archivo y activar Push Notifications desde Xcode. BuildProject MCP y checks de
+sintaxis/diff pasaron después de los cambios.
+
+Se aplicó la paleta entregada por el usuario: azul ASPCH como primary, rojo ASPCH
+como accent/active, light blanco/gris claro con texto azul oscuro, dark
+azul-negro con texto blanco. Cambios en `public/styles.css`, AccentColor del
+asset catalog y NativeNavigationBar. BuildProject MCP volvió a aprobar.
+
+Tercera pasada del 2026-09-09: el PIN pasó a ser de exactamente 4 dígitos en
+`public/index.html`, `public/admin.html`, `public/app.js`, `lib/auth.mjs`,
+`server.mjs` y el fallback nativo. La pantalla nativa de reapertura quedó con
+saludo `Hola <primer nombre>` y un único botón principal `Acceder` antes de la
+biometría; no muestra PIN/logout hasta modo PIN. Se corrigió el bridge
+`miASPCHNavigation` para publicar snapshots en page world sin romper por
+reasignación de constantes, lo que permite enviar `memberName` a Swift.
+
+Cuarta pasada del 2026-09-09: la pantalla nativa usa `ASPCHLogo.imageset`,
+derivado del PNG institucional ya presente en AppIcon, en vez de símbolos
+Face ID/candado. Se reforzó `unlockWithBiometrics()` para que cualquier toque
+con 3 fallos acumulados fuerce inmediatamente modo PIN en lugar de reintentar
+biometría.
+
+Ajuste posterior: todo resultado no exitoso de `LocalAuthentication`
+-- cancelación, fallo, lockout o no disponibilidad -- entra directamente al
+fallback PIN de Mi ASPCH. Esto evita que iOS cierre el sheet de Face ID con una
+cancelación y la app vuelva a mostrar "Acceder" biométrico en vez del PIN.

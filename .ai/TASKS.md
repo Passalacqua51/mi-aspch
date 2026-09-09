@@ -89,3 +89,54 @@
 - [x] Integrar `fix/remove-presentation-login` en `main` mediante merge no-FF.
 - [x] Preparar la release `0.6.16` sin construir ni desplegar Docker.
 - [x] Construir, fijar el digest SHA-256 inmutable y desplegar `mi-aspch:v0.6.16` en producción con healthcheck.
+
+
+## 2026-09-07 — Liquid Glass en capa iOS
+
+- [x] Adaptar superficies y controles de la capa iOS a Liquid Glass y compilar DEBUG/RELEASE.
+- [ ] Validar visualmente en iPhone claro/oscuro, teclado del login y menú nativo tras esta actualización.
+
+## 2026-09-07 — Navegación inferior nativa iOS
+
+- [x] Sustituir header nativo por navegación SwiftUI inferior basada en la web.
+- [x] Persistir un WKWebView y sincronizar navegación sin loops ni recargas.
+- [x] Compilar DEBUG/RELEASE firmados con deployment target 17.6.
+- [x] Validar en Simulator navegación, sesión sintética, safe area y Face ID.
+- [x] Instalar/abrir en iPhone 13 con Signing existente.
+- [ ] Confirmar Face ID físico y navegación con sesión web real en iPhone.
+- [ ] Validar visualmente en runtime iOS anterior a 26 cuando esté disponible.
+
+## 2026-09-07 — Icono y apariencia, build 2
+
+- [x] Renovar identidad del icono sin cambiar su imagen ni borrar la app/datos.
+- [x] Sincronizar explícitamente apariencia SwiftUI → WKWebView sin recarga.
+- [x] DEBUG/RELEASE y cuatro pruebas Simulator; instalar build 2 en «iPhone».
+- [ ] Confirmar visualmente icono de inicio y modo oscuro en el iPhone del usuario.
+
+## 2026-09-09 — Cierre funcional/visual iOS pre-GitHub
+
+- [x] Retirar Liquid Glass de NativeNavigationBar y conservar cápsula, 5
+      posiciones, acciones reales y selector animado.
+- [x] Sincronizar Face ID nativo exitoso con el gate web sin recrear WKWebView.
+- [x] Corregir fallback PIN nativo para ejecutar el desbloqueo en el mundo de la
+      página y llamar `loginSuccess` real.
+- [x] Mantener `WKWebsiteDataStore.default()`, cookies y sessionStorage en un
+      único WKWebView persistente.
+- [x] Ejecutar diagnósticos Xcode en archivos tocados y `git diff --check`.
+- [x] Ejecutar BuildProject MCP correctamente.
+- [x] Mejorar contraste de NativeNavigationBar en Dark Mode.
+- [x] Evitar doble prompt Face ID → PIN: Face ID nativo solo se ofrece cuando
+      el servidor sigue desbloqueado; si no, queda el PIN web existente.
+- [x] Retirar texto `Sincronizado con ESTACIONAMIENTOS ASPCH`.
+- [x] Restringir PIN de Mi ASPCH a exactamente 4 dígitos en web/API/iOS.
+- [x] Simplificar pantalla nativa de reapertura a `Hola <nombre>` y botón
+      principal `Acceder`, dejando PIN/logout solo para modo PIN.
+- [ ] Reintentar build explícito Debug/Release cuando CoreSimulator/actool no
+      esté bloqueado por ausencia de runtimes.
+- [ ] Enlazar `MiASPCH.entitlements` al target desde Xcode y activar Push
+      Notifications en Signing & Capabilities para obtener APNs device token.
+- [ ] Implementar backend APNs antes de considerar Push remoto productivo
+      completo; Web Push PWA no equivale a Push nativo dentro de WKWebView.
+- [ ] Validar en iPhone físico los flujos A-K solicitados: sesión nueva,
+      reapertura con Face ID, 3 fallos → PIN, background <30 s/>=30 s, logout,
+      light/dark, barra inferior, Cmd+R y apertura manual sin debugger.

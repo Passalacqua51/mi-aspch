@@ -551,3 +551,51 @@ Todo despliegue debe inspeccionar mounts y configuración real, respaldar lo nec
 ### Estado
 
 Activa
+
+
+## 2026-09-07 — Liquid Glass en capa iOS
+
+Usar componentes estándar de navegación de iOS para Liquid Glass, disponible desde iOS 26, con fallback en versiones anteriores y respeto de Reducir transparencia. No simular Liquid Glass mediante CSS ni convertir la autenticación web en un flujo nativo. El diagnóstico temporal queda en una hoja accesible desde Opciones, sin overlay sobre el formulario.
+
+## 2026-09-07 — Sustitución del header por navegación inferior
+
+Esta decisión reemplaza la propuesta anterior de NavigationStack/título y
+hoja de diagnóstico por instrucción explícita del usuario: ningún header
+nativo superior, ningún navigationTitle ni reserva de espacio. DEBUG será
+overlay temporal. El WKWebView conserva posición e identidad; la navegación
+vive en un safeAreaInset inferior con Button/Menu SwiftUI y glassEffect
+oficial en una única superficie (fallback .bar/opaco según disponibilidad y
+accesibilidad). No se crean subárboles web por pestaña.
+
+La fuente es el DOM generado por renderNav y los controles de cuenta reales.
+Se conservan Inicio/Estacionamiento/Reservas/Perfil y Más; no se inventan rutas
+como benefits. Las acciones nativas hacen click en los controles existentes,
+en un mundo WebKit aislado. MutationObserver deduplica snapshots; recibir
+selección nunca dispara otra navegación. El adaptador no accede a cookies,
+credenciales, estado de autenticación ni APIs y solo opera en el origen
+configurado/main frame. El único CSS añadido vive en el wrapper y elimina
+controles web duplicados y sus espacios; no simula vidrio.
+
+Referencia oficial: https://developer.apple.com/documentation/SwiftUI/Applying-Liquid-Glass-to-custom-views
+
+## 2026-09-07 — Apariencia del wrapper e identidad del icono
+
+La petición posterior de corregir el icono autoriza modificar su configuración:
+asset renombrado MiASPCHIcon y build 2, preservando bytes del PNG, Signing y
+Bundle ID. No se desinstala la app ni se borran cachés/sesiones del dispositivo.
+La apariencia SwiftUI se transmite mediante overrideUserInterfaceStyle al
+WKWebView persistente y fondos systemBackground; no se inyectan temas CSS ni
+se modifica la web. El cambio de iconos de SpringBoard es independiente del
+modo claro/oscuro del sistema que debe seguir la app.
+
+## 2026-09-09 — Barra inferior iOS sin Liquid Glass
+
+Por instrucción del usuario, NativeNavigationBar prioriza nitidez, contraste y
+adaptación claro/oscuro sobre Liquid Glass. La barra inferior conserva geometría
+de cápsula flotante, orden, acciones reales y selector animado con
+matchedGeometryEffect, pero ya no usa GlassEffectContainer ni glassEffect en esa
+superficie y no escala el icono activo.
+
+El wrapper puede seguir usando otros controles DEBUG temporales con Glass fuera
+de la barra, pero no se usa Liquid Glass para la navegación principal mientras
+produzca refracción, lupa, deformación o bajo contraste.

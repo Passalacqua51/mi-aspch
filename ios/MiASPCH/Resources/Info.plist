@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Mi ASPCH</string>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>whatsapp</string>
+        <string>tel</string>
+        <string>mailto</string>
+        <string>maps</string>
+    </array>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+#if DEBUG
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>100.109.170.84</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSIncludesSubdomains</key>
+                <false/>
+            </dict>
+        </dict>
+#endif
+    </dict>
+    <key>NSFaceIDUsageDescription</key>
+    <string>Mi ASPCH puede usar Face ID para desbloquear la app localmente.</string>
+</dict>
+</plist>

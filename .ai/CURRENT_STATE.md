@@ -317,3 +317,106 @@ La ruta `/mnt/MediaCenter/aspch` es legado/runtime y no es fuente de código.
 - La unidad histórica `cloudflared-tunnel.service` sigue activa por falta de
   privilegios sudo, pero apunta a `localhost:8086` y no puede alcanzar el
   listener exclusivo Tailscale. Falta retirarla como endurecimiento adicional.
+
+
+## 2026-09-07 — Liquid Glass en capa iOS
+
+Adaptación de la capa iOS: barra y menú SwiftUI estándar, diagnóstico DEBUG en hoja modal, fondo semántico claro/oscuro y fallback opaco al reducir transparencia. Carga visual sin captura de toques. DEBUG y RELEASE compilan con firma local. Contenido web, URLs y autenticación sin cambios. Revisión visual final en dispositivo pendiente.
+
+## 2026-09-07 — Navegación inferior nativa iOS
+
+- WebContainerView elimina NavigationStack, navigationTitle y toolbar superior.
+  El diagnóstico DEBUG vuelve a overlay sin reservar espacio de layout.
+- Barra SwiftUI derivada del DOM real: Inicio/home, Estac./parking,
+  Reservas/booking, Perfil/profile y Más con servicios/cuenta existentes.
+  Mensualidad usa membership y Beneficios corresponde a Convenios/convenios;
+  no existe una ruta benefits. Modo simple y panel ADMIN se adaptan al DOM.
+- WebViewModel retiene un único WKWebView con WKWebsiteDataStore.default().
+  Un WKUserScript en defaultClient ejecuta click sobre controles existentes;
+  MutationObserver publica selección/listas, con deduplicación y validación
+  de origen/main frame en Coordinator. No se reemplaza go() ni autenticación.
+- CSS solo inyectado en el wrapper elimina del flujo topbar/mobile-nav y sus
+  reservas de espacio. No se modifican public/, CSP ni APIs. Los botones del
+  header (cuenta, bloqueo, logout, alternancia ADMIN) siguen en Más.
+- Liquid Glass oficial mediante glassEffect en una única superficie inferior;
+  Button/Menu nativos. Fallback material .bar antes de iOS 26 y fondo opaco con
+  Reducir transparencia; sin animaciones añadidas y con etiquetas VoiceOver.
+- DEBUG y RELEASE finales firmados: BUILD SUCCEEDED; MinimumOSVersion 17.6.
+  Simulator iOS 26.5: tres pruebas de integración y una UI de Face ID aprobadas.
+  Se verificaron identidad del WKWebView, cookie sintética, sessionStorage,
+  ausencia de recarga/loops, modo simple/ADMIN/bloqueo, origen ajeno rechazado
+  y borde superior del WKWebView igual al safe area. Sin warning Publishing.
+- iPhone 13 conectado: instalación y lanzamiento con Signing existente.
+  Face ID físico y sesión web real requieren comprobación del usuario;
+  no se alteraron cuentas ni sesiones reales. Runtime anterior no instalado.
+- Evidencia temporal: /tmp/mi-aspch-navigation (logs, xcresult, capturas,
+  proyecto de pruebas descartable con fixture offline y navegación real
+  extraída de public/app.js). No se añadió autenticación de prueba a la app.
+
+## 2026-09-07 — Build 2: icono y apariencia iOS
+
+Tras reporte del usuario (icono de pantalla de inicio en el dispositivo «iPhone»),
+se renovó la identidad del asset AppIcon → MiASPCHIcon conservando el PNG exacto
+y se incrementó CURRENT_PROJECT_VERSION a 2. iOS genera el icono real, sin
+placeholder, tanto antes como después; el síntoma visual de SpringBoard no se
+pudo reproducir remotamente, por lo que no se atribuye una causa confirmada.
+WKWebView ahora recibe explícitamente colorScheme de SwiftUI en make/update,
+con fondos semánticos y sin recarga. DEBUG muestra apariencia iOS y build.
+DEBUG/RELEASE y cuatro pruebas Simulator pasan; claro/oscuro/claro conserva el
+contexto JavaScript y cambia matchMedia/colores. La prueba de apariencia también
+pasaba antes en Simulator. Build 2 instalada/abierta en el iPhone confirmado.
+Pendiente confirmación visual del usuario. Evidencia: /tmp/mi-aspch-appearance.
+
+## 2026-09-09 — Correcciones iOS pre-GitHub sin commit
+
+NativeNavigationBar quedó sin Liquid Glass: usa material estándar, colores
+dinámicos, borde/sombra sutiles y selector con matchedGeometryEffect. Se retiró
+el escalado del icono activo para evitar deformación; se conservan geometría,
+orden, iconos y acciones.
+
+El desbloqueo local nativo ahora sincroniza el gate web antes de mostrar Home.
+Face ID exitoso marca `sessionStorage.miAspchUnlocked` y llama el `loginSuccess`
+real de la página en el mismo WKWebView persistente. El fallback PIN nativo se
+ejecuta en el mundo JavaScript de la página, reutiliza `/api/security/unlock`,
+actualiza `state.security`, marca sessionStorage y llama `loginSuccess`; no
+guarda PIN local ni lo registra en logs.
+
+Se mantiene un único WKWebView con `WKWebsiteDataStore.default()`, sin recreación
+para navegación ni cambios de apariencia. SwiftUI sigue transmitiendo light/dark
+mediante `overrideUserInterfaceStyle`, fondos semánticos y sin filtros CSS.
+
+Validación local: diagnósticos Xcode sin issues en RootView, WebContainerView y
+WebViewModel; `git diff --check` aprobado; `BuildProject` MCP aprobado. Los
+builds explícitos `xcodebuild` Debug/Release quedaron bloqueados por `actool` al
+no poder usar CoreSimulator (`No available simulator runtimes for platform
+iphonesimulator`) durante la compilación thinned de assets, aun con destino
+iphoneos genérico. No hubo commit, push, backend, Push remoto ni infraestructura.
+
+Actualización posterior del mismo día: Dark Mode de NativeNavigationBar subió
+contraste con fondo `secondarySystemBackground`, selector más visible e iconos
+inactivos menos lavados. El bridge distingue si el lock web proviene de una
+sesión servidor aún desbloqueada; Face ID nativo solo se ofrece en ese caso y
+sincroniza `sessionStorage`/`loginSuccess`. Si la sesión del servidor ya está
+bloqueada, se evita el doble paso Face ID → PIN y queda visible directamente el
+PIN existente de Mi ASPCH. Estacionamientos ya no muestra el rótulo
+`Sincronizado con ESTACIONAMIENTOS ASPCH`.
+
+Push nativo: se creó `ios/MiASPCH/MiASPCH.entitlements` con
+`aps-environment=development`, pero no se enlazó al target porque Xcode está
+abierto y no se debe editar `project.pbxproj` directamente. Falta activar Push
+Notifications desde Signing & Capabilities o cerrar Xcode para aplicar el cambio
+de proyecto con seguridad. La app conserva la prueba local DEBUG y el registro
+APNs en memoria sin exponer token completo.
+
+La paleta visual quedó alineada: azul ASPCH para marca/primary, rojo ASPCH como
+accent/active, light con blanco/gris claro y texto azul muy oscuro, dark con
+azul-negro y texto blanco. El AccentColor nativo ahora es rojo ASPCH y los
+estados activos web principales usan `--red`/`--red-soft`.
+
+Actualización posterior: el PIN de Mi ASPCH queda restringido a exactamente 4
+dígitos en frontend, API y validación compartida. La pantalla nativa de
+reapertura muestra `Hola <nombre>` cuando el bridge web entrega el socio y solo
+presenta un botón principal `Acceder`; Face ID se invoca al tocarlo y el PIN de
+fallback aparece únicamente al entrar en modo PIN, incluyendo 3 fallos o lockout.
+Se corrigió el bridge nativo/web para que publique correctamente snapshots desde
+el mundo de la página, incluyendo nombre de socio y estado de desbloqueo.

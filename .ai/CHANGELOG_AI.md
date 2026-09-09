@@ -147,3 +147,52 @@
 - `server.mjs` ahora intercepta `?sim=` en el Lab y carga directamente el perfil real desde SQLite simulando una sesión limpia, sin alterar datos y aislando la cookie para este laboratorio.
 - Modificado `lab-interceptor.js` para detener la interceptación de `/api/me` (ahora se nutre del backend real), conservando solo el mock 401 para la simulación de *login* (teléfono 1) y el pin lock (teléfono 2).
 - Agregado el botón **INFORMÁTICA** al selector de la UI `lab.html`.
+
+
+## 2026-09-07 — Liquid Glass en capa iOS
+
+Adaptación visual de la capa iOS con navegación estándar, diagnóstico separado del formulario y accesibilidad de transparencias. Builds DEBUG/RELEASE aprobados; revisión visual de dispositivo pendiente.
+
+## 2026-09-07 — Navegación inferior iOS
+
+- Retirados NavigationStack/título/header superior y espacio web duplicado.
+- Añadida barra SwiftUI con acciones reales web, sincronización DOM y un único
+  WKWebView persistente; cookies y autenticación preservadas.
+- Liquid Glass oficial en superficie inferior, fallback nativo y DEBUG overlay.
+- DEBUG/RELEASE firmados y cuatro pruebas Simulator aprobadas (incluye Face ID).
+- Instalación/lanzamiento en iPhone 13 sin cambios de Signing. Sin commit,
+  despliegue, cambios backend, datos ni infraestructura.
+
+## 2026-09-07 — Build 2 iOS
+
+- Renovada identidad del asset del icono, preservando el PNG original.
+- Apariencia SwiftUI transmitida explícitamente al WKWebView persistente.
+- DEBUG muestra apariencia/build; DEBUG/RELEASE y pruebas aprobadas.
+- Instalada build 2 en el iPhone confirmado, sin desinstalación ni cambios de datos.
+
+## 2026-09-09 — Correcciones iOS pre-GitHub
+
+- NativeNavigationBar deja de usar Liquid Glass y elimina el escalado del icono
+  activo; conserva cápsula flotante, 5 posiciones, acciones reales y selector
+  animado.
+- Face ID nativo exitoso ahora completa el desbloqueo local del gate web en la
+  misma instancia persistente de WKWebView.
+- El PIN fallback nativo reutiliza `/api/security/unlock`, actualiza estado web
+  y llama `loginSuccess` desde el mundo de la página; no guarda PIN local.
+- Sin cambios a backend, Cloudflare, DNS, Docker, SQLite, usuarios, PINes,
+  Signing, Bundle ID, AppIcon ni Push remoto.
+- Validado con Xcode diagnostics, `git diff --check` y BuildProject MCP. Builds
+  explícitos Debug/Release por `xcodebuild` bloqueados por CoreSimulator/actool
+  sin runtimes disponibles para assets thinned.
+- Segunda pasada: Dark Mode de la barra sube contraste, el lock nativo evita el
+  doble prompt Face ID → PIN cuando la sesión servidor ya está bloqueada, y
+  Estacionamientos deja de mostrar `Sincronizado con ESTACIONAMIENTOS ASPCH`.
+- Se agregó archivo de entitlements APNs development, pendiente de enlazar al
+  target desde Xcode por seguridad mientras el proyecto está abierto.
+- PIN de Mi ASPCH restringido a 4 dígitos exactos en frontend, backend y UI
+  nativa; pantalla de reapertura simplificada a saludo con nombre y botón
+  principal `Acceder`.
+- Pantalla nativa de reapertura reemplaza iconografía Face ID/candado por logo
+  ASPCH y fuerza fallback PIN al alcanzar 3 fallos biométricos.
+- Cualquier resultado no exitoso de Face ID en la pantalla nativa pasa al PIN
+  de Mi ASPCH, evitando reintentos biométricos inesperados.

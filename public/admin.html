@@ -83,11 +83,11 @@
       </form>
       <form id="pin-setup-form" class="auth-clean-form hidden">
         <h2 style="font-size:20px;margin:0 0 10px;text-align:center;font-weight:750;">Crea tu PIN</h2>
-        <label class="clean-label">PIN de 4 a 6 dígitos
-          <input id="setup-pin" class="clean-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" minlength="4" maxlength="6" placeholder="••••" required>
+        <label class="clean-label">PIN de 4 dígitos
+          <input id="setup-pin" class="clean-pin-input" type="password" inputmode="numeric" pattern="[0-9]{4}" autocomplete="off" minlength="4" maxlength="4" placeholder="••••" required>
         </label>
         <label class="clean-label">Repite el PIN
-          <input id="setup-pin-confirm" class="clean-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" minlength="4" maxlength="6" placeholder="••••" required>
+          <input id="setup-pin-confirm" class="clean-pin-input" type="password" inputmode="numeric" pattern="[0-9]{4}" autocomplete="off" minlength="4" maxlength="4" placeholder="••••" required>
         </label>
         <button class="button primary clean-btn" type="submit">Activar Mi ASPCH</button>
         <p class="auth-error hidden" role="alert"></p>
@@ -102,7 +102,7 @@
       <button id="biometric-button" class="button primary clean-btn hidden" type="button" disabled>Acceder</button>
       <button id="show-pin-button" class="button ghost clean-btn-sec hidden" type="button">Usar PIN</button>
       <form id="unlock-form" class="auth-clean-form">
-        <input id="unlock-pin" class="clean-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" maxlength="6" placeholder="Ingresa tu PIN" required>
+        <input id="unlock-pin" class="clean-pin-input" type="password" inputmode="numeric" pattern="[0-9]{4}" autocomplete="current-password" maxlength="4" placeholder="Ingresa tu PIN" required>
         <button id="unlock-submit" class="button primary clean-btn" type="submit">Acceder</button>
         <p class="auth-error hidden" role="alert"></p>
       </form>
