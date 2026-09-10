@@ -13,6 +13,17 @@ const ADMIN_PLACEHOLDERS={
   'admin-finance':['💳','Finanzas','La gestión financiera dedicada se incorporará en una próxima etapa.'],
   'admin-content':['📰','Contenido','La gestión de contenido se separará en una próxima etapa.']
 };
+// Presentación de estacionamientos: solo visual, sin tocar reglas de reserva/disponibilidad.
+// parkingDisplayLabel() cambia únicamente el texto visible (ej. "15 (Motos)" -> "15");
+// el id interno del cupo (data-space) y la lógica de reserva siguen intactos.
+// PARKING_FLOOR_BY_LABEL guarda pisos físicos confirmados por número visible.
+// Los cupos sin piso confirmado quedan fuera del mapa (floor = null) y no muestran piso.
+const PARKING_FLOOR_BY_LABEL=Object.freeze({'3':'-1','4':'-1','41':'-2','71':'-2'});
+function parkingDisplayLabel(label){const v=String(label??'').trim();if(v==='15 (Motos)')return '15';return v}
+function parkingFloorFor(space){const display=parkingDisplayLabel(space?.label??'');const byLabel=PARKING_FLOOR_BY_LABEL[display];if(byLabel!=null)return byLabel;const byId=space?.id!=null?PARKING_FLOOR_BY_LABEL[String(space.id).trim()]:null;return byId??null}
+// Listo para agrupar por piso cuando se confirmen todos los datos.
+// Por ahora la UI sigue plana (sin agrupar); esta función queda preparada para el cambio futuro.
+function parkingGroupsByFloor(spaces){const groups=new Map(),unknown=[];for(const s of (spaces||[])){const floor=parkingFloorFor(s);if(floor==null){unknown.push(s);continue}if(!groups.has(floor))groups.set(floor,[]);groups.get(floor).push(s)}return{groups,unknown}};
 
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.installPrompt=e;$('#install-app')?.classList.remove('hidden')});
 $('#install-app').addEventListener('click',async()=>{if(state.installPrompt){await state.installPrompt.prompt();state.installPrompt=null;$('#install-app').classList.add('hidden')}});
@@ -486,7 +497,7 @@ async function renderHome(){
       <span class="home-row-icon">🚗</span>
       <div class="home-row-copy">
         <span class="eyebrow">ESTACIONAMIENTO ACTIVO</span>
-        <strong>Padre Mariano ${escapeHtml(mineParking.building)} · Cupo ${escapeHtml(mineParking.label)}</strong>
+        <strong>Padre Mariano ${escapeHtml(mineParking.building)} · Cupo ${escapeHtml(parkingDisplayLabel(mineParking.label))}</strong>
         <span>${mineParking.checkedInAt?'Llegada marcada':'Reserva activa para hoy'}</span>
       </div>
     </div>
@@ -669,11 +680,11 @@ function showParkingConfirmationPrompt(mine,date){
   $('#parking-confirm-no').onclick=()=>{overlay.remove();vacateParking()};
 }
 
-function parkingSpaceHtml(s,allowed=true){const cls=s.mine?'mine':s.occupied?'occupied':allowed?'available':'restricted';const status=s.mine?'✓ Tu reserva':s.occupied?'Ocupado':allowed?'Libre · toca para reservar':'Libre · restringido';return `<button class="parking-space ${cls}" data-space="${s.id}" aria-label="Estacionamiento ${escapeHtml(s.label)}: ${escapeHtml(status)}" ${(!allowed||s.occupied&&!s.mine)?'disabled':''}><span class="parking-number">${escapeHtml(s.label)}</span><small>${escapeHtml(status)}</small></button>`}
+function parkingSpaceHtml(s,allowed=true){const cls=s.mine?'mine':s.occupied?'occupied':allowed?'available':'restricted';const fullStatus=s.mine?'Tu reserva':s.occupied?'Ocupado':allowed?'Libre · toca para reservar':'Libre · restringido';const shortStatus=s.mine?'Tu reserva':s.occupied?'Ocupado':'Libre';const display=parkingDisplayLabel(s.label);const floor=parkingFloorFor(s);const floorHtml=floor!=null?`<span class="parking-floor">Piso ${floor}</span>`:'';return `<button class="parking-space ${cls}" data-space="${s.id}" aria-label="Estacionamiento ${escapeHtml(display)}: ${escapeHtml(fullStatus)}" ${(!allowed||s.occupied&&!s.mine)?'disabled':''}><span class="parking-number">${escapeHtml(display)}</span>${floorHtml}<small>${escapeHtml(shortStatus)}</small></button>`}
 
 function mineReservationHtml(m,date){
   const todayFlag=date===today(),checked=!!m.checkedInAt;
-  return `<div class="card parking-current"><div><span class="eyebrow">TU RESERVA</span><h3>Padre Mariano ${escapeHtml(m.building)} · ${escapeHtml(m.label)}</h3><p>${humanDate(date)}${checked?` · Llegada marcada ${hm(m.checkedInAt)}`:''}</p></div><div class="parking-current-actions">${todayFlag&&!checked?`<button id="parking-checkin" class="button primary">Ya estacioné</button><span class="hint">Al marcar llegada, recibirás un recordatorio fijo cada 4 horas hasta liberar el cupo.</span>`:''}${checked?`<button id="parking-vacate" class="button primary">Marcar desocupado</button>${'Notification'in window&&Notification.permission!=='granted'?'<button id="enable-parking-notifications" class="button ghost">Activar recordatorios</button>':''}`:`<button id="cancel-reservation" class="button ghost">Cancelar reserva</button>`}</div></div>`;
+  return `<div class="card parking-current"><div><span class="eyebrow">TU RESERVA</span><h3>Padre Mariano ${escapeHtml(m.building)} · ${escapeHtml(parkingDisplayLabel(m.label))}</h3><p>${humanDate(date)}${checked?` · Llegada marcada ${hm(m.checkedInAt)}`:''}</p></div><div class="parking-current-actions">${todayFlag&&!checked?`<button id="parking-checkin" class="button primary">Ya estacioné</button><span class="hint">Al marcar llegada, recibirás un recordatorio fijo cada 4 horas hasta liberar el cupo.</span>`:''}${checked?`<button id="parking-vacate" class="button primary">Marcar desocupado</button>${'Notification'in window&&Notification.permission!=='granted'?'<button id="enable-parking-notifications" class="button ghost">Activar recordatorios</button>':''}`:`<button id="cancel-reservation" class="button ghost">Cancelar reserva</button>`}</div></div>`;
 }
 
 async function reserveParking(spaceId){try{await api('/api/parking/reserve',{method:'POST',body:{date:state.parking.date,spaceId}});toast('Estacionamiento reservado');renderParking(state.parking.date)}catch(e){toast(e.message,true)}}
