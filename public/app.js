@@ -18,7 +18,7 @@ const ADMIN_PLACEHOLDERS={
 // el id interno del cupo (data-space) y la lógica de reserva siguen intactos.
 // PARKING_FLOOR_BY_LABEL guarda pisos físicos confirmados por número visible.
 // Los cupos sin piso confirmado quedan fuera del mapa (floor = null) y no muestran piso.
-const PARKING_FLOOR_BY_LABEL=Object.freeze({'3':'-1','4':'-1','41':'-2','71':'-3','154-A':'-4','154-B':'-4','167':'-4'});
+const PARKING_FLOOR_BY_LABEL=Object.freeze({'3':'-1','4':'-1','41':'-1','71':'-2','154-A':'-4','154-B':'-4','167':'-4'});
 function parkingDisplayLabel(label){const v=String(label??'').trim();if(v==='15 (Motos)')return '15';return v}
 // Normaliza para tolerar variantes de la planilla/DB ("154 A", "154A", "154-A") sin tocar IDs.
 function parkingFloorNorm(v){return String(v??'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'')}
