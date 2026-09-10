@@ -18,9 +18,12 @@ const ADMIN_PLACEHOLDERS={
 // el id interno del cupo (data-space) y la lógica de reserva siguen intactos.
 // PARKING_FLOOR_BY_LABEL guarda pisos físicos confirmados por número visible.
 // Los cupos sin piso confirmado quedan fuera del mapa (floor = null) y no muestran piso.
-const PARKING_FLOOR_BY_LABEL=Object.freeze({'3':'-1','4':'-1','41':'-2','71':'-2'});
+const PARKING_FLOOR_BY_LABEL=Object.freeze({'3':'-1','4':'-1','41':'-2','71':'-3','154-A':'-4','154-B':'-4','167':'-4'});
 function parkingDisplayLabel(label){const v=String(label??'').trim();if(v==='15 (Motos)')return '15';return v}
-function parkingFloorFor(space){const display=parkingDisplayLabel(space?.label??'');const byLabel=PARKING_FLOOR_BY_LABEL[display];if(byLabel!=null)return byLabel;const byId=space?.id!=null?PARKING_FLOOR_BY_LABEL[String(space.id).trim()]:null;return byId??null}
+// Normaliza para tolerar variantes de la planilla/DB ("154 A", "154A", "154-A") sin tocar IDs.
+function parkingFloorNorm(v){return String(v??'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'')}
+const PARKING_FLOOR_BY_NORM=Object.freeze(Object.fromEntries(Object.entries(PARKING_FLOOR_BY_LABEL).map(([k,v])=>[parkingFloorNorm(k),v])));
+function parkingFloorFor(space){const byLabel=PARKING_FLOOR_BY_NORM[parkingFloorNorm(parkingDisplayLabel(space?.label??''))];if(byLabel!=null)return byLabel;const byId=space?.id!=null?PARKING_FLOOR_BY_NORM[parkingFloorNorm(space.id)]:null;return byId??null}
 // Listo para agrupar por piso cuando se confirmen todos los datos.
 // Por ahora la UI sigue plana (sin agrupar); esta función queda preparada para el cambio futuro.
 function parkingGroupsByFloor(spaces){const groups=new Map(),unknown=[];for(const s of (spaces||[])){const floor=parkingFloorFor(s);if(floor==null){unknown.push(s);continue}if(!groups.has(floor))groups.set(floor,[]);groups.get(floor).push(s)}return{groups,unknown}};
