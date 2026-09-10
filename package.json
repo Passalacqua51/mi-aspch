@@ -13,6 +13,7 @@
     "preview:check": "node --no-warnings tools/self_check_preview_safety.mjs",
     "preview:profiles": "node --no-warnings tools/self_check_preview_profiles.mjs",
     "auth-gate:test": "node --no-warnings tools/self_check_auth_gate.mjs",
+    "admin:test": "node --no-warnings tools/self_check_admin_panel.mjs",
     "staticcheck": "node tools/self_check_v0.6.0_static.mjs",
     "corecheck": "node --no-warnings tools/self_check_v0.6.0_core.mjs"
   },

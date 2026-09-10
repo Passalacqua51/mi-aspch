@@ -9,10 +9,7 @@ const SIMPLE_MODE_SECONDARY=[];
 const SIMPLE_MODE_ROUTES=new Set(['home','parking','contact','credential','emergency']);
 const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥','Socios'],['admin-finance','💳','Finanzas'],['admin-reservations','🗓️','Reservas'],['admin-content','📰','Contenido'],['admin-votes','🗳️','Votaciones'],['admin-notifications','🔔','Notificaciones'],['admin-integrations','🔗','Integraciones'],['admin-security','🛡️','Seguridad'],['admin-audit','🧾','Auditoría'],['admin-system','⚙️','Sistema'],['developer','🛠️','Developer']];
 const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
-const ADMIN_PLACEHOLDERS={
-  'admin-finance':['💳','Finanzas','La gestión financiera dedicada se incorporará en una próxima etapa.'],
-  'admin-content':['📰','Contenido','La gestión de contenido se separará en una próxima etapa.']
-};
+const ADMIN_PLACEHOLDERS={};
 // Presentación de estacionamientos: solo visual, sin tocar reglas de reserva/disponibilidad.
 // parkingDisplayLabel() cambia únicamente el texto visible (ej. "15 (Motos)" -> "15");
 // el id interno del cupo (data-space) y la lógica de reserva siguen intactos.
@@ -309,7 +306,7 @@ async function go(view){
   state.view=view;renderNav();
   const titles={home:'Inicio',emergency:'Emergencia / IFALPA',booking:'Reservas',reservations:'Mi agenda',credential:'Credencial digital',security:'Seguridad',membership:'Mensualidad',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Contacto y asesorías',contact:'Contacto',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
   $('#page-title').textContent=view==='parking'?'':(titles[view]||'Mi ASPCH');const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
-  const routes={home:()=>renderHome(),emergency:()=>renderEmergency(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-reservations':()=>renderAdminReservations(),'admin-votes':()=>renderAdminVotes(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
+  const routes={home:()=>renderHome(),emergency:()=>renderEmergency(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-finance':()=>renderAdminFinance(),'admin-content':()=>renderAdminContent(),'admin-reservations':()=>renderAdminReservations(),'admin-votes':()=>renderAdminVotes(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
   try{if(!routes[view])return go('home');await routes[view]()}catch(err){console.error(`[Mi ASPCH] No se pudo renderizar ${view}:`,err);if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message||'No fue posible cargar esta sección.')}</div>`}
 }
 
@@ -1013,7 +1010,7 @@ async function renderAdminDashboard(){
   if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/dashboard'),m=d.metrics||{},finance=d.finance||{},caps=d.integrations?.google||{},links=ADMIN_NAV.filter(([id])=>id!=='admin-dashboard');
   $('#view').innerHTML=`<section class="admin-dashboard-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA</span><h2>Estado general de Mi ASPCH</h2><p>Resumen maestro de lectura con la información operativa existente.</p></div><div class="admin-health"><span class="badge ${d.health?.ok?'green':'amber'}"><i class="dot"></i>${d.health?.ok?'Operativo':'Con alertas'}</span><strong>v${escapeHtml(d.health?.version||state.config?.version||'0.6.16')}</strong><small>${d.generatedAt?formatLocalDateTime(d.generatedAt):'Ahora'}</small></div></section><div class="admin-summary-grid">${adminSummaryCard('👥','Socios activos',m.members?.active||0,`${m.members?.total||0} registrados`)}${adminSummaryCard('💳','Estados financieros',Object.values(finance.counts||{}).reduce((a,b)=>a+Number(b||0),0),'registros disponibles')}${adminSummaryCard('🚗','Estacionamientos',m.parking?.active||0,`${m.parking?.today||0} para hoy`)}${adminSummaryCard('📖','Sala de estudios',m.study?.active||0,'reservas activas')}</div><section class="section grid two"><div class="card"><span class="eyebrow">INTEGRACIONES</span><h3>Capacidades configuradas</h3><div class="capability-grid">${cap('Sheets READ',caps.sheets?.read)}${cap('Sheets WRITE',caps.sheets?.write)}${cap('Calendar READ',caps.calendar?.read)}${cap('Calendar WRITE',caps.calendar?.write)}${cap('Gmail OTP',caps.gmail?.otp)}${cap('Web Push',d.integrations?.push?.enabled)}</div></div><div class="card"><span class="eyebrow">AUDITORÍA</span><h3>Últimos eventos</h3><div class="admin-event-list">${(d.audit||[]).map(adminDashboardEvent).join('')||'<div class="empty compact-empty">Sin eventos registrados.</div>'}</div></div></section><section class="section card"><span class="eyebrow">SECCIONES</span><h3>Control Informática</h3><div class="admin-dashboard-links">${links.map(([id,icon,label])=>`<a class="card admin-dashboard-link" role="link" tabindex="0" data-admin-go="${id}"><span>${icon}</span><div><strong>${escapeHtml(label)}</strong><small>Abrir sección</small></div><b>→</b></a>`).join('')}</div></section>`;
-  $$('[data-admin-go]').forEach(button=>button.onclick=()=>go(button.dataset.adminGo));
+  $$('[data-admin-go]').forEach(button=>{button.onclick=()=>go(button.dataset.adminGo);button.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go(button.dataset.adminGo)}}});
 }
 function adminSummaryCard(icon,label,value,detail){return `<div class="card admin-summary-card"><span>${icon}</span><div><small>${escapeHtml(label)}</small><strong>${Number(value||0)}</strong><p>${escapeHtml(detail)}</p></div></div>`}
 function adminDashboardEvent(e){return `<div class="admin-dashboard-event"><div><strong>${escapeHtml(e.action||'Evento')}</strong><span>${escapeHtml(e.actorName||'Sistema')}${e.entityType?` · ${escapeHtml(e.entityType)}`:''}</span></div><time>${e.createdAt?formatLocalDateTime(e.createdAt):'—'}</time></div>`}
@@ -1749,9 +1746,69 @@ function adminMasterBackup(b){
 function adminMasterError(row){
   return `<div class="admin-error-row"><div><strong>${escapeHtml(row.source||'ERROR')}</strong><p>${escapeHtml(row.detail||'Sin detalle disponible.')}</p></div><time>${row.createdAt?formatLocalDateTime(row.createdAt):'Sin fecha'}</time></div>`;
 }
+async function renderAdminFinance(){
+  if(state.member?.role!=='ADMIN')return go('home');
+  let d;
+  try{d=await api('/api/admin/finance')}catch(err){
+    $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · FINANZAS</span><h2>Fuente financiera (solo lectura)</h2><p>Error al consultar la fuente real.</p></div><span class="badge red">ERROR</span></section><div class="admin-alert red" style="margin-top:14px;"><span>⚠</span><div><strong>Sin conexión</strong><p>${escapeHtml(err.message||'No se pudo conectar.')}</p></div></div><div class="toolbar" style="margin-top:14px;"><button class="button primary" id="admin-finance-retry" type="button">Reintentar</button></div>`;
+    $('#admin-finance-retry')?.addEventListener('click',()=>renderAdminFinance());
+    return;
+  }
+  const src=d.source||{},ready=!!src.ready,counts=src.counts||{},debtors=d.debtors||[];
+  const tone=!ready?'red':src.status==='OK'?'green':'amber';
+  const statusLabel=!ready?'NO CONFIGURADA':src.status==='OK'?'OPERATIVA':'REVISAR';
+  $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · FINANZAS</span><h2>Fuente financiera (solo lectura)</h2><p>XLSM habilitado únicamente para lectura diagnóstica. No carga archivos, no persiste estados, no cambia membresías ni cuotas.</p></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;"><span class="badge ${tone}"><i class="dot"></i>${statusLabel}</span><button class="button secondary" id="admin-finance-reread" type="button">Releer XLSM en diagnóstico</button></div></section>
+  ${!ready?`<div class="admin-alert red" style="margin-top:14px;"><span>⚠</span><div><strong>Fuente financiera no configurada</strong><p>${escapeHtml(src.error||'Archivo XLSM no encontrado en el servidor.')} Esperado: ${escapeHtml(src.fileName||'BASE DE DATOS.xlsm')}. Sin esta fuente no hay deuda ni totales para mostrar; el resto del panel sigue operativo.</p></div></div>`:''}
+  <div class="admin-summary-grid">
+    ${adminSummaryCard('📄','Filas válidas',src.validRows||0,`${src.rows||0} filas leídas`)}
+    ${adminSummaryCard('🚩','Socios con deuda',d.debtorsTotal||0,'meses o monto mayor a 0')}
+    ${adminSummaryCard('⚠','Errores de fórmula',src.formulaErrors||0,'en fuente XLSM')}
+    ${adminSummaryCard('🕒','Última lectura',src.lastReadAt?'OK':'—',src.lastReadAt?formatLocalDateTime(src.lastReadAt):'Sin lectura')}
+  </div>
+  <section class="section admin-master-grid">
+    <div class="card"><span class="eyebrow">FUENTE XLSM</span><h3>Estado y diagnóstico</h3><div class="admin-member-detail-fields">${field('Archivo',src.fileName||'No disponible')}${field('Hoja',src.sheet||'No disponible')}${field('Estado',src.status||'No disponible')}${field('Modificado',src.sourceModifiedAt?formatLocalDateTime(src.sourceModifiedAt):'No disponible')}${field('Última sincronización',d.lastSync?formatLocalDateTime(d.lastSync):'No disponible')}</div><p class="hint">Distribución local por estado:</p><div class="finance-counts">${Object.entries(counts).map(([k,v])=>`<span><strong>${v}</strong>${escapeHtml(k)} local</span>`).join('')||'<span class="hint">Sin datos.</span>'}</div></div>
+    <div class="card"><span class="eyebrow">DEUDA</span><h3>Socios con deuda (máx. 200)</h3><div class="admin-operation-list">${debtors.map(x=>`<div class="admin-operation-row"><span class="admin-operation-icon">💳</span><div><strong>${escapeHtml(x.name||'Socio')}</strong><p>${x.monthsDue} mes(es) · ${formatClpClient(x.amountDue)}</p><small>${x.sourceYear?`Fuente ${escapeHtml(String(x.sourceYear))} · `:''}${x.syncedAt?`Sincronizado ${formatLocalDateTime(x.syncedAt)}`:'Sin sincronización'}</small></div>${adminMemberStateBadge(x.financialStatus)}</div>`).join('')||'<div class="empty compact-empty">Sin deudores registrados en la fuente local.</div>'}</div></div>
+  </section>`;
+  $('#admin-finance-reread')?.addEventListener('click',async e=>{
+    e.currentTarget.disabled=true;
+    try{const r=await api('/api/admin/sync-financial',{method:'POST',body:{}});toast(r.result?.sourceReady?'XLSM releído en modo diagnóstico.':(r.result?.error||'Fuente XLSM no disponible.'),!r.result?.sourceReady);renderAdminFinance()}catch(err){toast(err.message,true);e.currentTarget.disabled=false}
+  });
+}
+async function renderAdminContent(){
+  if(state.member?.role!=='ADMIN')return go('home');
+  let o;
+  try{o=await api('/api/admin/overview')}catch(err){
+    $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · CONTENIDO</span><h2>Contenido administrable</h2><p>Error al consultar el contenido real.</p></div><span class="badge red">ERROR</span></section><div class="toolbar" style="margin-top:14px;"><button class="button primary" id="admin-content-retry" type="button">Reintentar</button></div>`;
+    $('#admin-content-retry')?.addEventListener('click',()=>renderAdminContent());
+    return;
+  }
+  const news=o.news||[],activities=o.activities||[],agreements=o.agreements||[],library=o.library||[];
+  $('#view').innerHTML=`<section class="admin-module-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA · CONTENIDO</span><h2>Contenido administrable</h2><p>Noticias, actividades, convenios y biblioteca con persistencia real en SQLite. Todo cambio queda auditado cuando el endpoint lo registra.</p></div><span class="badge blue">${news.length+activities.length+agreements.length+library.length} ítems</span></section>
+  <section class="section admin-master-grid">
+    <div class="card"><div class="admin-section-title"><div><span class="eyebrow">NOTICIAS</span><h3>Publicar (${news.length})</h3></div></div><form id="news-form" class="admin-form"><input id="news-title" placeholder="Título" required><textarea id="news-body" placeholder="Contenido" required></textarea><label><input id="news-pinned" type="checkbox"> Destacar</label><button class="button primary">Publicar</button></form><div class="dev-list" style="margin-top:12px;">${news.map(n=>`<div><div><strong>${escapeHtml(n.title)}</strong><span>${formatLocalDateTime(n.published_at)}${n.pinned?' · Destacada':''}</span></div><button class="button ghost admin-news-delete" data-id="${n.id}">Eliminar</button></div>`).join('')||'<div class="empty">Sin noticias.</div>'}</div></div>
+    <div class="card"><div class="admin-section-title"><div><span class="eyebrow">ACTIVIDADES</span><h3>Cursos y charlas (${activities.length})</h3></div></div><form id="activity-form" class="admin-form"><select id="activity-type"><option value="COURSE">Curso</option><option value="TALK">Charla</option><option value="EVENT">Actividad</option></select><input id="activity-title" placeholder="Título" required><textarea id="activity-desc" placeholder="Descripción"></textarea><label>Inicio<input id="activity-start" type="datetime-local"></label><label>Término<input id="activity-end" type="datetime-local"></label><input id="activity-url" type="url" placeholder="https://forms.gle/..." required><button class="button primary">Publicar</button></form><div class="dev-list" style="margin-top:12px;">${activities.map(activityAdminRow).join('')||'<div class="empty">Sin actividades.</div>'}</div></div>
+    <div class="card"><div class="admin-section-title"><div><span class="eyebrow">CONVENIOS</span><h3>Administrar (${agreements.length})</h3></div></div><form id="agreement-form" class="admin-form"><input id="agreement-id" type="hidden"><input id="agreement-title" placeholder="Nombre convenio" required><textarea id="agreement-desc" placeholder="Descripción"></textarea><textarea id="agreement-benefit" placeholder="Beneficio"></textarea><input id="agreement-url" type="url" placeholder="https://..." required><input id="agreement-logo" type="url" placeholder="Logo URL (opcional)"><input id="agreement-valid" type="date"><button class="button primary">Guardar convenio</button></form><div class="dev-list" style="margin-top:12px;">${agreements.map(agreementAdminRow).join('')||'<div class="empty">Sin convenios.</div>'}</div></div>
+    <div class="card"><div class="admin-section-title"><div><span class="eyebrow">BIBLIOTECA</span><h3>Documentos (${library.length})</h3></div></div><form id="library-admin-form" class="admin-form"><input id="library-admin-id" type="hidden"><input id="library-admin-category" placeholder="Categoría" value="General" required><input id="library-admin-title" placeholder="Título" required><textarea id="library-admin-desc" placeholder="Descripción"></textarea><input id="library-admin-url" type="url" placeholder="https://..." required><input id="library-admin-source" placeholder="Fuente"><button class="button primary">Guardar documento</button></form><div class="dev-list" style="margin-top:12px;">${library.map(libraryAdminRow).join('')||'<div class="empty">Sin documentos.</div>'}</div></div>
+  </section>`;
+  $('#news-form').onsubmit=adminContentNewsCreate;$$('.admin-news-delete').forEach(b=>b.onclick=()=>adminContentNewsDelete(Number(b.dataset.id)));
+  $('#activity-form').onsubmit=adminContentActivityCreate;$$('.activity-status').forEach(b=>b.onclick=()=>adminContentActivityStatus(Number(b.dataset.id),b.dataset.status));$$('.activity-edit').forEach(b=>b.onclick=()=>adminContentActivityEdit(Number(b.dataset.id),activities));
+  $('#agreement-form').onsubmit=adminContentAgreementSave;$$('.agreement-edit').forEach(b=>b.onclick=()=>fillAgreementForm(Number(b.dataset.id),agreements));$$('.agreement-status').forEach(b=>b.onclick=()=>adminContentAgreementStatus(Number(b.dataset.id),b.dataset.status));
+  $('#library-admin-form').onsubmit=adminContentLibrarySave;$$('.library-admin-edit').forEach(b=>b.onclick=()=>fillLibraryAdminForm(Number(b.dataset.id),library));$$('.library-admin-status').forEach(b=>b.onclick=()=>adminContentLibraryStatus(Number(b.dataset.id),b.dataset.status));
+}
+async function adminContentNewsCreate(e){e.preventDefault();try{await api('/api/admin/news',{method:'POST',body:{title:$('#news-title').value,body:$('#news-body').value,pinned:$('#news-pinned').checked}});toast('Noticia publicada.');renderAdminContent()}catch(err){toast(err.message,true)}}
+async function adminContentNewsDelete(id){if(!confirm('¿Eliminar esta noticia?'))return;try{await api('/api/admin/news/delete',{method:'POST',body:{id}});toast('Noticia eliminada.');renderAdminContent()}catch(e){toast(e.message,true)}}
+async function adminContentActivityCreate(e){e.preventDefault();try{await api('/api/admin/activities',{method:'POST',body:{type:$('#activity-type').value,title:$('#activity-title').value,description:$('#activity-desc').value,startsAt:localInputToIso($('#activity-start').value),endsAt:localInputToIso($('#activity-end')?.value),externalUrl:$('#activity-url').value}});toast('Actividad publicada.');renderAdminContent()}catch(err){toast(err.message,true)}}
+async function adminContentActivityStatus(id,status){try{await api('/api/admin/activities/status',{method:'POST',body:{id,status}});toast('Actividad actualizada.');renderAdminContent()}catch(e){toast(e.message,true)}}
+async function adminContentActivityEdit(id,rows){const a=rows.find(x=>Number(x.id)===id);if(!a)return;const title=prompt('Título:',a.title||'');if(title===null)return;const description=prompt('Descripción:',a.description||'');if(description===null)return;const externalUrl=prompt('URL Forms / inscripción:',a.external_url||'');if(externalUrl===null)return;try{await api('/api/admin/activities/update',{method:'POST',body:{id,title,description,externalUrl,type:a.type,startsAt:a.starts_at,endsAt:a.ends_at}});toast('Actividad editada.');renderAdminContent()}catch(e){toast(e.message,true)}}
+async function adminContentAgreementSave(e){e.preventDefault();try{await api('/api/admin/agreements',{method:'POST',body:{id:Number($('#agreement-id').value)||null,title:$('#agreement-title').value,description:$('#agreement-desc').value,benefit:$('#agreement-benefit').value,url:$('#agreement-url').value,logoUrl:$('#agreement-logo').value||null,validUntil:$('#agreement-valid').value||null,status:'ACTIVE'}});toast('Convenio guardado.');renderAdminContent()}catch(err){toast(err.message,true)}}
+async function adminContentAgreementStatus(id,status){try{await api('/api/admin/agreements/status',{method:'POST',body:{id,status}});toast('Convenio actualizado.');renderAdminContent()}catch(e){toast(e.message,true)}}
+async function adminContentLibrarySave(e){e.preventDefault();try{await api('/api/admin/library',{method:'POST',body:{id:Number($('#library-admin-id').value)||null,category:$('#library-admin-category').value,title:$('#library-admin-title').value,description:$('#library-admin-desc').value,url:$('#library-admin-url').value,source:$('#library-admin-source').value,status:'ACTIVE'}});toast('Documento guardado.');renderAdminContent()}catch(err){toast(err.message,true)}}
+async function adminContentLibraryStatus(id,status){try{await api('/api/admin/library/status',{method:'POST',body:{id,status}});toast('Biblioteca actualizada.');renderAdminContent()}catch(e){toast(e.message,true)}}
 function renderAdminPlaceholder(id){
   if(state.member?.role!=='ADMIN')return go('home');
-  const [icon,title,description]=ADMIN_PLACEHOLDERS[id];
+  const entry=ADMIN_PLACEHOLDERS[id];
+  if(!entry)return go('admin-dashboard');
+  const [icon,title,description]=entry;
   $('#view').innerHTML=`<div class="card admin-placeholder"><span>${icon}</span><span class="eyebrow">ESTRUCTURA ADMIN</span><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p><strong>Pendiente · sin funciones ni datos adicionales</strong></div>`;
 }
 async function renderAdmin(){return renderDeveloper()}
@@ -1761,7 +1818,6 @@ async function renderDeveloper(){
   const pending=(o.marketplace||[]).filter(x=>x.status==='PENDING');
   const reports=(o.marketplaceReports||[]).filter(x=>x.status==='OPEN');
   const modules=o.modules||{};
-  state.instagramSync=o.instagram||{};
   const metrics=[
     ['Socios activos',m.members?.active||0,'👥'],['Morosos',m.members?.moroso||0,'💳'],['Directorio',m.members?.board||0,'⭐'],['Estac. activas',m.parking?.active||0,'🚗'],
     ['Sala activa',m.study?.active||0,'📖'],['Mercado pendiente',m.marketplace?.pending||0,'🛒'],['Reportes abiertos',m.marketplace?.reports||0,'🚩'],
@@ -1772,16 +1828,8 @@ async function renderDeveloper(){
   <div class="dev-metric-grid">${metrics.map(x=>`<div class="card dev-metric"><span>${x[2]}</span><strong>${x[1]}</strong><small>${x[0]}</small></div>`).join('')}</div>
 
   
-  <details class="dev-section card" open><summary>📸 Noticias e Instagram</summary><div class="dev-section-body">
-    <div class="admin-status-grid">
-      <div>
-        <span class="eyebrow">INSTAGRAM SYNC</span>
-        <h3 id="ig-status">Estado: ${escapeHtml(state.instagramSync?.status || 'No sincronizado')}</h3>
-        <p class="hint">Última sincr: ${escapeHtml(state.instagramSync?.lastSync || '—')}</p>
-        <p class="hint">Publicaciones encontradas: ${escapeHtml(state.instagramSync?.count || '0')}</p>
-        <button class="button primary" style="margin-top:0.5rem;" onclick="adminSyncInstagram()">Sincronizar ahora</button>
-      </div>
-    </div>
+  <details class="dev-section card"><summary>📸 Instagram</summary><div class="dev-section-body">
+    <div class="admin-alert amber"><span>⚠</span><div><strong>No configurado</strong><p>No existe integración con Instagram en Mi ASPCH: sin credenciales, sin endpoint de sincronización y sin consumo en Noticias. Esta tarjeta es solo informativa.</p></div></div>
   </div></details>
 
   <details class="dev-section card"><summary>⚙️ Sistema, Google y mantenimiento</summary><div class="dev-section-body">
@@ -2086,15 +2134,3 @@ function firstLast(n=''){const a=n.trim().split(/\s+/).filter(Boolean);return ti
 function titleName(n=''){return n.toLowerCase().replace(/(^|\s|[-'])\p{L}/gu,m=>m.toUpperCase())}
 function titleWord(n=''){return n?n[0].toUpperCase()+n.slice(1).toLowerCase():''}
 function escapeHtml(s=''){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-
-
-async function adminSyncInstagram(){
-  try {
-    const r = await api('/api/admin/sync-instagram', {method: 'POST', body: {}});
-    if (r.error) throw new Error(r.error);
-    toast('Sincronización finalizada. Nuevos: ' + r.synced);
-    renderAdmin(); // re-render to update status
-  } catch(e) {
-    toast('Error: ' + e.message, true);
-  }
-}

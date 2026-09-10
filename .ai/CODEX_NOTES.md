@@ -630,3 +630,16 @@ quedando `VACATED`+`vacated_at` y auditoría `ADMIN_PARKING_RELEASED`. Se aline�
 de Google). `npm run check` OK. Bloqueo de validación local: el self-check
 completo exige Node 22 (assert) y el equipo local tiene Node 26; la rama live
 de Google Sheets no es ejercitable sin credenciales reales.
+
+## Panel Informática completo — 2026-09-10
+
+Matriz auditada: Dashboard/Reservas/Socios/Votos/Notificaciones/Integraciones/
+Seguridad/Auditoría/Sistema ✅; Developer ⚠️ por botón muerto Instagram Sync
+(`POST /api/admin/sync-instagram` inexistente) → tarjeta honesta "No
+configurado", función/estado huérfanos eliminados. Finanzas 🟡→✅ con
+`GET /api/admin/finance` read-only (diagnóstico XLSM + deudores de
+`member_financial_status`, máx 200). Contenido 🟡→✅ con CRUD real sobre
+endpoints existentes. Nuevo `tools/self_check_admin_panel.mjs`: 12 secciones,
+59 llamadas API cubiertas, guard 403 verificado. `self_check_auth` sigue
+bloqueado en local por Node 26 vs assert v22 (ambiental, prod usa 22).
+Reporte: `PANEL_INFORMATICA_AUDIT.md`. Sin cambios a auth/sesiones/PIN/WebAuthn.
