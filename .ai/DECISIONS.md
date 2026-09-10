@@ -1,5 +1,60 @@
 # Registro de decisiones
 
+## 2026-09-09 — OLED Dark exclusivo del Panel Informática
+
+### Decisión
+
+El tema OLED negro se aplica solo al Panel Informática mediante la clase
+`informatica-panel` en el `<html>` de `admin.html` (documento servido
+exclusivamente para `/informatica`, `/informatica/`, `/admin` y `/admin.html`),
+con variables y overrides CSS scoped en `styles.css` — la app normal conserva su
+tema estándar. En iOS, el lienzo del WKWebView persistente queda negro cuando el
+pathname es del panel y `systemBackground` en el resto (`underPageBackgroundColor`),
+sin crear otra WKWebView ni alterar sesión/auth. Paleta: bg `#000000`, surface
+`#050505`/`#080808`, line `#1a1a1a`, text `#f5f5f5`, muted `#9ca3af`; azul ASPCH
+para primarios/activos/links/selección, rojo solo errores/alertas/destructivas y
+verde solo OK/online/éxito.
+
+### Estado
+
+Activa en código fuente; sin commit ni push. `git diff --check` exit 0 y BUILD
+DEBUG iOS Simulator SUCCEEDED.
+
+## 2026-09-09 — Operación principal del Panel Informática
+
+### Decisión
+
+La navegación principal ADMIN prioriza Estacionamientos/Reservas, Socios,
+Votaciones y Auditoría; Dashboard, Sistema y herramientas complementarias
+quedan en Más. El bloqueo de usuario es un estado local independiente de la
+membresía autoritativa: no altera XLSM ni `members.active`, invalida sesiones,
+excluye ADMIN como objetivo y registra bloqueo/reactivación en Auditoría.
+
+### Estado
+
+Activa en código fuente; sin despliegue.
+
+## 2026-09-09 — Navegación simple y capacidad Push iOS
+
+### Decisión
+
+Modo Simple usa Inicio, Estacionamiento, Reservas y Perfil como navegación
+principal. Las rutas no admitidas vuelven a Inicio y nunca se transforman en
+Credencial. Credencial permanece en Inicio. El menú Más excluye acciones de
+cuenta y agrupa Biblioteca, Convenios y Mercado ASPCH como Beneficios ASPCH.
+
+Push Notifications no queda enlazado mientras se firme con un equipo personal:
+Apple no permite crear un perfil con `aps-environment` en esa modalidad y la app
+dejaría de instalar desde Xcode. Las notificaciones locales DEBUG permanecen
+disponibles. Push remoto exige equipo Apple Developer de pago, perfil APNs,
+credenciales y backend. Las capacidades del Panel Informática continúan
+autorizándose por rol ADMIN en el servidor, no mediante un correo hardcodeado ni
+controles solo visuales.
+
+### Estado
+
+Activa en código fuente; sin despliegue ni backend APNs nuevo.
+
 ## 2026-09-03 — Preview: Push administrativo acotado y assets verificados
 
 ### Decisión

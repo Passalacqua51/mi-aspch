@@ -60,7 +60,12 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .background {
+            (colorScheme == .dark
+                ? Color(red: 0.020, green: 0.043, blue: 0.094)
+                : Color(red: 0.965, green: 0.973, blue: 0.984))
+                .ignoresSafeArea()
+        }
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-debugResetSession") {

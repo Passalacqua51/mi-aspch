@@ -10,7 +10,7 @@ import { googleEnabled, googleCapabilities, sheetsReadEnabled, sheetsWriteEnable
 import { webauthnRequestInfo, webauthnSummary, registrationOptions, finishRegistration, authenticationOptions, finishAuthentication, removeAllPasskeys } from './lib/webauthn.mjs';
 import { initV050, financialSummary, benefitAccess, latestFinancialSync, studyRoomAvailability, reserveStudyRoom, cancelStudyRoom, createMarketplaceListing, publicMarketplace, marketplaceImage, marketplaceOwnerAction, marketplaceOwnerEdit, moderateMarketplace, expireMarketplace, listActivities, adminActivities, createActivity, setActivityStatus, dueNotificationText } from './lib/v050.mjs';
 import { pushEnabled, vapidPublicKey, upsertPushSubscription, removePushSubscription, sendMemberPush } from './lib/push.mjs';
-import { initV060, audit, auditRows, moduleStates, moduleEnabled, setModuleState, memberUiPreferences, setMemberUiPreferences, addStudyWaitlist, cancelStudyWaitlist, memberStudyWaitlist, matchingStudyWaitlist, markStudyWaitlistNotified, reportMarketplace, marketplaceReports, resolveMarketplaceReport, agreements, upsertAgreement, setAgreementStatus, libraryItems, toggleLibraryFavorite, upsertLibraryItem, activityCenter, setActivityRegistration, credentialStatus, setCredentialRevoked, memberHistory, systemMetrics, adminMasterSnapshot, adminReservationsSnapshot, adminNotificationsSnapshot, adminSecuritySnapshot, adminAuditSnapshot, dbStats, createBackup, backupRuns, invalidateOtherSessions, invalidateMemberSessions, adminMemberSearch, adminMembersList, adminMemberDetail, diagnostics, toIcs, createVote, updateVoteDraft, deleteVoteDraft, setVoteStatus, voteResults, voteParticipants, adminVotes, memberVotes, castVote } from './lib/v060.mjs';
+import { initV060, audit, auditRows, moduleStates, moduleEnabled, setModuleState, memberUiPreferences, setMemberUiPreferences, addStudyWaitlist, cancelStudyWaitlist, memberStudyWaitlist, matchingStudyWaitlist, markStudyWaitlistNotified, reportMarketplace, marketplaceReports, resolveMarketplaceReport, agreements, upsertAgreement, setAgreementStatus, libraryItems, toggleLibraryFavorite, upsertLibraryItem, activityCenter, setActivityRegistration, credentialStatus, setCredentialRevoked, memberHistory, systemMetrics, adminMasterSnapshot, adminReservationsSnapshot, adminNotificationsSnapshot, adminSecuritySnapshot, adminAuditSnapshot, dbStats, createBackup, backupRuns, invalidateOtherSessions, invalidateMemberSessions, memberAccessBlock, setMemberAccessBlocked, adminMemberSearch, adminMembersList, adminMemberDetail, diagnostics, toIcs, createVote, updateVoteDraft, deleteVoteDraft, setVoteStatus, voteResults, voteParticipants, adminVotes, memberVotes, castVote } from './lib/v060.mjs';
 import { inspectRut, readFinancialWorkbook } from './lib/financial-reader.mjs';
 import { buildFinancialSyncPlan } from './lib/financial-sync.mjs';
 
@@ -813,17 +813,23 @@ async function routeApi(req, res, url) {
       const liveParking=await getAdminLiveParking(today);
       return json(res,200,adminReservationsSnapshot(db,{today,liveParking}));
     }
+    if(req.method==='POST'&&p==='/api/admin/parking/release'){
+      const body=await readJson(req),date=validDate(body.date),spaceId=String(body.spaceId||'').trim();
+      if(String(body.confirm||'')!=='LIBERAR RESERVA')return json(res,400,{error:'Confirmación requerida: LIBERAR RESERVA'});
+      if(!date||!spaceId)return json(res,400,{error:'Fecha y estacionamiento son obligatorios.'});
+      return json(res,200,await releaseParkingAsAdmin({date,spaceId,actor:member}));
+    }
     if(req.method==='GET'&&p==='/api/admin/integrations')return json(res,200,await adminIntegrationsSnapshot());
     if(req.method==='GET'&&p==='/api/admin/system')return json(res,200,adminSystemSnapshot());
     if(req.method==='GET'&&p==='/api/admin/notifications')return json(res,200,adminNotificationsSnapshot(db,{pushReady:pushEnabled(),gmailOtpReady:gmailOtpSendEnabled()}));
     if(req.method==='GET'&&p==='/api/admin/security')return json(res,200,adminSecuritySnapshot(db,{adminEmail:config.adminEmail,gmailOtpReady:gmailOtpSendEnabled()}));
     if(req.method==='GET'&&p==='/api/admin/audit')return json(res,200,adminAuditSnapshot(db,{from:url.searchParams.get('from')||'',to:url.searchParams.get('to')||'',action:url.searchParams.get('action')||'',memberId:url.searchParams.get('memberId'),category:url.searchParams.get('category')||'',limit:url.searchParams.get('limit')}));
     if(req.method==='GET'&&p==='/api/admin/members/list')return json(res,200,{generatedAt:new Date().toISOString(),...adminMembersList(db,{query:url.searchParams.get('q')||'',page:url.searchParams.get('page'),limit:url.searchParams.get('limit')})});
-    const memberActionMatch=p.match(/^\/api\/admin\/members\/(\d+)\/actions\/(refresh|release-parking|cancel-study|close-sessions|revoke-passkeys|issue-otp|reset-pin|set-pin)$/);
+    const memberActionMatch=p.match(/^\/api\/admin\/members\/(\d+)\/actions\/(refresh|release-parking|cancel-study|close-sessions|revoke-passkeys|issue-otp|reset-pin|set-pin|block-user|unblock-user)$/);
     if(req.method==='POST'&&memberActionMatch){
       const targetId=Number(memberActionMatch[1]),action=memberActionMatch[2],target=db.prepare("SELECT * FROM members WHERE id=? AND role!='ADMIN'").get(targetId);
       if(!target)return json(res,404,{error:'Socio no encontrado.'});
-      const body=await readJson(req),confirmations={'release-parking':'LIBERAR RESERVA','cancel-study':'CANCELAR RESERVA','close-sessions':'CERRAR SESIONES','revoke-passkeys':'REVOCAR PASSKEYS','issue-otp':'GENERAR OTP'};
+      const body=await readJson(req),confirmations={'release-parking':'LIBERAR RESERVA','cancel-study':'CANCELAR RESERVA','close-sessions':'CERRAR SESIONES','revoke-passkeys':'REVOCAR PASSKEYS','issue-otp':'GENERAR OTP','block-user':'BLOQUEAR USUARIO','unblock-user':'REACTIVAR USUARIO'};
       if(confirmations[action]&&String(body.confirm||'')!==confirmations[action])return json(res,400,{error:`Confirmación requerida: ${confirmations[action]}`});
       let result={ok:true};
       if(action==='refresh'){
@@ -834,8 +840,7 @@ async function routeApi(req, res, url) {
       if(action==='release-parking'){
         const id=Number(body.reservationId),prior=db.prepare("SELECT id,reservation_date,space_id FROM parking_reservations WHERE id=? AND member_id=? AND status='ACTIVE'").get(id,targetId);
         if(!prior)return json(res,404,{error:'Reserva de estacionamiento activa no encontrada.'});
-        const changed=db.prepare("UPDATE parking_reservations SET status='CANCELLED',cancelled_at=? WHERE id=? AND member_id=? AND status='ACTIVE'").run(new Date().toISOString(),id,targetId);result={ok:true,changed:Number(changed.changes||0)};
-        audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PARKING_RELEASED',entityType:'parking',entityId:id,details:{date:prior.reservation_date,spaceId:prior.space_id,externalWrites:false}});
+        result=await releaseParkingAsAdmin({date:prior.reservation_date,spaceId:prior.space_id,actor:member,targetMember:target});
       }else if(action==='cancel-study'){
         const id=Number(body.reservationId),prior=db.prepare("SELECT id,start_at,end_at FROM study_room_reservations WHERE id=? AND member_id=? AND status='ACTIVE'").get(id,targetId);
         if(!prior)return json(res,404,{error:'Reserva de sala activa no encontrada.'});
@@ -857,6 +862,10 @@ async function routeApi(req, res, url) {
         const salt=crypto.randomBytes(16).toString('base64url'),hash=crypto.scryptSync(pin,salt,32).toString('base64url'),stamp=new Date().toISOString();
         db.exec('BEGIN IMMEDIATE');let sessionsRemoved=0;try{db.prepare('UPDATE members SET pin_salt=?,pin_hash=?,pin_updated_at=?,updated_at=? WHERE id=?').run(salt,hash,stamp,stamp,targetId);sessionsRemoved=Number(db.prepare('DELETE FROM sessions WHERE member_id=?').run(targetId).changes||0);db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
         audit(db,{actorId:member.id,subjectId:targetId,action:'ADMIN_PIN_CHANGED',entityType:'security',entityId:targetId,details:{sessionsRemoved,secretsExposed:false}});result={ok:true,sessionsRemoved};
+      }else if(action==='block-user'){
+        const block=setMemberAccessBlocked(db,{memberId:targetId,blocked:true,reason:body.reason,actorId:member.id}),sessionsRemoved=invalidateMemberSessions(db,{memberId:targetId,actorId:member.id});result={ok:true,block,sessionsRemoved};
+      }else if(action==='unblock-user'){
+        result={ok:true,block:setMemberAccessBlocked(db,{memberId:targetId,blocked:false,actorId:member.id})};
       }
       return json(res,200,result);
     }
@@ -1296,7 +1305,9 @@ function isPreviewSyntheticMember(member) {
 }
 
 function requestMember(req) {
-  return memberFromRequest(db, req, { allowInactive:member => isPreviewSyntheticMember(member) });
+  const member=memberFromRequest(db, req, { allowInactive:member => isPreviewSyntheticMember(member) });
+  if(member&&member.role!=='ADMIN'&&memberAccessBlock(db,member.id).blocked)return null;
+  return member;
 }
 
 function previewProfile(value) {
@@ -1656,6 +1667,38 @@ async function clearVisibleParkingIfOwned(spot, member) {
   const currentMember=memberFromParkingIdentity({name:current[0],validation:current[1]});
   if (currentMember && currentMember.id !== member.id) return;
   await sheetsUpdate(config.parkingSheetId, parkingTabRange(config.parkingTab, `D${target.rowNumber}:E${target.rowNumber}`), [['','']]);
+}
+
+async function clearVisibleParkingAsAdmin(space) {
+  const rows=await visibleParkingRowsMap(),target=rows.get(space.id);
+  if(!target)return;
+  await sheetsUpdate(config.parkingSheetId,parkingTabRange(config.parkingTab,`D${target.rowNumber}:E${target.rowNumber}`),[['','']]);
+}
+
+async function releaseParkingAsAdmin({date,spaceId,actor,targetMember=null}) {
+  const space=db.prepare('SELECT * FROM parking_spaces WHERE id=? AND active=1').get(String(spaceId));
+  if(!space)throw friendlyError(404,'Estacionamiento no encontrado.');
+  const localRows=db.prepare(`SELECT r.id,r.member_id FROM parking_reservations r WHERE r.reservation_date=? AND r.space_id=? AND r.status='ACTIVE' ORDER BY r.id DESC`).all(date,space.id);
+  let ledgerRow=null,externalWrites=false;
+  if(sheetsReadEnabled()){
+    if(!sheetsWriteEnabled())throw friendlyError(503,'La liberación requiere permiso de escritura en la fuente de estacionamientos.');
+    const rows=await readParkingLedgerRows(date,{includeInactive:true});
+    ledgerRow=rows.filter(row=>row.spaceId===space.id&&row.active).sort((a,b)=>b.rowNumber-a.rowNumber)[0]||null;
+    if(!ledgerRow&&!localRows.length)throw friendlyError(404,'La reserva activa ya no existe en la fuente de estacionamientos.');
+    if(ledgerRow){
+      await sheetsUpdate(config.parkingSheetId,parkingTabRange(config.parkingReservationsTab,`H${ledgerRow.rowNumber}:I${ledgerRow.rowNumber}`),[['DESOCUPADO',new Date().toISOString()]]);
+    }
+    if(date===todayChile())await clearVisibleParkingAsAdmin(space);
+    parkingSyncCache.delete(date);externalWrites=true;
+  }else if(!localRows.length){
+    throw friendlyError(404,'Reserva activa no encontrada.');
+  }
+  const stamp=new Date().toISOString();
+  const changed=db.prepare(`UPDATE parking_reservations SET status='VACATED',vacated_at=? WHERE reservation_date=? AND space_id=? AND status='ACTIVE'`).run(stamp,date,space.id);
+  const subjectId=Number(targetMember?.id||ledgerRow?.memberId||localRows[0]?.member_id)||null;
+  await safeParkingLog('ADMIN_DESOCUPA',date,space,targetMember||ledgerRow?.member||actor);
+  audit(db,{actorId:actor.id,subjectId,action:'ADMIN_PARKING_RELEASED',entityType:'parking',entityId:ledgerRow?.rowNumber||localRows[0]?.id||space.id,details:{date,spaceId:space.id,space:space.label,building:space.building,externalWrites,localRowsChanged:Number(changed.changes||0)}});
+  return{ok:true,changed:Number(changed.changes||0),externalWrites};
 }
 
 function ensureLocalParkingReservation(date, space, member, source='SHEET') {

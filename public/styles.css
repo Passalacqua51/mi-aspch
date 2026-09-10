@@ -624,6 +624,11 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 .home-emergency-row{border-color:color-mix(in srgb,var(--amber) 45%,var(--line));cursor:pointer;margin-top:28px;margin-bottom:8px}
 .home-emergency-row:active{transform:scale(.98)}
 .home-emergency-row .home-row-icon{background:color-mix(in srgb,var(--amber-soft) 80%,var(--surface))}
+.home-module-list{display:grid;gap:8px;margin-top:4px}
+.home-history-row{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.home-history-row>div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.home-history-row strong{font-size:13px;font-weight:750}
+.home-history-row span{font-size:11px;color:var(--muted)}
 .emergency-page{max-width:720px;margin:0 auto}
 .emergency-hero-card{display:grid;gap:6px;padding:20px 18px}
 .emergency-hero-card h2{margin:4px 0 6px;font-size:22px}
@@ -703,3 +708,40 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 
 /* PIN directo de Control Informática */
 .admin-direct-pin,.admin-security-pin{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.admin-direct-pin input,.admin-security-pin input{min-height:42px;min-width:150px;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.admin-security-row{flex-wrap:wrap}.admin-security-row .admin-security-pin{margin:0;min-width:min(100%,280px)}
+
+/* =====================================================================
+   OLED DARK EXCLUSIVO — PANEL INFORMÁTICA (/informatica, /admin, /admin.html)
+   La clase "informatica-panel" se aplica únicamente en <html> de
+   admin.html (servido solo para rutas del panel). Todo lo demás de
+   Mi ASPCH conserva su tema estándar (light/dark del sistema).
+   Reglas: azul ASPCH en primarios/activos/links/selección; rojo solo
+   errores/alertas/destructivas; verde solo OK/online/sucesso.
+   ===================================================================== */
+html.informatica-panel{color-scheme:dark;--bg:#000000;--surface:#050505;--surface-2:#080808;--surface-3:#0d0d0f;--text:#f5f5f5;--muted:#9ca3af;--line:#1a1a1a;--navy:#2e6bd4;--navy-2:#3d7ae8;--blue:#6da8ff;--blue-soft:#0d1f3c;--green:#34d399;--green-soft:#0a2a1c;--amber:#f5b75e;--amber-soft:#2a2113;--red:#ff5f73;--red-soft:#331216;--shadow:0 14px 40px rgba(0,0,0,.55);background:#000;color:var(--text)}
+html.informatica-panel body{background:#000;color:var(--text)}
+html.informatica-panel ::selection{background:var(--blue);color:#041226}
+html.informatica-panel :focus-visible{outline-color:var(--blue)}
+html.informatica-panel .empty,html.informatica-panel .compact-empty{color:var(--muted)}
+html.informatica-panel .app-shell{background:#000}
+html.informatica-panel .card{background:var(--surface);border-color:var(--line);box-shadow:none}
+html.informatica-panel .sidebar{background:var(--surface);border-color:var(--line)}
+html.informatica-panel .nav-item.active{background:var(--blue-soft);color:var(--blue)}
+html.informatica-panel .nav-item:hover{background:var(--surface-2);color:var(--text)}
+html.informatica-panel .button.secondary{background:var(--navy);color:#fff}
+html.informatica-panel .topbar{background:color-mix(in srgb,var(--bg) 86%,transparent);border-color:color-mix(in srgb,var(--line) 70%,transparent)}
+html.informatica-panel .auth-screen,html.informatica-panel .lock-screen{padding:32px 20px}
+html.informatica-panel body .auth-screen,html.informatica-panel body .lock-screen{background:#000}
+html.informatica-panel .auth-clean-title{color:var(--text)}
+html.informatica-panel .clean-label{color:var(--muted)}
+html.informatica-panel .clean-input,html.informatica-panel .clean-pin-input{background:#0a0a0c;border-color:var(--line);color:var(--text);box-shadow:none}
+html.informatica-panel .clean-input::placeholder,html.informatica-panel .clean-pin-input::placeholder{color:#5b6472}
+html.informatica-panel .clean-input:focus,html.informatica-panel .clean-pin-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 16%,transparent)}
+html.informatica-panel .clean-btn{background:var(--navy)!important;color:#fff!important;box-shadow:0 4px 14px rgba(46,107,212,.26)}
+html.informatica-panel .clean-btn:hover{background:var(--navy-2)!important}
+html.informatica-panel .clean-link{color:var(--blue)}
+html.informatica-panel .clean-link:hover{color:var(--navy-2)}
+html.informatica-panel .setup-overlay{background:rgba(0,0,0,.72)}
+html.informatica-panel .sidebar-logo,html.informatica-panel .credential-logo,html.informatica-panel .setup-logo{background:rgba(255,255,255,.94);border-radius:12px;padding:6px 9px}
+html.informatica-panel .admin-members-table-head,html.informatica-panel .admin-audit-head{color:var(--muted)}
+html.informatica-panel .admin-member-row:hover,html.informatica-panel .admin-member-row:focus-visible{background:var(--blue-soft)}
+html.informatica-panel .admin-direct-pin input,html.informatica-panel .admin-security-pin input{background:var(--surface);border-color:var(--line)}

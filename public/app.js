@@ -4,6 +4,9 @@ const UI_SERVICE_DEFAULTS={parking:true,reservations:true,simulators:true,studyr
 const A320PRO_PREVIEW_RATES=[{hours:2,priceClp:75000},{hours:4,priceClp:100000}];
 const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,parkingPrompt:new URLSearchParams(location.search).get('parkingPrompt')==='1',postLoginPromptsStarted:false,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,uiPreferences:{configured:false,simpleMode:false,services:{...UI_SERVICE_DEFAULTS}},registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
 const NAV=[['home','🏠','Inicio'],['parking','🚗','Estacionamiento'],['booking','🗓️','Reservas'],['profile','👤','Mi perfil'],['credential','🪪','Credencial'],['security','🔐','Seguridad'],['membership','💳','Mensualidad'],['convenios','🤝','Convenios'],['library','📚','Biblioteca'],['marketplace','🛒','Mercado ASPCH'],['activities','🎓','Cursos y charlas'],['votes','🗳️','Votaciones'],['contact','📞','Contacto'],['news','📰','Noticias']];
+const SIMPLE_MODE_PRIMARY=['home','parking','booking','profile'];
+const SIMPLE_MODE_SECONDARY=['credential','contact'];
+const SIMPLE_MODE_ROUTES=new Set([...SIMPLE_MODE_PRIMARY,...SIMPLE_MODE_SECONDARY,'reservations','simulators','studyroom']);
 const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥','Socios'],['admin-finance','💳','Finanzas'],['admin-reservations','🗓️','Reservas'],['admin-content','📰','Contenido'],['admin-votes','🗳️','Votaciones'],['admin-notifications','🔔','Notificaciones'],['admin-integrations','🔗','Integraciones'],['admin-security','🛡️','Seguridad'],['admin-audit','🧾','Auditoría'],['admin-system','⚙️','Sistema'],['developer','🛠️','Developer']];
 const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
 const ADMIN_PLACEHOLDERS={
@@ -48,7 +51,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 boot();
 
-function initialView(){const requested=new URLSearchParams(location.search).get('view');if(window.IS_ADMIN_PANEL)return requested||'admin-dashboard';if(simpleModeEnabled())return ['credential','parking','contact'].includes(requested)?requested:'credential';return requested||'home'}
+function initialView(){const requested=new URLSearchParams(location.search).get('view');if(window.IS_ADMIN_PANEL)return requested||'admin-reservations';if(simpleModeEnabled())return SIMPLE_MODE_ROUTES.has(requested)?requested:'home';return requested||'home'}
 function openAppUrl(url){try{const u=new URL(url,location.origin);if(u.searchParams.get('parkingPrompt')==='1')state.parkingPrompt=true;const view=u.searchParams.get('view');if(view)go(view)}catch{}}
 function initUiMode(){
   state.uiMode='iphone';
@@ -228,19 +231,18 @@ function renderNav(){
   document.body.classList.toggle('simple-mode',simpleModeEnabled()&&!window.IS_ADMIN_PANEL);
   document.body.classList.toggle('admin-panel',adminItems.length>0);
   if(adminItems.length){
-    const primaryIds=['admin-dashboard','admin-members','admin-reservations','admin-system'];
-    const primary=adminItems.filter(([id])=>primaryIds.includes(id)),secondary=adminItems.filter(([id])=>!primaryIds.includes(id));
+    const primaryIds=['admin-reservations','admin-members','admin-votes','admin-audit'];
+    const primary=primaryIds.map(id=>adminItems.find(item=>item[0]===id)).filter(Boolean),secondary=adminItems.filter(([id])=>!primaryIds.includes(id));
     $('#desktop-nav').innerHTML=`<div class="nav-section-label">Control Informática</div>${adminItems.map(x=>navItem(...x)).join('')}`;
-    const mobileLabel={'admin-dashboard':'Métricas','admin-members':'Socios','admin-reservations':'Reservas','admin-system':'Sistema'};
+    const mobileLabel={'admin-reservations':'Estac.','admin-members':'Socios','admin-votes':'Votos','admin-audit':'Auditoría'};
     $('#mobile-nav').innerHTML=primary.map(([id,icon,label])=>navItem(id,icon,mobileLabel[id]||label)).join('');
     $('#mobile-more-nav').innerHTML=`<section class="mobile-menu-group"><span>Panel Informática</span>${secondary.map(x=>navItem(...x)).join('')}</section>`;
     $('#more-menu-toggle')?.classList.remove('hidden');$('#more-menu-toggle')?.classList.toggle('active',!primaryIds.includes(state.view));
     $$('[data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));return;
   }
-  const primaryIds=['home','parking','booking','profile'];
-  if(simpleModeEnabled())primaryIds.splice(0,primaryIds.length,'credential','parking','contact','profile');
+  const primaryIds=simpleModeEnabled()?[...SIMPLE_MODE_PRIMARY]:['home','parking','booking','profile'];
   const primary=allItems.filter(x=>primaryIds.includes(x[0]));
-  const secondary=simpleModeEnabled()?[]:allItems.filter(x=>!primaryIds.includes(x[0])&&navigationItemVisible(x[0]));
+  const secondary=allItems.filter(x=>!primaryIds.includes(x[0])&&navigationItemVisible(x[0]));
   const items=[...primary,...secondary];
   const admin=adminItems.length?`<details class="sidebar-more admin-navigation" open><summary>Administración</summary><div class="sidebar-more-items">${adminItems.map(x=>navItem(...x)).join('')}</div></details>`:'';
   $('#desktop-nav').innerHTML=`<div class="nav-section-label">Principal</div>${primary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}<details class="sidebar-more" open><summary>Más servicios</summary><div class="sidebar-more-items">${secondary.map(([id,icon,label])=>navItem(id,icon,label)).join('')}</div></details>${admin}`;
@@ -278,7 +280,7 @@ function reservationsVisible(){return serviceVisible('reservations')&&(serviceVi
 function navigationItemVisible(id){
   if(id==='activities')return state.modules?.activities?.enabled===true;
   if(id==='votes')return state.modules?.votes?.enabled===true;
-  if(simpleModeEnabled())return ['credential','contact'].includes(id);
+  if(simpleModeEnabled())return SIMPLE_MODE_SECONDARY.includes(id);
   const keys={convenios:'agreements',library:'library',news:'news'};
   return keys[id]?serviceVisible(keys[id]):true;
 }
@@ -286,13 +288,13 @@ async function go(view){
   clearTimeout(state.parkingPollTimer);if(state.adminReservationsTimer&&view!=='admin-reservations'){clearInterval(state.adminReservationsTimer);state.adminReservationsTimer=null;}closeMobileMenu();closeAccountMenu();
   if(view==='admin')view='developer';
   if(ADMIN_VIEWS.has(view)&&state.member?.role!=='ADMIN')view='home';
-  if(simpleModeEnabled()&&!window.IS_ADMIN_PANEL&&!['credential','parking','contact'].includes(view))view='credential';
+  if(simpleModeEnabled()&&!window.IS_ADMIN_PANEL&&!SIMPLE_MODE_ROUTES.has(view))view='home';
   if(['MOROSO','CONGELADO'].includes(state.access?.reason)&&['booking','reservations','simulators','studyroom'].includes(view)){
     state.view=view;renderNav();$('#page-title').textContent=view==='booking'?'Reservas':({reservations:'Mi agenda',simulators:'Turnos de simulador',studyroom:'Sala de estudios'}[view]||'Reservas');renderRestrictedBenefitBlock(view,state.access.reason);return;
   }
   state.view=view;renderNav();
   const titles={home:'Inicio',emergency:'Emergencia / IFALPA',booking:'Reservas',reservations:'Mi agenda',credential:'Credencial digital',security:'Seguridad',membership:'Mensualidad',parking:'Estacionamiento',simulators:'Turnos de simulador',studyroom:'Sala de estudios',marketplace:'Mercado ASPCH',activities:'Cursos y charlas',votes:'Votaciones',advisors:'Contacto y asesorías',contact:'Contacto',convenios:'Convenios',library:'Biblioteca',news:'Noticias',profile:'Mi perfil','admin-dashboard':'Dashboard','admin-members':'Socios','admin-finance':'Finanzas','admin-reservations':'Reservas','admin-content':'Contenido','admin-votes':'Votaciones','admin-notifications':'Notificaciones','admin-integrations':'Integraciones','admin-security':'Seguridad','admin-audit':'Auditoría','admin-system':'Sistema',developer:'Developer'};
-  $('#page-title').textContent=titles[view]||'Mi ASPCH';const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
+  $('#page-title').textContent=view==='parking'?'':(titles[view]||'Mi ASPCH');const v=$('#view');v.innerHTML='<div class="empty">Cargando…</div>';
   const routes={home:()=>renderHome(),emergency:()=>renderEmergency(),booking:()=>renderBookingHub(),reservations:()=>renderReservations(),credential:()=>renderCredential(),security:()=>renderSecurity(),membership:()=>renderMembership(),parking:()=>renderParking(),simulators:()=>renderSimulators(),studyroom:()=>renderStudyRoom(),marketplace:()=>renderMarketplace(),activities:()=>renderActivities(),votes:()=>renderVotes(),advisors:()=>renderContact(),contact:()=>renderContact(),convenios:()=>renderConvenios(),library:()=>renderLibrary(),news:()=>renderNews(),profile:()=>renderProfile(),'admin-dashboard':()=>renderAdminDashboard(),'admin-members':()=>renderAdminMembers(),'admin-reservations':()=>renderAdminReservations(),'admin-votes':()=>renderAdminVotes(),'admin-notifications':()=>renderAdminNotifications(),'admin-integrations':()=>renderAdminIntegrations(),'admin-security':()=>renderAdminSecurity(),'admin-audit':()=>renderAdminAudit(),'admin-system':()=>renderAdminSystem(),developer:()=>renderDeveloper(),...Object.fromEntries(Object.keys(ADMIN_PLACEHOLDERS).map(id=>[id,()=>renderAdminPlaceholder(id)]))};
   try{if(!routes[view])return go('home');await routes[view]()}catch(err){console.error(`[Mi ASPCH] No se pudo renderizar ${view}:`,err);if(err.code!=='LOCKED')v.innerHTML=`<div class="card empty">${escapeHtml(err.message||'No fue posible cargar esta sección.')}</div>`}
 }
@@ -422,25 +424,51 @@ async function renderHome(){
   </div>`;
 
   // 2.1 Votación oficial activa, si existe
-  let voteCard = '';
-  if (state.modules?.votes?.enabled) {
+  let voteCard = '', pastVotesCard = '', votes = [];
+  try { votes = (await api('/api/votes')).votes || []; } catch {}
+  const openVotes = votes.filter(v => v.status === 'OPEN');
+  if (openVotes.length) {
+    const v = openVotes[0];
+    const voteStatus=v.voted?'✓ Voto registrado':v.eligible?'Participa en esta votación habilitada':'Votación activa · Tu cuenta no pertenece al padrón';
+    const voteAction=v.voted?'✓ Registrado':v.eligible?'Votar →':'Ver →';
+    voteCard = `<div class="card home-row-card home-vote-row" data-go="votes" style="border-color:var(--primary,#1976d2);">
+      <div class="home-row-left">
+        <span class="home-row-icon">🗳️</span>
+        <div class="home-row-copy">
+          <span class="eyebrow" style="color:var(--primary,#1976d2);">VOTACIÓN OFICIAL ACTIVA</span>
+          <strong>${escapeHtml(v.title)}</strong>
+          <span>${voteStatus}</span>
+        </div>
+      </div>
+      <span class="badge ${v.voted ? 'green' : 'blue'}">${voteAction}</span>
+    </div>`;
+  }
+  const pastVotes = votes.filter(v => v.status !== 'OPEN' && v.status !== 'DRAFT').slice(0, 2);
+  if (pastVotes.length) pastVotesCard = pastVotes.map(v => `<div class="home-history-row"><span class="badge blue">🗳️ Votación</span><div><strong>${escapeHtml(v.title)}</strong><span>${v.results ? `Participación ${v.results.turnout||0}%` : (v.voted ? '✓ Participaste' : 'Cerrada')}</span></div></div>`).join('');
+
+  // 2.2 Inscripciones abiertas a cursos, charlas y eventos
+  let activitiesCard = '', pastActivitiesCard = '', activities = [];
+  try { activities = (await api('/api/activities')).activities || []; } catch {}
+  const openActivityRegistrations = activities.filter(a => a.phase === 'UPCOMING' && activityRegistrationOpen(a)).slice(0, 3);
+  if (state.modules?.activities?.enabled && openActivityRegistrations.length) {
+    activitiesCard = `<div class="card"><div class="section-head compact"><div><span class="eyebrow">📅 INSCRIPCIONES ABIERTAS</span><h3>Cursos, charlas y eventos</h3></div></div><div class="activity-grid">${openActivityRegistrations.map(activityCard).join('')}</div></div>`;
+  }
+  const finishedActivities = activities.filter(a => a.phase === 'FINISHED').slice(0, 2);
+  if (finishedActivities.length) pastActivitiesCard = finishedActivities.map(a => `<div class="home-history-row"><span class="badge blue">${a.type==='COURSE'?'🎓 Curso':a.type==='TALK'?'💬 Charla':'📅 Evento'}</span><div><strong>${escapeHtml(a.title)}</strong>${a.starts_at?`<span>${formatLocalDateTime(a.starts_at)}</span>`:''}</div></div>`).join('');
+
+  // 2.3 Historial de votaciones y cursos realizados (siempre que exista contenido)
+  let historyCard = '';
+  if (pastVotesCard || pastActivitiesCard) {
+    historyCard = `<div class="card"><div class="section-head compact"><div><span class="eyebrow">🕓 HISTORIAL</span><h3>Votaciones y cursos realizados</h3></div></div><div class="home-module-list">${pastVotesCard}${pastActivitiesCard}</div></div>`;
+  }
+
+  // 2.4 Noticias, solo si hay publicaciones
+  let newsCard = '';
+  if (serviceVisible('news')) {
     try {
-      const vData = await api('/api/votes');
-      const openVotes = (vData.votes || []).filter(v => v.status === 'OPEN' && v.eligible);
-      if (openVotes.length) {
-        const v = openVotes[0];
-        voteCard = `<div class="card home-row-card home-vote-row" data-go="votes" style="border-color:var(--primary,#1976d2);">
-          <div class="home-row-left">
-            <span class="home-row-icon">🗳️</span>
-            <div class="home-row-copy">
-              <span class="eyebrow" style="color:var(--primary,#1976d2);">VOTACIÓN OFICIAL ACTIVA</span>
-              <strong>${escapeHtml(v.title)}</strong>
-              <span>${v.voted ? '✓ Voto registrado' : 'Participa en esta votación habilitada'}</span>
-            </div>
-          </div>
-          <span class="badge ${v.voted ? 'green' : 'blue'}">${v.voted ? '✓ Registrado' : 'Votar →'}</span>
-        </div>`;
-      }
+      const news = (await api('/api/news')).news || [];
+      const latestNews = news.slice(0, 3);
+      if (latestNews.length) newsCard = `<div class="section-head"><div><span class="eyebrow">📰 NOTICIAS</span><h3>Últimas novedades</h3></div></div>${latestNews.map(newsHtml).join('')}`;
     } catch {}
   }
 
@@ -496,6 +524,9 @@ async function renderHome(){
   ${unavailableNotice}
   ${credentialCard}
   ${voteCard}
+  ${activitiesCard}
+  ${historyCard}
+  ${newsCard}
   ${simulatorCard}
   ${parkingCard}
   ${specialNotice}
@@ -610,22 +641,22 @@ function resizePhotoForCredential(file){
 }
 
 async function renderParking(date=state.parking?.date||today()){
-  const selected=date||today(),weekStart=state.parkingWeekStart||mondayOf(selected);state.parkingWeekStart=weekStart;
+  const firstAvailableDate=today(),requested=date||firstAvailableDate,selected=requested<firstAvailableDate?firstAvailableDate:requested;
+  const rangeStartCandidate=state.parkingWeekStart||selected,rangeStart=rangeStartCandidate<firstAvailableDate?firstAvailableDate:rangeStartCandidate;state.parkingWeekStart=rangeStart;
   const data=await getParking(selected,true);state.parking=data;
   const allowed=data.access?.allowed??state.access?.parking??true;
-  const dates=Array.from({length:7},(_,i)=>addDays(weekStart,i)),group87=data.spaces.filter(s=>s.building==='87'),group103=data.spaces.filter(s=>s.building==='103'),mine=data.mineReservation;
-  const syncLabel=data.sync?.enabled?'<span class="parking-sync-status warn">● Sincronización temporalmente no disponible</span>':'';
+  const dates=Array.from({length:7},(_,i)=>addDays(rangeStart,i)),group87=data.spaces.filter(s=>s.building==='87'),group103=data.spaces.filter(s=>s.building==='103'),mine=data.mineReservation;
   const restrictedReason=data.access?.reason||state.access?.reason;
   const restrictedCopy=restrictedReason==='CONGELADO'?'Puedes ver los cupos disponibles detrás de esta pantalla, pero las reservas están pausadas mientras tu membresía está congelada.':'Puedes ver los cupos disponibles detrás de esta pantalla, pero no reservar mientras tu membresía esté morosa.';
   const previewStart=!allowed?`<div class="benefit-preview-shell"><div class="card benefit-preview-overlay" role="status"><span class="benefit-preview-lock">🔒</span><span class="eyebrow">VISTA PREVIA</span><h2>${restrictedReason==='CONGELADO'?'Estacionamiento pausado':'Estacionamiento bloqueado'}</h2><p>${restrictedCopy}</p><button class="button primary" data-go="profile">Ver situación y pago</button></div><div class="benefit-preview-content" inert aria-hidden="true">`:'';
   const previewEnd=!allowed?'</div></div>':'';
-  $('#view').innerHTML=`${previewStart}<div class="parking-head card"><div><span class="eyebrow">ESTACIONAMIENTO</span><h2>Reserva aquí tu estacionamiento</h2>${syncLabel}<div class="parking-legend"><span><i class="free-dot"></i>Libre · toca para reservar</span><span><i class="occupied-dot"></i>Ocupado</span><span><i class="mine-dot"></i>Tu reserva</span></div></div><label class="date-picker">Otra fecha<input id="parking-date" type="date" min="${today()}" value="${data.date}"></label></div>
-  <div class="parking-week-toolbar"><button id="parking-prev-week" class="button ghost">←</button><strong>${weekLabel(weekStart)}</strong><button id="parking-next-week" class="button ghost">→</button></div>
+  $('#view').innerHTML=`${previewStart}<div class="parking-legend"><span><i class="free-dot"></i>Libre · toca para reservar</span><span><i class="occupied-dot"></i>Ocupado</span><span><i class="mine-dot"></i>Tu reserva</span></div>
+  <div class="parking-week-toolbar"><button id="parking-prev-week" class="button ghost" ${rangeStart===firstAvailableDate?'disabled':''}>←</button><strong>${dayNum(rangeStart)} ${monthShort(rangeStart)} – ${dayNum(addDays(rangeStart,6))} ${monthShort(addDays(rangeStart,6))}</strong><button id="parking-next-week" class="button ghost">→</button></div>
   <div class="date-strip week-7">${dates.map(d=>`<button class="date-chip ${d===data.date?'active':''}" data-date="${d}"><span>${weekdayShort(d)}</span><strong>${dayNum(d)}</strong><em>${monthShort(d)}</em></button>`).join('')}</div>
   ${mine?mineReservationHtml(mine,data.date):''}
   ${data.canSeeBoardParking?`<section class="section board-parking board-parking-priority"><div class="section-head"><div><h3>Padre Mariano 103 · Directorio</h3><p>Cupos exclusivos del Directorio.</p></div><span class="badge blue">Directorio</span></div><div class="parking-grid">${group103.map(s=>parkingSpaceHtml(s,allowed)).join('')}</div></section>`:''}
   <section class="section"><div class="section-head"><div><h3>Padre Mariano 87</h3><p>${allowed?'Toca un cupo gris para reservarlo aquí mismo':'Puedes ver disponibilidad, pero las reservas están deshabilitadas'} para ${humanDate(data.date)}.</p></div></div><div class="parking-grid">${group87.map(s=>parkingSpaceHtml(s,allowed)).join('')}</div></section>${previewEnd}`;
-  $('#parking-date').addEventListener('change',e=>{state.parkingWeekStart=mondayOf(e.target.value);renderParking(e.target.value)});$('#parking-prev-week').onclick=()=>{state.parkingWeekStart=addDays(state.parkingWeekStart,-7);renderParking(state.parkingWeekStart)};$('#parking-next-week').onclick=()=>{state.parkingWeekStart=addDays(state.parkingWeekStart,7);renderParking(state.parkingWeekStart)};
+  $('#parking-prev-week').onclick=()=>{state.parkingWeekStart=addDays(state.parkingWeekStart,-7)<firstAvailableDate?firstAvailableDate:addDays(state.parkingWeekStart,-7);renderParking(state.parkingWeekStart)};$('#parking-next-week').onclick=()=>{state.parkingWeekStart=addDays(state.parkingWeekStart,7);renderParking(state.parkingWeekStart)};
   $$('.date-chip').forEach(b=>b.onclick=()=>renderParking(b.dataset.date));$$('.parking-space.available').forEach(b=>b.onclick=()=>reserveParking(b.dataset.space));$('#cancel-reservation')?.addEventListener('click',cancelParking);$('#parking-checkin')?.addEventListener('click',checkInParking);$('#parking-vacate')?.addEventListener('click',vacateParking);$('#enable-parking-notifications')?.addEventListener('click',enableBrowserNotifications);$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
   showParkingConfirmationPrompt(mine,data.date);
   clearTimeout(state.parkingPollTimer);state.parkingPollTimer=setTimeout(()=>{if(state.view==='parking')renderParking(state.parking?.date||data.date)},45000);
@@ -768,17 +799,14 @@ async function cancelSimulatorTurn(eventRef){
 
 async function renderStudyRoom(){
   if(state.access?.studyRoom===false){const frozen=state.access?.reason==='CONGELADO';$('#view').innerHTML=`<div class="card restricted-benefit"><span class="eyebrow">📖 SALA DE ESTUDIOS</span><h2>${frozen?'Beneficio pausado por membresía congelada':'Beneficio temporalmente restringido'}</h2><p>${frozen?'La Sala de estudios queda pausada durante el período informado por ASPCH. Comunícate con nosotros si necesitas orientación.':'Los socios morosos no pueden reservar la Sala de estudios. Regulariza tu membresía para recuperar este beneficio.'}</p><button class="button primary" data-go="profile">Ver membresía</button></div>`;$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));return}
-  const from=new Date().toISOString(),to=new Date(Date.now()+21*86400_000).toISOString();const [data,waitData]=await Promise.all([api(`/api/study-room?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),api('/api/study-room/waitlist')]);
-  const mine=data.reservations.filter(r=>r.mine),occupied=data.reservations.filter(r=>!r.mine),waitlist=waitData.waitlist||[];
+  const from=new Date().toISOString(),to=new Date(Date.now()+21*86400_000).toISOString(),data=await api(`/api/study-room?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  const mine=data.reservations.filter(r=>r.mine);
   $('#view').innerHTML=`<div class="card study-hero"><span class="eyebrow">📖 SALA DE ESTUDIOS</span><h2>Reserva tu bloque</h2><p>Una sala · bloques de hasta 4 horas · puedes mantener varias reservas futuras · cancelación disponible siempre.</p>
-  <form id="study-form" class="study-form"><label>Fecha<input id="study-date" type="date" min="${today()}" value="${today()}" required></label><label>Desde<input id="study-start" type="time" required></label><label>Hasta<input id="study-end" type="time" required></label><div class="study-actions"><button class="button primary" data-action="reserve">Reservar</button><button class="button ghost" data-action="waitlist">Avísame si se libera</button></div></form></div>
-  <section class="section"><div class="section-head"><div><h3>Tus reservas</h3></div></div><div class="reservation-list">${mine.length?mine.map(r=>`<div class="card reservation-row"><div><strong>${formatLocalDateTime(r.start)}–${hm(r.end)}</strong><span>Sala de estudios</span></div><button class="button ghost study-cancel" data-id="${r.id}">Cancelar</button></div>`).join(''):'<div class="card empty">No tienes reservas futuras.</div>'}</div></section>
-  <section class="section"><div class="section-head"><div><h3>Avísame si se libera</h3><p>Te avisamos por push; nunca se asigna automáticamente.</p></div></div><div class="reservation-list">${waitlist.length?waitlist.map(r=>`<div class="reservation-row compact"><div><strong>${formatLocalDateTime(r.start_at)}–${hm(r.end_at)}</strong><span>${r.notified_at?'Ya se envió un aviso de liberación':'Esperando liberación'}</span></div><button class="button ghost study-wait-cancel" data-id="${r.id}">Quitar aviso</button></div>`).join(''):'<div class="card empty">No tienes avisos de disponibilidad activos.</div>'}</div></section>
-  <section class="section"><div class="section-head"><div><h3>Horarios ocupados</h3><p>Por privacidad no mostramos quién reservó.</p></div></div><div class="reservation-list">${occupied.length?occupied.map(r=>`<div class="reservation-row compact"><strong>${formatLocalDateTime(r.start)}–${hm(r.end)}</strong><span class="badge amber">Ocupada</span></div>`).join(''):'<div class="card empty">Sin reservas ajenas en los próximos 21 días.</div>'}</div></section>`;
-  $('#study-form').onsubmit=reserveStudy;$$('.study-cancel').forEach(b=>b.onclick=()=>cancelStudy(Number(b.dataset.id)));$$('.study-wait-cancel').forEach(b=>b.onclick=()=>cancelStudyWait(Number(b.dataset.id)));
+  <form id="study-form" class="study-form"><label>Fecha<input id="study-date" type="date" min="${today()}" value="${today()}" required></label><label>Desde<input id="study-start" type="time" required></label><label>Hasta<input id="study-end" type="time" required></label><div class="study-actions"><button class="button primary">Reservar</button></div></form></div>
+  ${mine.length?`<section class="section"><div class="section-head"><div><h3>Tu reserva</h3></div></div><div class="reservation-list">${mine.map(r=>`<div class="card reservation-row"><div><strong>${formatLocalDateTime(r.start)}–${hm(r.end)}</strong><span>Sala de estudios</span></div><button class="button ghost study-cancel" data-id="${r.id}">Cancelar</button></div>`).join('')}</div></section>`:''}`;
+  $('#study-form').onsubmit=reserveStudy;$$('.study-cancel').forEach(b=>b.onclick=()=>cancelStudy(Number(b.dataset.id)));
 }
-async function reserveStudy(e){e.preventDefault();const d=$('#study-date').value,a=$('#study-start').value,b=$('#study-end').value;if(!d||!a||!b)return;const action=e.submitter?.dataset?.action||'reserve';try{if(action==='waitlist'){await api('/api/study-room/waitlist',{method:'POST',body:{date:d,startTime:a,endTime:b}});await enableBrowserNotifications(true);toast('Te avisaremos si ese horario se libera.')}else{await api('/api/study-room/reserve',{method:'POST',body:{date:d,startTime:a,endTime:b}});toast('Sala de estudios reservada.')}renderStudyRoom()}catch(err){toast(err.message,true)}}
-async function cancelStudyWait(id){try{await api('/api/study-room/waitlist',{method:'DELETE',body:{id}});toast('Aviso de disponibilidad eliminado.');renderStudyRoom()}catch(err){toast(err.message,true)}}
+async function reserveStudy(e){e.preventDefault();const d=$('#study-date').value,a=$('#study-start').value,b=$('#study-end').value;if(!d||!a||!b)return;try{await api('/api/study-room/reserve',{method:'POST',body:{date:d,startTime:a,endTime:b}});toast('Sala de estudios reservada.');renderStudyRoom()}catch(err){toast(err.message,true)}}
 async function cancelStudy(id){if(!confirm('¿Cancelar esta reserva de Sala de estudios?'))return;try{await api('/api/study-room/reserve',{method:'DELETE',body:{id}});toast('Reserva cancelada.');renderStudyRoom()}catch(err){toast(err.message,true)}}
 
 async function renderMarketplace(){
@@ -806,7 +834,8 @@ async function renderActivities(){
   <section class="section"><div class="activity-grid">${visible.length?visible.map(activityCard).join(''):'<div class="card empty">No hay actividades en esta vista.</div>'}</div></section>`;
   $$('.activity-filter').forEach(b=>b.onclick=()=>{state.activityFilter=b.dataset.filter;renderActivities()});$$('.activity-registration').forEach(b=>b.onclick=()=>toggleActivityRegistration(Number(b.dataset.id),b.dataset.registered!=='true'));
 }
-function activityCard(a){const type=a.type==='COURSE'?'Curso':a.type==='TALK'?'Charla':'Actividad';const phase=a.phase==='FINISHED'?'Finalizado':a.status==='CLOSED'?'Inscripción cerrada':'Próximo';return `<article class="card activity-card"><div class="activity-card-top"><span class="badge blue">${type}</span><span class="badge ${a.registered?'green':'blue'}">${a.registered?'✓ Inscrito':phase}</span></div><h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.description||'')}</p>${a.starts_at?`<span>📅 ${formatLocalDateTime(a.starts_at)}</span>`:''}<div class="toolbar">${a.external_url&&a.phase==='UPCOMING'?`<a class="button primary" href="${escapeHtml(a.external_url)}" target="_blank" rel="noopener noreferrer">Abrir inscripción ↗</a>`:''}${a.phase!=='FINISHED'?`<button class="button ghost activity-registration" data-id="${a.id}" data-registered="${a.registered?'true':'false'}">${a.registered?'Quitar de inscritos':'Ya me inscribí'}</button>`:''}</div></article>`}
+function activityRegistrationOpen(a,now=Date.now()){return a.status==='ACTIVE'&&(!a.registration_open_at||new Date(a.registration_open_at).getTime()<=now)&&(!a.registration_close_at||new Date(a.registration_close_at).getTime()>now)}
+function activityCard(a){const type=a.type==='COURSE'?'Curso':a.type==='TALK'?'Charla':'Evento',registrationOpen=activityRegistrationOpen(a);const phase=a.phase==='FINISHED'?'Finalizado':registrationOpen?'Inscripción abierta':'Inscripción cerrada';return `<article class="card activity-card"><div class="activity-card-top"><span class="badge blue">${type}</span><span class="badge ${a.registered?'green':'blue'}">${a.registered?'✓ Inscrito':phase}</span></div><h3>${escapeHtml(a.title)}</h3><p>${escapeHtml(a.description||'')}</p>${a.starts_at?`<span>📅 ${formatLocalDateTime(a.starts_at)}</span>`:''}<div class="toolbar">${a.external_url&&registrationOpen?`<a class="button primary" href="${escapeHtml(a.external_url)}" target="_blank" rel="noopener noreferrer">Abrir inscripción ↗</a>`:''}${a.phase!=='FINISHED'?`<button class="button ghost activity-registration" data-id="${a.id}" data-registered="${a.registered?'true':'false'}">${a.registered?'Quitar de inscritos':'Ya me inscribí'}</button>`:''}</div></article>`}
 async function toggleActivityRegistration(id,registered){try{await api('/api/activities/registration',{method:'POST',body:{id,registered}});if(registered)await enableBrowserNotifications(true);toast(registered?'Actividad marcada como inscrita.':'Actividad quitada de tus inscritos.');renderActivities()}catch(err){toast(err.message,true)}}
 
 async function renderVotes(){
@@ -927,7 +956,7 @@ async function toggleLibraryFavoriteUi(id,favorite){try{await api('/api/library/
 async function renderNews(){const news=await getNews(true);$('#view').innerHTML=`<div class="card"><div class="section-head"><div><h3>Noticias / Instagram</h3></div></div><div class="news-list">${news.length?news.map(newsHtml).join(''):'<div class="empty">Sin publicaciones.</div>'}</div></div>`}
 async function renderProfile(){
   const m=state.member;
-  $('#view').innerHTML=`<div class="grid two profile-page"><div class="card"><span class="eyebrow">👤 SOCIO</span><h2>${escapeHtml(titleName(m.name))}</h2>${m.isBoard?'<span class="badge blue">⭐ Directorio</span>':''}${preferredNameProfileHtml()}<div class="profile-grid">${field('📧 Correo',m.email)}${field('🪪 RUT',m.rut||'—')}${field('📱 Teléfono',m.phone||'—')}${field('🏢 Empleador',m.employer||'—')}${field('🧭 Categoría',m.category||'—')}${field('✈️ Cargo',m.position||'—')}</div>${airlineDataHtml(m)}</div><div class="card service-personalization-card"><span class="eyebrow">⚙️ PREFERENCIAS</span><h2>Personaliza tu experiencia</h2><p class="muted-copy">Elige los servicios que quieres mantener visibles.</p><button id="personalize-services" class="button secondary" type="button">Personalizar servicios</button><label class="simple-mode-toggle"><span><strong>Modo simple</strong><small>Muestra únicamente Credencial, Estacionamiento y Contacto.</small></span><input id="simple-mode-toggle" type="checkbox" ${simpleModeEnabled()?'checked':''}></label></div><div class="card"><span class="eyebrow">🔔 NOTIFICACIONES</span><h2>Elige qué quieres recibir</h2><div class="notification-prefs">${notificationPrefToggle('parking','🚗 Estacionamientos','Recordatorios de reserva y desocupación.')}${notificationPrefToggle('simulators','✈️ Simuladores','Avisos de próximos turnos confirmados.')}${notificationPrefToggle('studyroom','📖 Sala de estudios','Liberación de horarios de tu lista de espera.')}${notificationPrefToggle('membership','💳 Membresía','Avisos sobre tu estado de membresía.')}${notificationPrefToggle('news','📰 Noticias','Novedades relevantes de ASPCH.')}</div><div class="toolbar"><button class="button primary" id="enable-general-notifications">🔔 Activar notificaciones</button></div></div></div>`;
+  $('#view').innerHTML=`<div class="grid two profile-page"><div class="card"><span class="eyebrow">👤 SOCIO</span><h2>${escapeHtml(titleName(m.name))}</h2>${m.isBoard?'<span class="badge blue">⭐ Directorio</span>':''}${preferredNameProfileHtml()}<div class="profile-grid">${field('📧 Correo',m.email)}${field('🪪 RUT',m.rut||'—')}${field('📱 Teléfono',m.phone||'—')}${field('🏢 Empleador',m.employer||'—')}${field('🧭 Categoría',m.category||'—')}${field('✈️ Cargo',m.position||'—')}</div>${airlineDataHtml(m)}</div><div class="card service-personalization-card"><span class="eyebrow">⚙️ PREFERENCIAS</span><h2>Personaliza tu experiencia</h2><p class="muted-copy">Elige los servicios que quieres mantener visibles.</p><button id="personalize-services" class="button secondary" type="button">Personalizar servicios</button><label class="simple-mode-toggle"><span><strong>Modo simple</strong><small>Muestra únicamente Credencial, Estacionamiento y Contacto.</small></span><input id="simple-mode-toggle" type="checkbox" ${simpleModeEnabled()?'checked':''}></label></div><div class="card"><span class="eyebrow">🔔 NOTIFICACIONES</span><h2>Elige qué quieres recibir</h2><div class="notification-prefs">${notificationPrefToggle('parking','🚗 Estacionamientos','Recordatorios de reserva y desocupación.')}${notificationPrefToggle('simulators','✈️ Simuladores','Avisos de próximos turnos confirmados.')}${notificationPrefToggle('membership','💳 Membresía','Avisos sobre tu estado de membresía.')}${notificationPrefToggle('news','📰 Noticias','Novedades relevantes de ASPCH.')}</div><div class="toolbar"><button class="button primary" id="enable-general-notifications">🔔 Activar notificaciones</button></div></div></div>`;
   installEditableNumericInputs($('#view'));
   $('#preferred-name-form-profile')?.addEventListener('submit',savePreferredName);$('#airline-data-form')?.addEventListener('submit',saveAirlineData);
   $('#personalize-services')?.addEventListener('click',()=>openServicePersonalization());$('#simple-mode-toggle')?.addEventListener('change',saveSimpleMode);
@@ -935,7 +964,7 @@ async function renderProfile(){
 }
 async function saveSimpleMode(e){
   const enabled=!!e.currentTarget.checked;e.currentTarget.disabled=true;
-  try{const result=await api('/api/profile/services',{method:'PUT',body:{services:state.uiPreferences.services,simpleMode:enabled}});state.uiPreferences=normalizedUiPreferences(result.uiPreferences);renderNav();toast(enabled?'Modo simple activado.':'Modo simple desactivado.');await go(enabled?'credential':'profile')}catch(err){e.currentTarget.checked=!enabled;e.currentTarget.disabled=false;toast(err.message,true)}
+  try{const result=await api('/api/profile/services',{method:'PUT',body:{services:state.uiPreferences.services,simpleMode:enabled}});state.uiPreferences=normalizedUiPreferences(result.uiPreferences);renderNav();toast(enabled?'Modo simple activado.':'Modo simple desactivado.');await go('home')}catch(err){e.currentTarget.checked=!enabled;e.currentTarget.disabled=false;toast(err.message,true)}
 }
 
 async function renderMembership(){
@@ -949,13 +978,11 @@ async function renderMembership(){
 }
 
 async function renderSecurity(){
-  const [sessionsData,hist]=await Promise.all([api('/api/security/sessions'),api('/api/history?limit=30').catch(()=>({history:[]}))]);
   const bioReady=!!state.security?.biometricAvailable&&!!window.PublicKeyCredential,bioState=state.security?.passkeySet?`${state.security.passkeyCount||1} registrada${Number(state.security.passkeyCount||1)===1?'':'s'}`:'Aún no configurado';
-  $('#view').innerHTML=`<section class="security-page"><div class="card"><span class="eyebrow">🔐 SEGURIDAD DEL DISPOSITIVO</span><h2>${state.security?.pinSet?'PIN configurado':'Crea un PIN de respaldo'}</h2><form id="pin-form" class="pin-form">${state.security?.pinSet?'<input id="current-pin" type="password" inputmode="numeric" maxlength="4" placeholder="PIN actual" required>':''}<input id="new-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" placeholder="Nuevo PIN (4 dígitos)" required><button class="button primary">${state.security?.pinSet?'Cambiar PIN':'Crear PIN'}</button></form><div class="security-bio"><div><strong>Face ID / huella</strong><span class="badge ${state.security?.passkeySet?'green':'blue'}">${escapeHtml(bioState)}</span></div><div class="toolbar">${bioReady?`<button class="button secondary" id="register-passkey" type="button">${state.security?.passkeySet?'Agregar otra passkey':'Activar Face ID / huella'}</button>`:''}${state.security?.passkeySet?'<button class="button ghost" id="remove-passkeys" type="button">Eliminar passkeys</button>':''}</div></div></div><div class="card"><span class="eyebrow">SESIONES</span><h2>Dispositivos con acceso</h2><div class="session-list">${(sessionsData.sessions||[]).map(s=>`<div><span>${s.current?'Este dispositivo':'Otra sesión'}</span><small>Creada ${formatLocalDateTime(s.createdAt)}</small><span class="badge ${s.current?'green':'blue'}">${s.current?'Actual':'Activa'}</span></div>`).join('')||'<div class="empty">Sin sesiones activas.</div>'}</div><button id="close-other-sessions" class="button ghost" type="button">Cerrar otras sesiones</button></div><div class="card history-card"><span class="eyebrow">🧾 TU HISTORIAL</span><h2>Actividad de tu cuenta</h2><div class="history-list">${(hist.history||[]).length?hist.history.map(historyRow).join(''):'<div class="empty">Aún no hay movimientos registrados.</div>'}</div></div></section>`;
-  installEditableNumericInputs($('#view'));$('#pin-form')?.addEventListener('submit',savePin);$('#register-passkey')?.addEventListener('click',registerPasskey);$('#remove-passkeys')?.addEventListener('click',removePasskeys);$('#close-other-sessions')?.addEventListener('click',async()=>{try{await api('/api/security/sessions',{method:'DELETE',body:{}});toast('Otras sesiones cerradas.');renderSecurity()}catch(err){toast(err.message,true)}});
+  $('#view').innerHTML=`<section class="security-page"><div class="card"><span class="eyebrow">🔐 SEGURIDAD DEL DISPOSITIVO</span><h2>${state.security?.pinSet?'PIN configurado':'Crea un PIN de respaldo'}</h2><form id="pin-form" class="pin-form">${state.security?.pinSet?'<input id="current-pin" type="password" inputmode="numeric" maxlength="4" placeholder="PIN actual" required>':''}<input id="new-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" placeholder="Nuevo PIN (4 dígitos)" required><button class="button primary">${state.security?.pinSet?'Cambiar PIN':'Crear PIN'}</button></form><div class="security-bio"><div><strong>Face ID / huella</strong><span class="badge ${state.security?.passkeySet?'green':'blue'}">${escapeHtml(bioState)}</span></div><div class="toolbar">${bioReady?`<button class="button secondary" id="register-passkey" type="button">${state.security?.passkeySet?'Agregar otra passkey':'Activar Face ID / huella'}</button>`:''}${state.security?.passkeySet?'<button class="button ghost" id="remove-passkeys" type="button">Eliminar passkeys</button>':''}</div></div></div></section>`;
+  installEditableNumericInputs($('#view'));$('#pin-form')?.addEventListener('submit',savePin);$('#register-passkey')?.addEventListener('click',registerPasskey);$('#remove-passkeys')?.addEventListener('click',removePasskeys);
 }
 
-function historyRow(x){const labels={PARKING_RESERVED:'Reservaste estacionamiento',PARKING_CANCELLED:'Cancelaste estacionamiento',PARKING_CHECKED_IN:'Marcaste llegada al estacionamiento',PARKING_VACATED:'Liberaste estacionamiento',SIMULATOR_CANCELLED:'Cancelaste un turno de simulador',STUDY_RESERVED:'Reservaste Sala de estudios',STUDY_RESERVATION_CANCELLED:'Cancelaste Sala de estudios',STUDY_WAITLIST_JOINED:'Pediste aviso de Sala de estudios',MARKETPLACE_CREATED:'Publicaste un producto para revisión'};return `<div class="history-row"><div><strong>${escapeHtml(labels[x.action]||String(x.action||'Actividad').replaceAll('_',' '))}</strong><span>${formatLocalDateTime(x.createdAt)}</span></div><span class="history-actor">${x.actorName&&x.actorName!==state.member?.name?'ASPCH':'Tú'}</span></div>`}
 function airlineDataHtml(m){if(!/L[IÍ]NEA\s*A[EÉ]REA/i.test(String(m.category||'')))return '';return `<div class="airline-update"><div class="section-head compact"><div><h3>✈️ ¿Cambiaste de línea aérea?</h3><p>Actualiza tus datos asociados a la ficha ASPCH.</p></div></div><form id="airline-data-form" class="airline-form"><label>Línea aérea actual<input id="airline-employer" maxlength="80" value="${escapeHtml(m.employer||'')}" required></label><label>Teléfono<input id="airline-phone" inputmode="tel" maxlength="30" value="${escapeHtml(m.phone||'')}"></label><button class="button secondary" type="submit">Guardar cambios</button></form></div>`}
 async function saveAirlineData(e){e.preventDefault();setLoading(e.currentTarget,true);try{const r=await api('/api/profile/airline-data',{method:'POST',body:{employer:$('#airline-employer').value,phone:$('#airline-phone').value}});state.member=r.member;applyMemberTheme(state.member);toast(r.message||'Datos actualizados.');renderProfile()}catch(err){toast(err.message,true)}finally{setLoading(e.currentTarget,false)}}
 function membershipStatusLabel(status){return ({AL_DIA:'Al día',EXENTO:'Exento',PENDIENTE:'Pendiente',MOROSO:'Moroso',DESAFILIADO:'Desafiliado',JUBILADO:'Jubilado',DIRECTORIO:'Directorio',CONGELADO:'Congelado'})[status]||String(status||'Pendiente')}
@@ -970,7 +997,7 @@ async function savePin(e){e.preventDefault();try{const r=await api('/api/securit
 async function renderAdminDashboard(){
   if(state.member?.role!=='ADMIN')return go('home');
   const d=await api('/api/admin/dashboard'),m=d.metrics||{},finance=d.finance||{},caps=d.integrations?.google||{},links=ADMIN_NAV.filter(([id])=>id!=='admin-dashboard');
-  $('#view').innerHTML=`<section class="admin-dashboard-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA</span><h2>Estado general de Mi ASPCH</h2><p>Resumen maestro de lectura con la información operativa existente.</p></div><div class="admin-health"><span class="badge ${d.health?.ok?'green':'amber'}"><i class="dot"></i>${d.health?.ok?'Operativo':'Con alertas'}</span><strong>v${escapeHtml(d.health?.version||state.config?.version||'0.6.16')}</strong><small>${d.generatedAt?formatLocalDateTime(d.generatedAt):'Ahora'}</small></div></section><div class="admin-summary-grid">${adminSummaryCard('👥','Socios activos',m.members?.active||0,`${m.members?.total||0} registrados`)}${adminSummaryCard('💳','Estados financieros',Object.values(finance.counts||{}).reduce((a,b)=>a+Number(b||0),0),'registros disponibles')}${adminSummaryCard('🚗','Estacionamientos',m.parking?.active||0,`${m.parking?.today||0} para hoy`)}${adminSummaryCard('📖','Sala de estudios',m.study?.active||0,`${m.study?.waitlist||0} avisos`)}</div><section class="section grid two"><div class="card"><span class="eyebrow">INTEGRACIONES</span><h3>Capacidades configuradas</h3><div class="capability-grid">${cap('Sheets READ',caps.sheets?.read)}${cap('Sheets WRITE',caps.sheets?.write)}${cap('Calendar READ',caps.calendar?.read)}${cap('Calendar WRITE',caps.calendar?.write)}${cap('Gmail OTP',caps.gmail?.otp)}${cap('Web Push',d.integrations?.push?.enabled)}</div></div><div class="card"><span class="eyebrow">AUDITORÍA</span><h3>Últimos eventos</h3><div class="admin-event-list">${(d.audit||[]).map(adminDashboardEvent).join('')||'<div class="empty compact-empty">Sin eventos registrados.</div>'}</div></div></section><section class="section card"><span class="eyebrow">SECCIONES</span><h3>Control Informática</h3><div class="admin-dashboard-links">${links.map(([id,icon,label])=>`<a class="card admin-dashboard-link" role="link" tabindex="0" data-admin-go="${id}"><span>${icon}</span><div><strong>${escapeHtml(label)}</strong><small>Abrir sección</small></div><b>→</b></a>`).join('')}</div></section>`;
+  $('#view').innerHTML=`<section class="admin-dashboard-hero card"><div><span class="eyebrow">CONTROL INFORMÁTICA</span><h2>Estado general de Mi ASPCH</h2><p>Resumen maestro de lectura con la información operativa existente.</p></div><div class="admin-health"><span class="badge ${d.health?.ok?'green':'amber'}"><i class="dot"></i>${d.health?.ok?'Operativo':'Con alertas'}</span><strong>v${escapeHtml(d.health?.version||state.config?.version||'0.6.16')}</strong><small>${d.generatedAt?formatLocalDateTime(d.generatedAt):'Ahora'}</small></div></section><div class="admin-summary-grid">${adminSummaryCard('👥','Socios activos',m.members?.active||0,`${m.members?.total||0} registrados`)}${adminSummaryCard('💳','Estados financieros',Object.values(finance.counts||{}).reduce((a,b)=>a+Number(b||0),0),'registros disponibles')}${adminSummaryCard('🚗','Estacionamientos',m.parking?.active||0,`${m.parking?.today||0} para hoy`)}${adminSummaryCard('📖','Sala de estudios',m.study?.active||0,'reservas activas')}</div><section class="section grid two"><div class="card"><span class="eyebrow">INTEGRACIONES</span><h3>Capacidades configuradas</h3><div class="capability-grid">${cap('Sheets READ',caps.sheets?.read)}${cap('Sheets WRITE',caps.sheets?.write)}${cap('Calendar READ',caps.calendar?.read)}${cap('Calendar WRITE',caps.calendar?.write)}${cap('Gmail OTP',caps.gmail?.otp)}${cap('Web Push',d.integrations?.push?.enabled)}</div></div><div class="card"><span class="eyebrow">AUDITORÍA</span><h3>Últimos eventos</h3><div class="admin-event-list">${(d.audit||[]).map(adminDashboardEvent).join('')||'<div class="empty compact-empty">Sin eventos registrados.</div>'}</div></div></section><section class="section card"><span class="eyebrow">SECCIONES</span><h3>Control Informática</h3><div class="admin-dashboard-links">${links.map(([id,icon,label])=>`<a class="card admin-dashboard-link" role="link" tabindex="0" data-admin-go="${id}"><span>${icon}</span><div><strong>${escapeHtml(label)}</strong><small>Abrir sección</small></div><b>→</b></a>`).join('')}</div></section>`;
   $$('[data-admin-go]').forEach(button=>button.onclick=()=>go(button.dataset.adminGo));
 }
 function adminSummaryCard(icon,label,value,detail){return `<div class="card admin-summary-card"><span>${icon}</span><div><small>${escapeHtml(label)}</small><strong>${Number(value||0)}</strong><p>${escapeHtml(detail)}</p></div></div>`}
@@ -987,7 +1014,7 @@ async function loadAdminMembersList(){
 
 function adminMembersTable(rows){
   if(!rows.length)return '<div class="empty">No se encontraron socios.</div>';
-  return `<div class="admin-members-table" role="table" aria-label="Socios"><div class="admin-members-table-head" role="row"><span>Socio</span><span>RUT</span><span>Email</span><span>Estado</span></div>${rows.map(m=>`<button class="admin-member-row" type="button" role="row" data-id="${m.id}"><strong>${escapeHtml(m.name||'No disponible')}</strong><span data-label="RUT">${escapeHtml(m.rutMasked||'No disponible')}</span><span data-label="Email">${escapeHtml(m.emailMasked||'No disponible')}</span>${adminMemberStateBadge(m.membershipState)}</button>`).join('')}</div>`;
+  return `<div class="admin-members-table" role="table" aria-label="Socios"><div class="admin-members-table-head" role="row"><span>Socio</span><span>RUT</span><span>Email</span><span>Estado</span></div>${rows.map(m=>`<button class="admin-member-row" type="button" role="row" data-id="${m.id}"><strong>${escapeHtml(m.name||'No disponible')}</strong><span data-label="RUT">${escapeHtml(m.rutMasked||'No disponible')}</span><span data-label="Email">${escapeHtml(m.emailMasked||'No disponible')}</span>${m.accessBlocked?'<span class="badge red"><i class="dot"></i>ACCESO BLOQUEADO</span>':adminMemberStateBadge(m.membershipState)}</button>`).join('')}</div>`;
 }
 async function loadAdminMemberDetail(id){
   const box=$('#admin-member-detail');if(!box)return;state.adminMembers.selectedId=id;box.innerHTML='<div class="empty compact-empty">Cargando ficha…</div>';
@@ -999,14 +1026,14 @@ function availableAdminValue(value){return value===null||value===undefined||Stri
 function adminMemberDetailHtml(d){
   const m=d.member||{},real=d.realState||{},applied=d.appliedState||{},personal=d.personal||{},security=d.security||{},updates=d.lastUpdate||{},reservations=d.reservations||[],diagnosis=d.diagnosis||[],actions=d.actions||{};
   const parking=reservations.filter(r=>r.type==='PARKING'),study=reservations.filter(r=>r.type==='STUDY_ROOM');
-  return `<div class="admin-member-detail-head"><div><span class="eyebrow">FICHA DE SOCIO</span><h3>${escapeHtml(availableAdminValue(m.name))}</h3></div>${adminMemberStateBadge(m.membershipState)}</div>
+  return `<div class="admin-member-detail-head"><div><span class="eyebrow">FICHA DE SOCIO</span><h3>${escapeHtml(availableAdminValue(m.name))}</h3></div>${m.accessBlocked?'<span class="badge red"><i class="dot"></i>ACCESO BLOQUEADO</span>':adminMemberStateBadge(m.membershipState)}</div>
   <div class="admin-member-diagnosis">${diagnosis.map(adminMemberDiagnosisHtml).join('')}</div>
   <div class="admin-member-detail-section source-real"><div class="admin-section-title"><div><span class="eyebrow">FUENTE AUTORITATIVA</span><h4>Estado XLSM</h4></div>${adminMemberStateBadge(real.status)}</div><div class="admin-member-detail-fields">${field('Estado explícito',availableAdminValue(real.status))}${field('Valor original',availableAdminValue(real.originalComment))}${field('Nombre en fuente',availableAdminValue(real.sourceName))}${field('Fila fuente',real.sourceRow||'No disponible')}${field('Última lectura',real.lastReadAt?formatLocalDateTime(real.lastReadAt):'No disponible')}${field('Archivo modificado',real.sourceModifiedAt?formatLocalDateTime(real.sourceModifiedAt):'No disponible')}</div>${real.matchIssue?`<p class="hint warning-copy">Diagnóstico: ${escapeHtml(real.matchIssue.replaceAll('_',' '))}. No se infirió ningún estado.</p>`:''}</div>
   <div class="admin-member-detail-section source-applied"><div class="admin-section-title"><div><span class="eyebrow">SQLITE MI ASPCH</span><h4>Estado aplicado por Mi ASPCH</h4></div>${adminMemberStateBadge(applied.state)}</div><div class="admin-member-detail-fields">${field('Estado usado',availableAdminValue(applied.state))}${field('Estado financiero local',availableAdminValue(applied.financialState))}${field('Indicador active',applied.activeFlag?'Sí':'No')}${field('Restricciones activas',(applied.blockedModules||[]).join(', ')||'Ninguna')}</div><p class="hint">Causa: ${escapeHtml(applied.cause||'No disponible')}</p><div class="admin-access-columns"><div><strong>Módulos permitidos</strong><p>${escapeHtml((applied.allowedModules||[]).join(', ')||'Ninguno')}</p></div><div><strong>Módulos bloqueados</strong><p>${escapeHtml((applied.blockedModules||[]).join(', ')||'Ninguno')}</p></div></div></div>
   <div class="admin-member-detail-section"><span class="eyebrow">BD SOCIOS</span><h4>Datos personales</h4><div class="admin-member-detail-fields">${field('RUT',availableAdminValue(personal.rut))}${field('Email',availableAdminValue(personal.email))}${field('Teléfono',availableAdminValue(personal.phone))}${field('Empresa / institución',availableAdminValue(personal.employer))}${field('Categoría',availableAdminValue(personal.category))}${field('Cargo',availableAdminValue(personal.position))}</div><p class="hint">Última actualización del snapshot: ${personal.lastSyncAt?formatLocalDateTime(personal.lastSyncAt):'No disponible'}. BD SOCIOS aporta datos personales, no autoridad de membresía.</p></div>
-  <div class="admin-member-detail-section"><span class="eyebrow">SQLITE MI ASPCH</span><h4>Estado operativo</h4><div class="admin-member-detail-fields">${field('Sesiones activas',Number(security.activeSessions||0))}${field('Passkeys',Number(security.passkeys||0))}${field('PIN',security.pinConfigured?'Configurado':'No configurado')}${field('OTP',security.otp?.pending?'Pendiente y vigente':'Sin OTP vigente')}${field('Último acceso',security.lastAccessAt?formatLocalDateTime(security.lastAccessAt):'No disponible')}${field('Último uso passkey',security.passkeyLastUsedAt?formatLocalDateTime(security.passkeyLastUsedAt):'No disponible')}</div><p class="hint">No se muestran PIN, hashes, tokens, credenciales WebAuthn ni OTP actuales.</p></div>
+  <div class="admin-member-detail-section"><span class="eyebrow">SQLITE MI ASPCH</span><h4>Estado operativo</h4><div class="admin-member-detail-fields">${field('Acceso a Mi ASPCH',m.accessBlocked?'Bloqueado':'Habilitado')}${field('Motivo de bloqueo',m.accessBlocked?availableAdminValue(m.accessBlockReason):'No aplica')}${field('Sesiones activas',Number(security.activeSessions||0))}${field('Passkeys',Number(security.passkeys||0))}${field('PIN',security.pinConfigured?'Configurado':'No configurado')}${field('OTP',security.otp?.pending?'Pendiente y vigente':'Sin OTP vigente')}${field('Último acceso',security.lastAccessAt?formatLocalDateTime(security.lastAccessAt):'No disponible')}${field('Último uso passkey',security.passkeyLastUsedAt?formatLocalDateTime(security.passkeyLastUsedAt):'No disponible')}</div><p class="hint">No se muestran PIN, hashes, tokens, credenciales WebAuthn ni OTP actuales.</p></div>
   <div class="admin-member-detail-section"><h4>Reservas activas</h4><div class="admin-member-reservations">${reservations.map(adminMemberReservationHtml).join('')||'<div class="empty compact-empty">Sin reservas activas relevantes en SQLite.</div>'}</div><p class="hint">Simuladores: no disponible sin una fuente local fiable.</p></div>
-  <div class="admin-member-detail-section"><span class="eyebrow">ACCIONES AUDITADAS</span><h4>Operación segura</h4><form class="admin-direct-pin" data-member="${m.id}"><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" placeholder="Nuevo PIN (4 dígitos)" required><button class="button secondary" type="submit">Guardar PIN directo</button>${actions.resetPin?'<button class="button ghost admin-member-action" data-action="reset-pin" type="button">Resetear PIN</button>':''}</form><div class="admin-member-actions"><button class="button secondary admin-member-action" data-action="refresh">Refrescar diagnóstico</button>${actions.closeSessions?'<button class="button ghost admin-member-action" data-action="close-sessions">Cerrar sesiones</button>':''}${actions.revokePasskeys?'<button class="button ghost admin-member-action" data-action="revoke-passkeys">Revocar passkeys</button>':''}${actions.issueOtp?'<button class="button ghost admin-member-action" data-action="issue-otp">Generar y enviar nuevo OTP</button>':'<button class="button ghost" disabled title="Entrega OTP deshabilitada">OTP no disponible</button>'}</div><p class="hint">El cambio de PIN es directo y queda auditado sin mostrar el valor. No existe acción manual para cambiar membresía.</p></div>
+  <div class="admin-member-detail-section"><span class="eyebrow">ACCIONES AUDITADAS</span><h4>Operación segura</h4><form class="admin-direct-pin" data-member="${m.id}"><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" placeholder="Nuevo PIN (4 dígitos)" required><button class="button secondary" type="submit">Guardar PIN directo</button>${actions.resetPin?'<button class="button ghost admin-member-action" data-action="reset-pin" type="button">Resetear PIN</button>':''}</form><div class="admin-member-actions"><button class="button secondary admin-member-action" data-action="refresh">Refrescar diagnóstico</button>${actions.blockUser?'<button class="button ghost admin-member-action" data-action="block-user">Bloquear usuario</button>':''}${actions.unblockUser?'<button class="button secondary admin-member-action" data-action="unblock-user">Reactivar usuario</button>':''}${actions.closeSessions?'<button class="button ghost admin-member-action" data-action="close-sessions">Cerrar sesiones</button>':''}${actions.revokePasskeys?'<button class="button ghost admin-member-action" data-action="revoke-passkeys">Revocar passkeys</button>':''}${actions.issueOtp?'<button class="button ghost admin-member-action" data-action="issue-otp">Generar y enviar nuevo OTP</button>':'<button class="button ghost" disabled title="Entrega OTP deshabilitada">OTP no disponible</button>'}</div><p class="hint">El cambio de PIN y el bloqueo de acceso son directos, cierran las sesiones cuando corresponde y quedan auditados. La membresía mantiene su fuente autoritativa.</p></div>
   <div class="admin-member-detail-section"><h4>Marcas de actualización</h4><div class="admin-member-detail-fields">${field('BD SOCIOS local',updates.memberUpdatedAt?formatLocalDateTime(updates.memberUpdatedAt):'No disponible')}${field('Última sincronización',updates.financialSyncedAt?formatLocalDateTime(updates.financialSyncedAt):'No disponible')}${field('XLSM leído',real.lastReadAt?formatLocalDateTime(real.lastReadAt):'No disponible')}</div></div>`;
 }
 function adminMemberDiagnosisHtml(item){const tone=item.severity==='critical'?'red':item.severity==='warning'?'amber':item.severity==='ok'?'green':'blue';return `<div class="admin-diagnosis ${tone}"><span>${item.severity==='critical'?'!':item.severity==='ok'?'✓':'⚠'}</span><div><strong>${escapeHtml(item.title||'Diagnóstico')}</strong><p>${escapeHtml(item.message||'')}</p></div></div>`}
@@ -1017,10 +1044,11 @@ function bindAdminMemberActions(detail){
   $$('.admin-direct-pin').forEach(form=>form.onsubmit=e=>{e.preventDefault();const pin=new FormData(form).get('pin');adminMasterMemberAction(detail.member.id,'set-pin',{pin})});
 }
 async function adminMasterMemberAction(memberId,action,extra={}){
-  const prompts={refresh:'Releer ahora el XLSM en modo diagnóstico y refrescar esta ficha?', 'release-parking':'Liberar esta reserva de estacionamiento? La acción quedará auditada.', 'cancel-study':'Cancelar esta reserva de sala? No se enviarán notificaciones externas.', 'close-sessions':'Cerrar todas las sesiones activas de este socio?', 'revoke-passkeys':'Revocar todas las passkeys de este socio? Deberá registrarlas nuevamente.', 'issue-otp':'Generar y enviar un OTP nuevo? El código actual no será mostrado.'};
+  const prompts={refresh:'Releer ahora el XLSM en modo diagnóstico y refrescar esta ficha?', 'release-parking':'Liberar esta reserva de estacionamiento? La acción quedará auditada.', 'cancel-study':'Cancelar esta reserva de sala? No se enviarán notificaciones externas.', 'close-sessions':'Cerrar todas las sesiones activas de este socio?', 'revoke-passkeys':'Revocar todas las passkeys de este socio? Deberá registrarlas nuevamente.', 'issue-otp':'Generar y enviar un OTP nuevo? El código actual no será mostrado.', 'block-user':'Bloquear el acceso de este socio a Mi ASPCH y cerrar todas sus sesiones?', 'unblock-user':'Reactivar el acceso de este socio a Mi ASPCH?'};
   if(!['set-pin','reset-pin'].includes(action)&&!confirm(prompts[action]||'Confirmar acción administrativa?'))return;
-  const confirmations={'release-parking':'LIBERAR RESERVA','cancel-study':'CANCELAR RESERVA','close-sessions':'CERRAR SESIONES','revoke-passkeys':'REVOCAR PASSKEYS','issue-otp':'GENERAR OTP'};
-  try{await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{...extra,confirm:confirmations[action]||''}});toast(action==='refresh'?'Diagnóstico actualizado.':'Acción administrativa completada y auditada.');await loadAdminMemberDetail(memberId)}catch(err){toast(err.message,true)}
+  const confirmations={'release-parking':'LIBERAR RESERVA','cancel-study':'CANCELAR RESERVA','close-sessions':'CERRAR SESIONES','revoke-passkeys':'REVOCAR PASSKEYS','issue-otp':'GENERAR OTP','block-user':'BLOQUEAR USUARIO','unblock-user':'REACTIVAR USUARIO'};
+  const reason=action==='block-user'?(prompt('Motivo del bloqueo:','Bloqueo administrativo')||'').trim():'';if(action==='block-user'&&!reason)return;
+  try{await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{...extra,reason,confirm:confirmations[action]||''}});toast(action==='refresh'?'Diagnóstico actualizado.':'Acción administrativa completada y auditada.');await loadAdminMemberDetail(memberId)}catch(err){toast(err.message,true)}
 }
 async function renderAdminReservations(){
   if(state.member?.role!=='ADMIN')return go('home');
@@ -1079,7 +1107,6 @@ function renderAdminReservationsView(d){
     ${adminSummaryCard('🚗','Estacionamientos hoy',s.parkingToday||0,`${available} cupos disponibles`)}
     ${adminSummaryCard('🗓️','Reservas activas',s.parkingActive||0,'estacionamientos hoy y futuros')}
     ${adminSummaryCard('📖','Sala de estudios',s.studyActive||0,'reservas activas')}
-    ${adminSummaryCard('⏳','Lista de espera',s.waitlistActive||0,'solicitudes activas')}
   </div>
   <section class="section admin-master-grid">
     <div class="card admin-master-wide">
@@ -1091,7 +1118,6 @@ function renderAdminReservationsView(d){
     </div>
     <div class="card"><span class="eyebrow">ESTACIONAMIENTOS</span><h3>Reservas activas</h3><div class="admin-operation-list">${(parking.active||[]).map(r=>adminParkingReservationRow(r,false)).join('')||'<div class="empty compact-empty">Sin reservas activas.</div>'}</div></div>
     <div class="card"><span class="eyebrow">SALA DE ESTUDIOS</span><h3>Reservas activas</h3><div class="admin-operation-list">${(study.active||[]).map(adminStudyReservationRow).join('')||'<div class="empty compact-empty">Sin reservas activas de sala.</div>'}</div></div>
-    <div class="card"><span class="eyebrow">LISTA DE ESPERA</span><h3>Solicitudes activas</h3><div class="admin-operation-list">${(study.waitlist||[]).map(adminStudyWaitlistRow).join('')||'<div class="empty compact-empty">Sin solicitudes en espera.</div>'}</div></div>
     <div class="card"><span class="eyebrow">SIMULADORES</span><h3>Fuente de ocupación</h3><div class="admin-alert amber"><span>⚠</span><div><strong>Fuente no disponible / local no fiable</strong><p>${escapeHtml(sim.impact||'No se muestran turnos hasta contar con una sincronización local segura.')}</p></div></div><p class="hint">Estado: ${escapeHtml(String(sim.status||'NO_RELIABLE_LOCAL_SOURCE').replaceAll('_',' '))}. Esta vista no consulta Calendar.</p></div>
     <div class="card"><span class="eyebrow">AUDITORÍA</span><h3>Acciones recientes de reservas</h3><div class="admin-event-list">${(d.audit||[]).map(adminReservationAuditRow).join('')||'<div class="empty compact-empty">Sin acciones ADMIN registradas.</div>'}</div></div>
   </section>`;
@@ -1106,7 +1132,7 @@ function renderAdminReservationsView(d){
       toast('Sin conexión / última lectura: '+(err.message||'error'),true);
     }
   });
-  $$('.admin-reservation-control').forEach(button=>button.onclick=()=>adminReservationControl(Number(button.dataset.member),button.dataset.action,Number(button.dataset.id)));
+  $$('.admin-reservation-control').forEach(button=>button.onclick=()=>adminReservationControl(Number(button.dataset.member),button.dataset.action,Number(button.dataset.id),button.dataset.date,button.dataset.space));
 }
 function adminParkingSpaceRow(s){
   if(s.occupied && s.reservation){
@@ -1120,7 +1146,7 @@ function adminParkingSpaceRow(s){
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
         <span class="badge amber"><i class="dot"></i>OCUPADO</span>
-        <button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId}" data-id="${r.id}" data-action="release-parking">Liberar</button>
+        <button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId||''}" data-date="${escapeHtml(r.reservationDate||'')}" data-space="${escapeHtml(s.id)}" data-action="release-parking">Liberar</button>
       </div>
     </div>`;
   }
@@ -1134,15 +1160,14 @@ function adminParkingSpaceRow(s){
     <span class="badge green"><i class="dot"></i>LIBRE</span>
   </div>`;
 }
-function adminParkingReservationRow(r,isToday){return `<div class="admin-operation-row"><span class="admin-operation-icon">🚗</span><div><strong>${escapeHtml(r.memberName||'Socio')}</strong><p>Est. ${escapeHtml(r.spaceLabel||r.spaceId||'—')} · Padre Mariano ${escapeHtml(r.building||'—')} · ${isToday?'Hoy':escapeHtml(r.reservationDate||'—')}</p><small>${escapeHtml(r.memberEmail||'')}</small></div><button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId}" data-id="${r.id}" data-action="release-parking">Liberar</button></div>`}
+function adminParkingReservationRow(r,isToday){return `<div class="admin-operation-row"><span class="admin-operation-icon">🚗</span><div><strong>${escapeHtml(r.memberName||'Socio')}</strong><p>Est. ${escapeHtml(r.spaceLabel||r.spaceId||'—')} · Padre Mariano ${escapeHtml(r.building||'—')} · ${isToday?'Hoy':escapeHtml(r.reservationDate||'—')}</p><small>${escapeHtml(r.memberEmail||'')}</small></div><button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId||''}" data-id="${r.id||''}" data-date="${escapeHtml(r.reservationDate||'')}" data-space="${escapeHtml(r.spaceId||'')}" data-action="release-parking">Liberar</button></div>`}
 function adminStudyReservationRow(r){return `<div class="admin-operation-row"><span class="admin-operation-icon">📖</span><div><strong>${escapeHtml(r.memberName||'Socio')}</strong><p>${escapeHtml(r.roomName||'Sala de estudios')} · ${formatLocalDateTime(r.startAt)} – ${hm(r.endAt)}</p><small>${escapeHtml(r.memberEmail||'')}</small></div><button class="button ghost admin-reservation-control" type="button" data-member="${r.memberId}" data-id="${r.id}" data-action="cancel-study">Cancelar</button></div>`}
-function adminStudyWaitlistRow(r){return `<div class="admin-operation-row"><span class="admin-operation-icon">⏳</span><div><strong>${escapeHtml(r.memberName||'Socio')}</strong><p>${escapeHtml(r.roomName||'Sala de estudios')} · ${formatLocalDateTime(r.startAt)} – ${hm(r.endAt)}</p><small>${r.notifiedAt?'Aviso local registrado '+formatLocalDateTime(r.notifiedAt):'Aún sin aviso registrado'}</small></div><span class="badge amber">EN ESPERA</span></div>`}
 function adminReservationAuditRow(r){const label=r.action==='ADMIN_PARKING_RELEASED'?'Estacionamiento liberado':'Sala cancelada';return `<div class="admin-dashboard-event"><div><strong>${escapeHtml(label)}</strong><span>${escapeHtml(r.actorName||'ADMIN')} → ${escapeHtml(r.subjectName||'Socio')}</span></div><time>${formatLocalDateTime(r.createdAt)}</time></div>`}
-async function adminReservationControl(memberId,action,reservationId){
+async function adminReservationControl(memberId,action,reservationId,date='',spaceId=''){
   const parking=action==='release-parking',message=parking?'¿Liberar esta reserva de estacionamiento? La acción quedará auditada.':'¿Cancelar esta reserva de sala? No se enviarán notificaciones externas.';
   if(!confirm(message))return;
   const confirmText=parking?'LIBERAR RESERVA':'CANCELAR RESERVA';
-  try{await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{reservationId,confirm:confirmText}});toast('Reserva actualizada y auditada.');await renderAdminReservations()}catch(err){toast(err.message,true)}
+  try{if(parking)await api('/api/admin/parking/release',{method:'POST',body:{date,spaceId,confirm:confirmText}});else await api(`/api/admin/members/${memberId}/actions/${action}`,{method:'POST',body:{reservationId,confirm:confirmText}});toast(parking?'Estacionamiento liberado y auditado.':'Reserva actualizada y auditada.');await renderAdminReservations()}catch(err){toast(err.message,true)}
 }
 async function renderAdminVotes(){
   if(state.member?.role!=='ADMIN')return go('home');
@@ -1724,7 +1749,7 @@ async function renderDeveloper(){
   state.instagramSync=o.instagram||{};
   const metrics=[
     ['Socios activos',m.members?.active||0,'👥'],['Morosos',m.members?.moroso||0,'💳'],['Directorio',m.members?.board||0,'⭐'],['Estac. activas',m.parking?.active||0,'🚗'],
-    ['Sala activa',m.study?.active||0,'📖'],['Lista espera',m.study?.waitlist||0,'⏳'],['Mercado pendiente',m.marketplace?.pending||0,'🛒'],['Reportes abiertos',m.marketplace?.reports||0,'🚩'],
+    ['Sala activa',m.study?.active||0,'📖'],['Mercado pendiente',m.marketplace?.pending||0,'🛒'],['Reportes abiertos',m.marketplace?.reports||0,'🚩'],
     ['Votaciones abiertas',m.votes?.open||0,'🗳️'],['Push devices',m.push?.subscriptions||0,'🔔'],['Sesiones',m.sessions?.active||0,'🔐'],['Auditoría',m.audit?.rows||0,'🧾']
   ];
   $('#view').innerHTML=`
@@ -1773,7 +1798,7 @@ async function renderDeveloper(){
 
   <details class="dev-section card" open><summary>🗳️ Votaciones</summary><div class="dev-section-body"><div class="grid two"><form id="vote-admin-form" class="admin-form"><input id="vote-id" type="hidden"><h3 id="vote-form-title">Nueva votación</h3><input id="vote-title" placeholder="Título" required><textarea id="vote-desc" placeholder="Descripción / pregunta"></textarea><select id="vote-secrecy"><option value="SECRET">Secreta</option><option value="IDENTIFIED">Identificada</option></select><select id="vote-eligibility"><option value="ACTIVE_ALL">Todos los socios activos</option><option value="AL_DIA_ONLY">Solo al día / exentos</option><option value="BOARD_ONLY">Solo Directorio</option></select><label>Apertura programada (opcional)<input id="vote-opens" type="datetime-local"></label><label>Cierre programado (opcional)<input id="vote-closes" type="datetime-local"></label><textarea id="vote-options" placeholder="Una opción por línea&#10;Sí&#10;No" required></textarea><div class="toolbar"><button class="button primary" id="vote-save-button">Crear borrador</button><button class="button ghost hidden" type="button" id="vote-cancel-edit">Cancelar edición</button></div><p class="hint">Al abrir se congela el padrón. Flujo irreversible: Borrador → Abierta → Cerrada → Archivada.</p></form><div><h3>Administrar</h3><div class="dev-list">${(o.votes||[]).map(voteAdminRow).join('')||'<div class="empty">Sin votaciones.</div>'}</div></div></div></div></details>
 
-  <details class="dev-section card"><summary>📖 Sala de estudios</summary><div class="dev-section-body"><div class="grid two"><div><h3>Próximas reservas</h3><div class="reservation-list">${(o.study?.reservations||[]).map(r=>`<div class="reservation-row compact"><div><strong>${formatLocalDateTime(r.start)}</strong><span>${escapeHtml(r.member_name||'')} · ${escapeHtml(r.member_email||'')}</span></div><button class="button ghost admin-study-cancel" data-id="${r.id}">Cancelar</button></div>`).join('')||'<div class="empty">Sin reservas.</div>'}</div></div><div><h3>Lista de espera</h3><div class="dev-list compact">${(o.study?.waitlist||[]).map(w=>`<div><strong>${escapeHtml(w.member_name||'')}</strong><span>${formatLocalDateTime(w.start_at)} → ${formatLocalDateTime(w.end_at)}</span></div>`).join('')||'<div class="empty">Sin espera activa.</div>'}</div></div></div></div></details>
+  <details class="dev-section card"><summary>📖 Sala de estudios</summary><div class="dev-section-body"><h3>Próximas reservas</h3><div class="reservation-list">${(o.study?.reservations||[]).map(r=>`<div class="reservation-row compact"><div><strong>${formatLocalDateTime(r.start)}</strong><span>${escapeHtml(r.member_name||'')} · ${escapeHtml(r.member_email||'')}</span></div><button class="button ghost admin-study-cancel" data-id="${r.id}">Cancelar</button></div>`).join('')||'<div class="empty">Sin reservas.</div>'}</div></div></details>
 
   <details class="dev-section card"><summary>🎓 Cursos, charlas y actividades</summary><div class="dev-section-body"><div class="grid two"><form id="activity-form" class="admin-form"><h3>Nueva actividad</h3><select id="activity-type"><option value="COURSE">Curso</option><option value="TALK">Charla</option><option value="EVENT">Actividad</option></select><input id="activity-title" placeholder="Título" required><textarea id="activity-desc" placeholder="Descripción"></textarea><label>Inicio<input id="activity-start" type="datetime-local"></label><label>Término<input id="activity-end" type="datetime-local"></label><input id="activity-url" type="url" placeholder="https://forms.gle/..." required><button class="button primary">Publicar</button></form><div><h3>Administrar</h3><div class="dev-list">${(o.activities||[]).map(activityAdminRow).join('')||'<div class="empty">Sin actividades.</div>'}</div></div></div></div></details>
 

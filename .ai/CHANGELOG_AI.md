@@ -1,3 +1,42 @@
+# OLED Dark exclusivo del Panel Informática — 2026-09-09
+
+- Tema OLED negro (bg `#000000`) aplicado solo a `/informatica`, `/informatica/`,
+  `/admin` y `/admin.html` vía `class="informatica-panel"` en `<html>` de
+  `admin.html`; la app normal conserva su tema estándar light/dark del sistema.
+- Nuevas variables OLED scoped en `styles.css` (bg `#000`, surface `#050505/`#080808`,
+  line `#1a1a1a`, text `#f5f5f5`, muted `#9ca3af`) manteniendo azul ASPCH para
+  primarios/activos/links/selección, rojo solo errores y verde solo OK.
+- Corregidos fondos hardcodeados del login/bloqueo en esencia: `.auth-screen`
+  y `.clean-*` pasan a negro en el panel; `nav-item.active` pasa de rojo a azul.
+- Lienzo nativo iOS: `MiASPCHWebView.applyInformaticaBackground` usa negro cuando
+  el pathname es del panel y `systemBackground` en el resto, sin crear WKWebView
+  nuevo ni tocar sesiones/auth (se re-aplica en `didFinish` y en cambios de colorScheme).
+- `git diff --check` limpio y BUILD DEBUG iOS Simulator **SUCCEEDED**. Sin commit ni push.
+
+# Navegación y vistas iOS — 2026-09-09
+
+- Corregido Perfil→Credencial en Modo Simple y restaurados Inicio,
+  Estacionamiento, Reservas y Perfil como destinos principales.
+- Ordenado Más con Beneficios ASPCH y sin acciones de cuenta duplicadas.
+- Simplificados Estacionamiento y Sala de estudios; Inicio incorpora votaciones
+  e inscripciones abiertas a cursos, charlas y eventos.
+- Conservada la firma con equipo personal sin Push entitlement; notificaciones
+  locales DEBUG disponibles y APNs remoto documentado como pendiente de equipo
+  Apple Developer de pago, perfil y backend.
+- Conservado acceso ADMIN server-side al Panel Informática desde la app; sin
+  despliegue, commit, backend APNs ni activación ficticia de integraciones.
+- Añadido selector flotante ADMIN arriba a la derecha para alternar entre Mi
+  ASPCH y Panel Informática dentro del mismo WKWebView y sesión.
+- Corregida la simplificación pendiente de Estacionamiento: sin título global,
+  sin cabecera/sincronización/`Otra fecha` y con siete fechas desde hoy.
+- Retirada de toda UI la lista de espera/avisos y horarios ocupados de Sala.
+- Navbar ADMIN reordenado a Estacionamientos, Socios, Votaciones y Auditoría;
+  el panel abre en Estacionamientos y Socios permite bloquear/reactivar acceso
+  con cierre de sesiones y auditoría, sin modificar la membresía.
+- Reparado `Liberar` de estacionamientos ADMIN para reservas live sin ID local:
+  ahora opera por fecha+cupo y sincroniza Google Sheets, proyección visible,
+  SQLite y Auditoría.
+
 # Preview 8086 — 2026-09-03
 
 - Segunda pasada: A320Pro muestra 2 horas $75.000 y 4 horas $100.000 con el
@@ -196,3 +235,4 @@ Adaptación visual de la capa iOS con navegación estándar, diagnóstico separa
   ASPCH y fuerza fallback PIN al alcanzar 3 fallos biométricos.
 - Cualquier resultado no exitoso de Face ID en la pantalla nativa pasa al PIN
   de Mi ASPCH, evitando reintentos biométricos inesperados.
+- 2026-09-10: Diagnóstico y verificación end-to-end de "Liberar estacionamiento" (Panel Informática). Reproducción del fallo sobre la baseline desplegada (404 del endpoint `/api/admin/parking/release`; fallo del flujo OLD con ids ausentes en vivo). Verificación del fix del working tree con `tools/self_check_admin_parking_release.mjs` (liberación panel) y alineación de `tools/self_check_auth.mjs` a `VACATED`/`vacated_at`.

@@ -1,5 +1,76 @@
 # Notas de Codex para ChatGPT
 
+## 2026-09-09 — OLED Dark exclusivo del Panel Informática
+
+Se implementó un tema OLED negro exclusivo para `/informatica` sin tocar la app
+normal:
+
+- `admin.html`: `<html lang="es" class="informatica-panel">` y
+  `theme-color` único `#000000`; detecta el panel por pathname en servidor, como
+  ya hacía (sin cambio de rutas). Sin JS extra ni flash de tema.
+- `styles.css`: bloque scoped bajo `html.informatica-panel` con paleta OLED y
+  overrides (login/bloqueo `.auth-screen`/`.clean-*`, `nav-item.active` azul,
+  botones secundarios navy, enfoque/selección azules, overlays oscuros, chip del
+  logo estable). `color-scheme:dark` mantiene controles/pickers en negro.
+- `ios/MiASPCH/Web/MiASPCHWebView.swift`: `applyInformaticaBackground(to:)`
+  pone el lienzo (`backgroundColor`, `scrollView.backgroundColor`,
+  `underPageBackgroundColor`) en negro para `/informatica|/admin|/admin.html` y
+  `systemBackground` para el resto; se ejecuta en `applyAppearance` y en
+  `didFinish` (persistente a la navegación panel↔app y a cambios de colorScheme).
+  Solo visual: no crea WKWebView, no toca auth/permisos/sesiones.
+
+Verificado: `git diff --check` exit 0 y BUILD DEBUG Simulator **SUCCEEDED**.
+No se hizo commit ni push. Nota: el usuario reportó no ver en el dispositivo el
+cambio de estacionamiento; esos cambios viven solo en el working tree sin commit
+y el entorno servido puede corresponder a otra réplica.
+
+## 2026-09-09 — Navbar simple, vistas y Push iOS
+
+Se eliminó la causa del duplicado Perfil/Credencial: el allowlist de `go()`
+omitía Perfil y redirigía toda ruta no permitida a Credencial. La barra simple
+queda Inicio, Estacionamiento, Reservas, Perfil y Más; Credencial vive en Inicio.
+Más excluye Credencial, Contacto, Bloquear y Cerrar sesión, y agrupa Biblioteca,
+Convenios y Mercado ASPCH bajo Beneficios ASPCH.
+
+Estacionamiento ya no muestra cabecera/título redundante, sincronización, `Otra
+fecha` ni días anteriores: la primera franja son hoy + 6 días. Sala muestra
+solo Reserva tu bloque y Tu reserva si existe; no quedan referencias visibles a
+lista de espera/avisos ni horarios ocupados, tampoco en Perfil o panel.
+
+El intento de enlazar `MiASPCH.entitlements` confirmó que el equipo personal de
+Apple no puede generar un perfil con Push/`aps-environment`, por lo que se retiró
+la capacidad del target para recuperar la instalación desde Xcode. La prueba de
+notificación local DEBUG no requiere ese entitlement. El selector ADMIN del menú
+nativo se mantiene accesible aun con Modo Simple, permitiendo llegar a Reservas
+y ejecutar la liberación auditada ya existente. Finanzas y Contenido siguen
+siendo los dos placeholders explícitos del panel.
+
+El navbar ADMIN principal ahora es Estacionamientos, Socios, Votaciones y
+Auditoría, y `/informatica` abre en Estacionamientos. La ficha Socios incorpora
+bloqueo/reactivación persistente separado de membresía; bloquear invalida sus
+sesiones y ambas acciones quedan auditadas. El self-check de esta migración pasó
+en SQLite temporal.
+
+Corrección de liberación ADMIN: `getAdminLiveParking()` entrega filas de Google
+sin `parking_reservations.id`; la UI anterior serializaba ese ID como inválido y
+el action endpoint solo cambiaba SQLite con `externalWrites:false`. El nuevo
+`POST /api/admin/parking/release` recibe fecha+cupo, marca `DESOCUPADO` en el
+ledger, limpia la proyección visible de hoy, actualiza SQLite y audita.
+
+Se añadió además un selector nativo flotante superior derecho, exclusivo para
+sesiones ADMIN, que alterna entre `/` y `/informatica` en el WKWebView persistente
+sin cambiar sesión. En DEBUG el control de diagnóstico se desplaza para no
+superponerse.
+
+Una votación `OPEN` ahora aparece siempre en Inicio. Para cuentas fuera del
+padrón congelado, incluida ADMIN, se muestra como visible pero no votable. Se
+rotaron el hash de `app.js` y el namespace del Service Worker; el source queda
+preparado, pero no se desplegó al origen remoto que consume la app Debug.
+
+`npm run check`, `plutil` y `git diff --check` aprobaron. El build Debug exacto
+falló en `CompileAssetCatalogVariant` porque CoreSimulator no ofrece runtimes;
+el mismo fallo ambiental ocurre con destino iphoneos y no es un error Swift.
+
 ## 2026-09-03 — Segunda pasada Preview
 
 Se corrigieron tarifas A320Pro (2 h $75.000, 4 h $100.000) y se mantuvo el
@@ -536,3 +607,26 @@ Ajuste posterior: todo resultado no exitoso de `LocalAuthentication`
 -- cancelación, fallo, lockout o no disponibilidad -- entra directamente al
 fallback PIN de Mi ASPCH. Esto evita que iOS cierre el sheet de Face ID con una
 cancelación y la app vuelva a mostrar "Acceder" biométrico en vez del PIN.
+
+### Diagnóstico "Liberar estacionamiento" (Panel Informática) — 2026-09-10
+
+Causa raíz confirmada por reproducción dual en commit HEAD `9f67545` (baseline
+desplegada en el contenedor 8085 / enlace Cloudflare del Directorio):
+
+1. El `POST /api/admin/parking/release` (fecha+cupo+confirmación) que usa la UI
+   nueva NO existe en el código desplegado → responde 404. La réplica remota
+   que ve el iPhone sirve una versión anterior a este fix.
+2. En el flujo OLD desplegado (ficha/lista con `memberId`+`reservationId`), las
+   reservas en vivo de Google Sheets no traen `parking_reservations.id` ni
+   `memberId` → la UI serializaba `data-id="undefined"/NaN` y el endpoint
+   respondía 404 ("Socio no encontrado") y la reserva seguía `ACTIVE`.
+
+El working tree ya contenía (sin commit) el fix completo y se verificó de punta
+a punta con `tools/self_check_admin_parking_release.mjs`: libera con
+confirmación exacta, `changed=1`, cupo pasa a Libre, desaparece de activas,
+quedando `VACATED`+`vacated_at` y auditoría `ADMIN_PARKING_RELEASED`. Se alineó
+`tools/self_check_auth.mjs` que aún esperaba `CANCELLED` para la liberación
+(ahora `VACATED`/`vacated_at`, consistente con vacate de socio y `DESOCUPADO`
+de Google). `npm run check` OK. Bloqueo de validación local: el self-check
+completo exige Node 22 (assert) y el equipo local tiene Node 26; la rama live
+de Google Sheets no es ejercitable sin credenciales reales.

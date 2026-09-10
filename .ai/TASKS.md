@@ -1,5 +1,10 @@
 # Pendientes
 
+- [ ] Completar las vistas dedicadas Finanzas y Contenido del Panel Informática
+      con fuentes reales, acciones auditadas y validación responsive iPhone/web.
+- [ ] Implementar registro persistente de tokens y entrega backend APNs con
+      credenciales Apple antes de declarar Push remoto nativo completo.
+
 - [ ] Incorporar, tras verificación documental, los assets oficiales de
       emergencia/IFALPA y los datos oficiales de precio/formulario A320Pro en
       Preview; no usar sustitutos ni activar URLs no verificadas.
@@ -19,8 +24,8 @@
       del `.env` productivo, sin mostrar sus valores.
 - [ ] Diseñar una fuente local segura y sincronizada para turnos de simulador.
 - [ ] Definir una fuente segura si se requiere mostrar estado real del contenedor.
-- [ ] Definir persistencia segura de intentos/fallos y bloqueos de acceso si esas
-      métricas deben incorporarse a Seguridad.
+- [ ] Definir persistencia de intentos/fallos de acceso si esas métricas deben
+      incorporarse a Seguridad; el bloqueo administrativo de socios ya persiste.
 - [ ] Evaluar un endpoint ADMIN acotado para limpiar Push muerto solo si el borrado
       automático 404/410 durante entregas resulta insuficiente.
 
@@ -33,6 +38,22 @@
 - Ninguna tarea documental bloqueada.
 
 # Completadas recientemente
+
+- [x] Tema OLED Dark exclusivo del Panel Informática (`/informatica`): scope por
+      clase `informatica-panel` en `admin.html`, variables y overrides scoped en
+      `styles.css`, y lienzo nativo negro bajo `/informatica` en `MiASPCHWebView`.
+      App normal sin cambios; `git diff --check` limpio y BUILD DEBUG iOS OK.
+
+- [x] Corregir duplicación Perfil/Credencial en Modo Simple, restaurar Inicio,
+      Reservas y Perfil como destinos principales y ordenar el menú Más.
+- [x] Simplificar Estacionamiento y Sala de estudios, y mostrar en Inicio
+      votaciones e inscripciones abiertas a cursos, charlas y eventos.
+- [x] Mantener el acceso ADMIN al Panel Informática disponible desde la app en
+      Modo Simple y documentar el bloqueo APNs del equipo personal de Apple.
+- [x] Priorizar Estacionamientos, Socios, Votaciones y Auditoría en el navbar
+      ADMIN; agregar bloqueo/reactivación persistente y auditada de socios.
+- [x] Eliminar de toda UI las listas de espera/avisos de Sala y endurecer
+      Estacionamiento a siete fechas desde hoy sin título redundante.
 
 - [x] Habilitar `/informatica` en el enlace Cloudflare canónico, compartir la
       sesión ADMIN y alternar entre Mi ASPCH con capacidades del Directorio y el

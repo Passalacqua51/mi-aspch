@@ -1,5 +1,50 @@
 # Estado actual
 
+## OLED Dark exclusivo del Panel Informática — 2026-09-09
+
+- Detección sin cambios: `IS_ADMIN_PANEL` y el servidor siguen resolviendo
+  `/informatica` → `admin.html`; el tema se activa con `class="informatica-panel"`
+  solo en el `<html>` de ese documento (CSP-safe, sin JS ni flash).
+- `html.informatica-panel` define paleta OLED (bg `#000`, surfaces `#050505`/
+  `#080808`, line `#1a1a1a`, text `#f5f5f5`, muted `#9ca3af`, azul ASPCH
+  `#2e6bd4`/`#6da8ff`, verde `#34d399`, ámbar `#f5b75e`, rojo `#ff5f73`) y
+  sobreescribe los pocos fondos hardcodeados de login/bloqueo y el `nav-item.active`.
+- iOS (`MiASPCHWebView`): `backgroundColor`/`scrollView`/`underPageBackgroundColor`
+  en negro cuando el pathname es `/informatica` (o variantes) y `systemBackground`
+  en el resto; se re-aplica en `didFinish` y al cambiar `colorScheme`. Puramente
+  visual, sin WKWebView nuevo ni cambios de sesión/auth.
+- Validación: `git diff --check` exit 0 y BUILD DEBUG (Simulator) **SUCCEEDED**.
+
+## Navegación iOS, vistas miembro y Push — 2026-09-09
+
+- Modo Simple conserva como destinos principales Inicio, Estacionamiento,
+  Reservas y Perfil; `go()` ya no convierte Perfil en Credencial.
+- Credencial sigue accesible desde Inicio. El menú nativo Más omite Credencial,
+  Contacto, Bloquear y Cerrar sesión, y agrupa Biblioteca, Convenios y Mercado
+  ASPCH bajo `Beneficios ASPCH`.
+- Estacionamiento muestra tramos móviles de siete días desde hoy, sin días
+  anteriores, selector `Otra fecha`, título/cabecera redundante ni texto de
+  sincronización. Sala de estudios muestra solo `Reserva tu bloque` y `Tu
+  reserva` cuando existe; sus referencias visibles a avisos/lista de espera y
+  horarios ocupados fueron retiradas también del panel y preferencias.
+- Inicio muestra votaciones abiertas e inscripciones abiertas a cursos, charlas
+  y eventos usando las ventanas reales de inscripción.
+- El equipo personal de desarrollo no admite Push Notifications ni perfiles con
+  `aps-environment`; la capacidad no queda enlazada al target para conservar la
+  instalación desde Xcode. Las notificaciones locales DEBUG siguen disponibles.
+  Push remoto requiere equipo Apple Developer de pago, perfil APNs y backend.
+- El acceso al Panel Informática permanece protegido por rol ADMIN en servidor;
+  un botón nativo flotante superior derecho cambia entre Mi ASPCH y el Panel en
+  el mismo WKWebView, incluso con Modo Simple. Finanzas y Contenido continúan
+  siendo los únicos placeholders explícitos del panel.
+- El panel abre en Estacionamientos/Reservas y su navbar principal queda
+  Estacionamientos, Socios, Votaciones y Auditoría. Socios permite cambiar o
+  resetear PIN y bloquear/reactivar el acceso mediante estado independiente de
+  la membresía; al bloquear se cierran sesiones y todo queda auditado.
+- `Liberar` en Estacionamientos ADMIN usa fecha + ID de cupo, no el ID SQLite
+  ausente en lecturas live. Actualiza el estado real en Google Sheets, limpia la
+  ocupación visible de hoy, refleja `VACATED` en SQLite e informa si falta WRITE.
+
 ## Cambios preparados para Preview 8086 — 2026-09-03
 
 - Segunda pasada implementada: A320Pro muestra 2 horas por $75.000 y 4 horas

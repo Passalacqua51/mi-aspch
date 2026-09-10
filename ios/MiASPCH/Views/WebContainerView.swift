@@ -17,10 +17,35 @@ struct WebContainerView: View {
 
     var body: some View {
         webContent
-            .overlay(alignment: .bottom) {
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !model.navigation.primary.isEmpty {
                     NativeNavigationBar(model: model)
                         .padding(.bottom, 8)
+                        .offset(y: 18)
+                }
+            }
+            .background {
+                (colorScheme == .dark ? ASPCHPalette.darkSurface : ASPCHPalette.lightSurface)
+                    .ignoresSafeArea(edges: .bottom)
+            }
+            .overlay(alignment: .topTrailing) {
+                if model.navigation.isAdmin {
+                    Button {
+                        model.toggleAdminPanel()
+                    } label: {
+                        Label(model.navigation.isAdminPanel ? "Mi ASPCH" : "Panel",
+                              systemImage: model.navigation.isAdminPanel ? "iphone" : "wrench.and.screwdriver")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .frame(height: 38)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .background(ASPCHPalette.primary, in: Capsule())
+                    .shadow(color: .black.opacity(0.18), radius: 7, x: 0, y: 3)
+                    .accessibilityLabel(model.navigation.isAdminPanel ? "Volver a Mi ASPCH" : "Abrir Panel Informática")
+                    .accessibilityIdentifier("native-admin-mode-switch")
+                    .padding(8)
                 }
             }
             #if DEBUG
@@ -68,7 +93,8 @@ struct WebContainerView: View {
                         .frame(maxWidth: 300)
                     }
                 }
-                .padding(8)
+                .padding(.top, model.navigation.isAdmin ? 54 : 8)
+                .padding(.horizontal, 8)
             }
             #endif
     }
@@ -120,6 +146,15 @@ private struct NativeNavigationBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var optimisticSelectedId: String? = nil
+    @State private var showExitSimpleConfirmation = false
+
+    private var benefitItems: [WebNavigationItem] {
+        model.navigation.secondary.filter { ["library", "convenios", "marketplace"].contains($0.id) }
+    }
+
+    private var otherSecondaryItems: [WebNavigationItem] {
+        model.navigation.secondary.filter { !["library", "convenios", "marketplace"].contains($0.id) }
+    }
 
     private var selectedId: String {
         if let optimistic = optimisticSelectedId {
@@ -141,6 +176,12 @@ private struct NativeNavigationBar: View {
             .padding(.vertical, 4)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Navegación principal")
+            .confirmationDialog("¿Volver al modo normal?", isPresented: $showExitSimpleConfirmation, titleVisibility: .visible) {
+                Button("Volver al modo normal") {
+                    model.exitSimpleMode()
+                }
+                Button("Cancelar", role: .cancel) {}
+            }
     }
 
     @ViewBuilder
@@ -175,14 +216,22 @@ private struct NativeNavigationBar: View {
 
             if !model.navigation.secondary.isEmpty {
                 Menu {
-                    ForEach(model.navigation.secondary) { item in
+                    ForEach(otherSecondaryItems) { item in
                         Button {
-                            withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.75)) {
-                                optimisticSelectedId = "more"
-                            }
-                            model.activate(item)
+                            activateSecondary(item)
                         } label: {
                             Label(item.label, systemImage: item.symbol)
+                        }
+                    }
+                    if !benefitItems.isEmpty {
+                        Menu("Beneficios ASPCH", systemImage: "gift") {
+                            ForEach(benefitItems) { item in
+                                Button {
+                                    activateSecondary(item)
+                                } label: {
+                                    Label(item.label, systemImage: item.symbol)
+                                }
+                            }
                         }
                     }
                     Divider()
@@ -211,6 +260,17 @@ private struct NativeNavigationBar: View {
                 optimisticSelectedId = nil
             }
         }
+    }
+
+    private func activateSecondary(_ item: WebNavigationItem) {
+        if item.id == "action:exit-simple-mode" {
+            showExitSimpleConfirmation = true
+            return
+        }
+        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.75)) {
+            optimisticSelectedId = "more"
+        }
+        model.activate(item)
     }
 
     private func tabItemView(id: String, label: String, symbol: String, isSelected: Bool) -> some View {
@@ -269,10 +329,12 @@ private struct NativeNavigationBar: View {
         if isSelected {
             switch item.id {
             case "home", "admin-dashboard": return "house.fill"
-            case "parking": return "car.fill"
-            case "booking", "admin-reservations": return "calendar"
+            case "parking", "admin-reservations": return "car.fill"
+            case "booking": return "calendar"
             case "profile", "admin-members": return "person.crop.circle.fill"
             case "credential": return "person.text.rectangle.fill"
+            case "admin-votes": return "checkmark.seal.fill"
+            case "admin-audit": return "list.clipboard.fill"
             default: return item.symbol
             }
         }

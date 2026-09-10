@@ -43,12 +43,27 @@ struct MiASPCHWebView: UIViewRepresentable {
             webView.overrideUserInterfaceStyle = style
         }
         webView.isOpaque = false
-        webView.backgroundColor = .systemBackground
-        webView.scrollView.backgroundColor = .systemBackground
-        webView.underPageBackgroundColor = .systemBackground
+        Self.applyInformaticaBackground(to: webView)
         #if DEBUG
         AppearanceDiagnostics.capture(colorScheme: colorScheme, webView: webView)
         #endif
+    }
+
+    /// OLED dark canvas for the Informática panel (/informatica) and the system
+    /// background everywhere else. Keeps the persistent WKWebView's own surfaces
+    /// black while the panel is open, so safe-area/overscroll edges never flash
+    /// white. Purely visual: no navigation, session or auth behavior changes.
+    static func applyInformaticaBackground(to webView: WKWebView) {
+        let background: UIColor = isInformaticaPanel(webView.url) ? .black : .systemBackground
+        webView.backgroundColor = background
+        webView.scrollView.backgroundColor = background
+        webView.underPageBackgroundColor = background
+    }
+
+    static func isInformaticaPanel(_ url: URL?) -> Bool {
+        guard let path = url?.path else { return false }
+        return path == "/informatica" || path == "/informatica/" ||
+            path == "/admin" || path == "/admin.html"
     }
 
     func makeCoordinator() -> Coordinator {
@@ -120,6 +135,7 @@ struct MiASPCHWebView: UIViewRepresentable {
             model.webState = .finished
             model.isLoading = false
             refreshControl.endRefreshing()
+            MiASPCHWebView.applyInformaticaBackground(to: webView)
             authDebugLog("web loaded")
         }
 
@@ -227,8 +243,8 @@ struct WebNavigationItem: Codable, Equatable, Identifiable {
     var symbol: String {
         switch id {
         case "home", "admin-dashboard": return "house"
-        case "parking": return "car"
-        case "booking", "admin-reservations": return "calendar"
+        case "parking", "admin-reservations": return "car"
+        case "booking": return "calendar"
         case "profile", "admin-members": return "person.crop.circle"
         case "membership", "admin-finance": return "creditcard"
         case "convenios": return "gift"
@@ -240,7 +256,8 @@ struct WebNavigationItem: Codable, Equatable, Identifiable {
         case "marketplace": return "cart"
         case "activities": return "graduationcap"
         case "votes", "admin-votes": return "checkmark.seal"
-        case "action:account-menu-logout": return "rectangle.portrait.and.arrow.right"
+        case "admin-audit": return "list.clipboard"
+        case "action:account-menu-logout", "action:exit-simple-mode": return "rectangle.portrait.and.arrow.right"
         default: return "square.grid.2x2"
         }
     }
@@ -269,6 +286,9 @@ struct WebNavigationSnapshot: Codable, Equatable {
     var sessionState: WebSessionState = .unknown
     var serverUnlocked: Bool? = nil
     var memberName: String? = nil
+    var simpleMode: Bool = false
+    var isAdmin: Bool = false
+    var isAdminPanel: Bool = false
 }
 
 enum WebNavigationBridge {
@@ -306,10 +326,6 @@ enum WebNavigationBridge {
                 body.aspch-native-navigation .view {
                     overflow-y: visible !important; padding-bottom: 16px !important;
                 }
-                /* Hide web equivalent of migrated native quick access cards */
-                body.aspch-native-navigation #view .home-row-card[data-go="credential"] {
-                    display: none !important;
-                }
             `;
             document.head.append(style);
             let previous = '';
@@ -338,14 +354,17 @@ enum WebNavigationBridge {
                 const serverUnlocked = typeof state !== 'undefined' ? state.security?.unlocked === true : null;
 
                 const memberName = typeof state !== 'undefined' ? state.member?.preferredName || state.member?.name || null : null;
+                const isAdmin = typeof state !== 'undefined' && state.member?.role === 'ADMIN';
+                const isAdminPanel = ['/informatica', '/informatica/', '/admin', '/admin.html'].includes(location.pathname);
 
-                if (!enabled) return { primary, secondary, selected: '', homeQuickAccess: null, sessionState, serverUnlocked, memberName };
+                if (!enabled) return { primary, secondary, selected: '', homeQuickAccess: null, sessionState, serverUnlocked, memberName, simpleMode: false, isAdmin, isAdminPanel };
                 const simple = document.body.classList.contains('simple-mode');
+                const excludedSecondary = new Set(['credential', 'contact', 'action:account-menu-lock', 'action:account-menu-logout']);
                 function add(button, list, action = false) {
                     const id = action ? 'action:' + button.id : button.dataset.view || button.dataset.accountView;
                     if (!id || targets.has(id) || button.disabled) return;
-                    // The existing go() redirects Profile to Credential in simple mode.
-                    if (simple && !['credential', 'parking', 'contact'].includes(id)) return;
+                    if (simple && !action && !['home', 'parking', 'booking', 'profile', 'credential', 'contact'].includes(id)) return;
+                    if (list === secondary && excludedSecondary.has(id)) return;
                     const copy = button.cloneNode(true);
                     if (!action) copy.querySelector('span')?.remove();
                     const label = copy.textContent.trim();
@@ -356,11 +375,10 @@ enum WebNavigationBridge {
                 document.querySelectorAll('#mobile-nav [data-view]').forEach(b => add(b, primary));
                 document.querySelectorAll('#mobile-more-nav [data-view], #account-menu [data-account-view]')
                     .forEach(b => add(b, secondary));
-                if (!simple) {
-                    ['admin-mode-switch', 'account-menu-lock', 'account-menu-logout'].forEach(id => {
-                        const button = document.getElementById(id);
-                        if (visible(button)) add(button, secondary, true);
-                    });
+                const adminModeSwitch = document.getElementById('admin-mode-switch');
+                if (visible(adminModeSwitch)) add(adminModeSwitch, secondary, true);
+                if (simple) {
+                    secondary.push({ id: 'action:exit-simple-mode', label: 'Salir del modo simple' });
                 }
                 const active = document.querySelector('#mobile-nav .active[data-view], #desktop-nav .active[data-view], #mobile-more-nav .active[data-view]');
                 let selected = active?.dataset.view || '';
@@ -388,7 +406,7 @@ enum WebNavigationBridge {
                     if (emEl) targets.set('emergency', emEl);
                 }
 
-                return { primary, secondary, selected, homeQuickAccess, sessionState, serverUnlocked, memberName };
+                return { primary, secondary, selected, homeQuickAccess, sessionState, serverUnlocked, memberName, simpleMode: simple, isAdmin, isAdminPanel };
             }
             function publish() {
                 scheduled = false;
@@ -461,6 +479,37 @@ enum WebNavigationBridge {
                         fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
                             .catch(() => {})
                             .then(() => location.reload());
+                    }
+                },
+                toggleAdminPanel() {
+                    if (typeof state === 'undefined' || state.member?.role !== 'ADMIN') return false;
+                    location.assign(['/informatica', '/informatica/', '/admin', '/admin.html'].includes(location.pathname) ? '/' : '/informatica');
+                    return true;
+                },
+                async exitSimpleMode() {
+                    try {
+                        const services = (typeof state !== 'undefined' && state.uiPreferences) ? (state.uiPreferences.services || {}) : {};
+                        const res = await fetch('/api/profile/services', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ services, simpleMode: false })
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            return { success: false, error: data.error || 'No fue posible salir del modo simple.' };
+                        }
+                        if (typeof state !== 'undefined' && data.uiPreferences) {
+                            state.uiPreferences = typeof window.normalizedUiPreferences === 'function'
+                                ? window.normalizedUiPreferences(data.uiPreferences)
+                                : data.uiPreferences;
+                        }
+                        if (typeof window.renderNav === 'function') window.renderNav();
+                        if (typeof window.go === 'function') await window.go('home');
+                        schedule();
+                        return { success: true };
+                    } catch (err) {
+                        return { success: false, error: err.message || 'Error de conexión.' };
                     }
                 }
             };

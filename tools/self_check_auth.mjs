@@ -387,8 +387,8 @@ try{
   assert.equal(membershipChange.response.status,404,'No debe existir una acción manual de membresía');
 
   const verifiedActions=new DatabaseSync(path.join(dataDir,'mi-aspch.sqlite'),{readOnly:true});
-  const parking=verifiedActions.prepare('SELECT status,cancelled_at FROM parking_reservations WHERE id=?').get(parkingId),study=verifiedActions.prepare('SELECT status,cancelled_at FROM study_room_reservations WHERE id=?').get(studyId);
-  assert.equal(parking.status,'CANCELLED');assert.ok(parking.cancelled_at);assert.equal(verifiedActions.prepare("SELECT COUNT(*) n FROM parking_reservations WHERE id=? AND status='ACTIVE'").get(parkingId).n,0,'El estacionamiento liberado no debe seguir activo');
+  const parking=verifiedActions.prepare('SELECT status,vacated_at FROM parking_reservations WHERE id=?').get(parkingId),study=verifiedActions.prepare('SELECT status,cancelled_at FROM study_room_reservations WHERE id=?').get(studyId);
+  assert.equal(parking.status,'VACATED');assert.ok(parking.vacated_at);assert.equal(verifiedActions.prepare("SELECT COUNT(*) n FROM parking_reservations WHERE id=? AND status='ACTIVE'").get(parkingId).n,0,'El estacionamiento liberado no debe seguir activo');
   assert.equal(study.status,'CANCELLED');assert.ok(study.cancelled_at);assert.equal(verifiedActions.prepare("SELECT COUNT(*) n FROM study_room_reservations WHERE id=? AND status='ACTIVE'").get(studyId).n,0,'La sala cancelada no debe seguir activa');
   assert.equal(verifiedActions.prepare('SELECT COUNT(*) n FROM passkeys WHERE member_id=?').get(morosoId).n,0,'Las passkeys revocadas deben desaparecer');
   const resetMember=verifiedActions.prepare('SELECT pin_hash,pin_salt FROM members WHERE id=?').get(member.id);assert.equal(resetMember.pin_hash,null);assert.equal(resetMember.pin_salt,null);assert.equal(verifiedActions.prepare('SELECT COUNT(*) n FROM sessions WHERE member_id=?').get(member.id).n,0,'Reset PIN no debe dejar sesiones del socio');

@@ -170,6 +170,18 @@ final class WebViewModel: ObservableObject {
         webView.callAsyncJavaScript("window.miASPCHNavigation?.logout()", in: nil, in: .page) { _ in }
     }
 
+    func exitSimpleMode() {
+        guard let webView else { return }
+        webView.callAsyncJavaScript("return window.miASPCHNavigation?.exitSimpleMode() ?? false",
+                                   in: nil, in: .page) { _ in }
+    }
+
+    func toggleAdminPanel() {
+        guard let webView else { return }
+        webView.callAsyncJavaScript("return window.miASPCHNavigation?.toggleAdminPanel() ?? false",
+                                   in: nil, in: .page) { _ in }
+    }
+
     func activate(_ item: WebNavigationItem) {
         guard navigation.primary.contains(item) || navigation.secondary.contains(item),
               let webView else { return }
