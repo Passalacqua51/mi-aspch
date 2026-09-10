@@ -750,3 +750,13 @@ html.informatica-panel .sidebar-logo,html.informatica-panel .credential-logo,htm
 html.informatica-panel .admin-members-table-head,html.informatica-panel .admin-audit-head{color:var(--muted)}
 html.informatica-panel .admin-member-row:hover,html.informatica-panel .admin-member-row:focus-visible{background:var(--blue-soft)}
 html.informatica-panel .admin-direct-pin input,html.informatica-panel .admin-security-pin input{background:var(--surface);border-color:var(--line)}
+/* Navbar y chrome seamless OLED: sólidos puros (sin translucidez ni blur, que
+   sobre el canvas del WebView se lavan y la barra se ve blanca). */
+html.informatica-panel .topbar{background:#000;border-color:var(--line);backdrop-filter:none;-webkit-backdrop-filter:none}
+html.informatica-panel .sidebar{background:#000}
+html.informatica-panel .ui-iphone .mobile-nav{background:#000;border-top:1px solid var(--line);backdrop-filter:none;-webkit-backdrop-filter:none}
+html.informatica-panel .ui-iphone .mobile-nav::after{background:rgba(255,255,255,.35)}
+html.informatica-panel .ui-iphone .mobile-drawer{background:#0a0a0c;border-color:var(--line)}
+html.informatica-panel .ui-iphone .mobile-drawer-backdrop{background:rgba(0,0,0,.7);backdrop-filter:none;-webkit-backdrop-filter:none}
+html.informatica-panel .mobile-more-button{background:#0a0a0c;border-color:var(--line);color:var(--text)}
+html.informatica-panel .mobile-menu-group>span,html.informatica-panel .nav-section-label{color:var(--muted)}
