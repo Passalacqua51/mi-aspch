@@ -648,9 +648,11 @@ body.ui-iphone .hero.hero-compact h1{font-size:20px}
 .home-contact-discreet-left{display:flex;align-items:center;gap:8px;min-width:0}
 .home-contact-discreet-left .home-contact-icon{font-size:14px}
 .home-contact-discreet strong{color:var(--blue);font-size:12px;font-weight:700;white-space:nowrap}
-.home-simple-exit{display:flex;justify-content:center;padding:6px 0 2px}
-.home-simple-exit .link-button{font-size:12px;color:var(--muted)}
-.home-simple-exit .link-button:disabled{opacity:.5}
+.simple-mode-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-bottom:10px}
+.simple-mode-banner>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.simple-mode-banner strong{font-size:13px}
+.simple-mode-banner span{font-size:11px;color:var(--muted)}
+.simple-mode-banner .button{flex:none;min-height:38px;padding:8px 14px}
 
 /* Contacto y asesorías */
 .contact-hero{padding:20px 16px;margin-bottom:14px}

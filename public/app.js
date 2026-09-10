@@ -513,10 +513,11 @@ async function renderHome(){
     <strong>Contactar ASPCH →</strong>
   </div>`;
 
-  // Salida discreta del Modo Simple (no es una pestaña principal).
-  const simpleExit=simpleModeEnabled()?`<div class="home-simple-exit"><button class="link-button" id="exit-simple-mode" type="button">Salir del modo simple</button></div>`:'';
+  // Salida del Modo Simple: visible al inicio de Inicio, sin ser pestaña.
+  const simpleExit=simpleModeEnabled()?`<div class="card simple-mode-banner"><div><strong>Modo simple activo</strong><span>Solo ves Inicio, Estacionamiento y Contacto.</span></div><button class="button ghost" id="exit-simple-mode" type="button">Salir</button></div>`: '';
 
   $('#view').innerHTML=`${greeting}
+  ${simpleExit}
   ${unavailableNotice}
   ${credentialCard}
   ${voteCard}
@@ -527,7 +528,6 @@ async function renderHome(){
   ${specialNotice}
   ${membershipCard}
   ${contactDiscreet}
-  ${simpleExit}
   ${emergencyCard}`;
 
   $$('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
