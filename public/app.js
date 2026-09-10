@@ -4,9 +4,9 @@ const UI_SERVICE_DEFAULTS={parking:true,reservations:true,simulators:true,studyr
 const A320PRO_PREVIEW_RATES=[{hours:2,priceClp:75000},{hours:4,priceClp:100000}];
 const state={member:null,membership:null,access:null,security:null,config:null,view:'home',news:[],parking:null,parkingWeekStart:null,parkingPollTimer:null,parkingPrompt:new URLSearchParams(location.search).get('parkingPrompt')==='1',postLoginPromptsStarted:false,simulators:null,simFilter:'a320',simWeek:null,installPrompt:null,reminderTimer:null,simReminderTimer:null,uiMode:null,notifyPrefs:null,uiPreferences:{configured:false,simpleMode:false,services:{...UI_SERVICE_DEFAULTS}},registration:{rut:'',email:'',emailChanged:false},marketplace:null,modules:null,reservations:null,activityFilter:'UPCOMING',adminMembers:{query:'',page:1,limit:20,selectedId:null}};
 const NAV=[['home','🏠','Inicio'],['parking','🚗','Estacionamiento'],['booking','🗓️','Reservas'],['profile','👤','Mi perfil'],['credential','🪪','Credencial'],['security','🔐','Seguridad'],['membership','💳','Mensualidad'],['convenios','🤝','Convenios'],['library','📚','Biblioteca'],['marketplace','🛒','Mercado ASPCH'],['activities','🎓','Cursos y charlas'],['votes','🗳️','Votaciones'],['contact','📞','Contacto'],['news','📰','Noticias']];
-const SIMPLE_MODE_PRIMARY=['home','parking','booking','profile'];
-const SIMPLE_MODE_SECONDARY=['credential','contact'];
-const SIMPLE_MODE_ROUTES=new Set([...SIMPLE_MODE_PRIMARY,...SIMPLE_MODE_SECONDARY,'reservations','simulators','studyroom']);
+const SIMPLE_MODE_PRIMARY=['home','parking','contact'];
+const SIMPLE_MODE_SECONDARY=[];
+const SIMPLE_MODE_ROUTES=new Set(['home','parking','contact','credential','emergency']);
 const ADMIN_NAV=[['admin-dashboard','📊','Dashboard'],['admin-members','👥','Socios'],['admin-finance','💳','Finanzas'],['admin-reservations','🗓️','Reservas'],['admin-content','📰','Contenido'],['admin-votes','🗳️','Votaciones'],['admin-notifications','🔔','Notificaciones'],['admin-integrations','🔗','Integraciones'],['admin-security','🛡️','Seguridad'],['admin-audit','🧾','Auditoría'],['admin-system','⚙️','Sistema'],['developer','🛠️','Developer']];
 const ADMIN_VIEWS=new Set(['admin',...ADMIN_NAV.map(x=>x[0])]);
 const ADMIN_PLACEHOLDERS={
@@ -257,7 +257,7 @@ function renderNav(){
 function renderMobileMore(items,adminItems=[]){
   const byId=Object.fromEntries(items.map(x=>[x[0],x]));
   const groups=simpleModeEnabled()?
-    [['Accesos simples',['credential','contact']]]:
+    []:
     [['Tu cuenta',['credential']],['Servicios',['convenios','library','marketplace']],['Comunidad',['activities','votes','news']],['Contacto y Ayuda',['contact']]];
   const html=groups.map(([label,ids])=>`<section class="mobile-menu-group"><span>${label}</span>${ids.map(id=>byId[id]?navItem(...byId[id]):'').join('')}</section>`).join('');
   const admin=adminItems.length?`<section class="mobile-menu-group"><span>Administración</span>${adminItems.map(x=>navItem(...x)).join('')}</section>`:'';
@@ -462,15 +462,8 @@ async function renderHome(){
     historyCard = `<div class="card"><div class="section-head compact"><div><span class="eyebrow">🕓 HISTORIAL</span><h3>Votaciones y cursos realizados</h3></div></div><div class="home-module-list">${pastVotesCard}${pastActivitiesCard}</div></div>`;
   }
 
-  // 2.4 Noticias, solo si hay publicaciones
-  let newsCard = '';
-  if (serviceVisible('news')) {
-    try {
-      const news = (await api('/api/news')).news || [];
-      const latestNews = news.slice(0, 3);
-      if (latestNews.length) newsCard = `<div class="section-head"><div><span class="eyebrow">📰 NOTICIAS</span><h3>Últimas novedades</h3></div></div>${latestNews.map(newsHtml).join('')}`;
-    } catch {}
-  }
+  // 2.4 Noticias: ocultas de Inicio por decisión de producto. El módulo
+  // Noticias (/news), su API y sus datos se conservan intactos.
 
   // 3. Próximo simulador, solo si existe
   const myTurn=(sims.occupancies||[]).filter(o=>o.mine&&o.start.slice(0,10)>=today()).sort((a,b)=>a.start.localeCompare(b.start))[0];
@@ -520,21 +513,25 @@ async function renderHome(){
     <strong>Contactar ASPCH →</strong>
   </div>`;
 
+  // Salida discreta del Modo Simple (no es una pestaña principal).
+  const simpleExit=simpleModeEnabled()?`<div class="home-simple-exit"><button class="link-button" id="exit-simple-mode" type="button">Salir del modo simple</button></div>`:'';
+
   $('#view').innerHTML=`${greeting}
   ${unavailableNotice}
   ${credentialCard}
   ${voteCard}
   ${activitiesCard}
   ${historyCard}
-  ${newsCard}
   ${simulatorCard}
   ${parkingCard}
   ${specialNotice}
   ${membershipCard}
   ${contactDiscreet}
+  ${simpleExit}
   ${emergencyCard}`;
 
   $$('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
+  $('#exit-simple-mode')?.addEventListener('click',exitSimpleMode);
   showDebtAlert(pay.membership);
 }
 
@@ -956,7 +953,7 @@ async function toggleLibraryFavoriteUi(id,favorite){try{await api('/api/library/
 async function renderNews(){const news=await getNews(true);$('#view').innerHTML=`<div class="card"><div class="section-head"><div><h3>Noticias / Instagram</h3></div></div><div class="news-list">${news.length?news.map(newsHtml).join(''):'<div class="empty">Sin publicaciones.</div>'}</div></div>`}
 async function renderProfile(){
   const m=state.member;
-  $('#view').innerHTML=`<div class="grid two profile-page"><div class="card"><span class="eyebrow">👤 SOCIO</span><h2>${escapeHtml(titleName(m.name))}</h2>${m.isBoard?'<span class="badge blue">⭐ Directorio</span>':''}${preferredNameProfileHtml()}<div class="profile-grid">${field('📧 Correo',m.email)}${field('🪪 RUT',m.rut||'—')}${field('📱 Teléfono',m.phone||'—')}${field('🏢 Empleador',m.employer||'—')}${field('🧭 Categoría',m.category||'—')}${field('✈️ Cargo',m.position||'—')}</div>${airlineDataHtml(m)}</div><div class="card service-personalization-card"><span class="eyebrow">⚙️ PREFERENCIAS</span><h2>Personaliza tu experiencia</h2><p class="muted-copy">Elige los servicios que quieres mantener visibles.</p><button id="personalize-services" class="button secondary" type="button">Personalizar servicios</button><label class="simple-mode-toggle"><span><strong>Modo simple</strong><small>Muestra únicamente Credencial, Estacionamiento y Contacto.</small></span><input id="simple-mode-toggle" type="checkbox" ${simpleModeEnabled()?'checked':''}></label></div><div class="card"><span class="eyebrow">🔔 NOTIFICACIONES</span><h2>Elige qué quieres recibir</h2><div class="notification-prefs">${notificationPrefToggle('parking','🚗 Estacionamientos','Recordatorios de reserva y desocupación.')}${notificationPrefToggle('simulators','✈️ Simuladores','Avisos de próximos turnos confirmados.')}${notificationPrefToggle('membership','💳 Membresía','Avisos sobre tu estado de membresía.')}${notificationPrefToggle('news','📰 Noticias','Novedades relevantes de ASPCH.')}</div><div class="toolbar"><button class="button primary" id="enable-general-notifications">🔔 Activar notificaciones</button></div></div></div>`;
+  $('#view').innerHTML=`<div class="grid two profile-page"><div class="card"><span class="eyebrow">👤 SOCIO</span><h2>${escapeHtml(titleName(m.name))}</h2>${m.isBoard?'<span class="badge blue">⭐ Directorio</span>':''}${preferredNameProfileHtml()}<div class="profile-grid">${field('📧 Correo',m.email)}${field('🪪 RUT',m.rut||'—')}${field('📱 Teléfono',m.phone||'—')}${field('🏢 Empleador',m.employer||'—')}${field('🧭 Categoría',m.category||'—')}${field('✈️ Cargo',m.position||'—')}</div>${airlineDataHtml(m)}</div><div class="card service-personalization-card"><span class="eyebrow">⚙️ PREFERENCIAS</span><h2>Personaliza tu experiencia</h2><p class="muted-copy">Elige los servicios que quieres mantener visibles.</p><button id="personalize-services" class="button secondary" type="button">Personalizar servicios</button><label class="simple-mode-toggle"><span><strong>Modo simple</strong><small>Muestra únicamente Inicio, Estacionamiento y Contacto.</small></span><input id="simple-mode-toggle" type="checkbox" ${simpleModeEnabled()?'checked':''}></label></div><div class="card"><span class="eyebrow">🔔 NOTIFICACIONES</span><h2>Elige qué quieres recibir</h2><div class="notification-prefs">${notificationPrefToggle('parking','🚗 Estacionamientos','Recordatorios de reserva y desocupación.')}${notificationPrefToggle('simulators','✈️ Simuladores','Avisos de próximos turnos confirmados.')}${notificationPrefToggle('membership','💳 Membresía','Avisos sobre tu estado de membresía.')}${notificationPrefToggle('news','📰 Noticias','Novedades relevantes de ASPCH.')}</div><div class="toolbar"><button class="button primary" id="enable-general-notifications">🔔 Activar notificaciones</button></div></div></div>`;
   installEditableNumericInputs($('#view'));
   $('#preferred-name-form-profile')?.addEventListener('submit',savePreferredName);$('#airline-data-form')?.addEventListener('submit',saveAirlineData);
   $('#personalize-services')?.addEventListener('click',()=>openServicePersonalization());$('#simple-mode-toggle')?.addEventListener('change',saveSimpleMode);
@@ -965,6 +962,10 @@ async function renderProfile(){
 async function saveSimpleMode(e){
   const enabled=!!e.currentTarget.checked;e.currentTarget.disabled=true;
   try{const result=await api('/api/profile/services',{method:'PUT',body:{services:state.uiPreferences.services,simpleMode:enabled}});state.uiPreferences=normalizedUiPreferences(result.uiPreferences);renderNav();toast(enabled?'Modo simple activado.':'Modo simple desactivado.');await go('home')}catch(err){e.currentTarget.checked=!enabled;e.currentTarget.disabled=false;toast(err.message,true)}
+}
+async function exitSimpleMode(){
+  const button=$('#exit-simple-mode');if(button)button.disabled=true;
+  try{const result=await api('/api/profile/services',{method:'PUT',body:{services:state.uiPreferences.services,simpleMode:false}});state.uiPreferences=normalizedUiPreferences(result.uiPreferences);renderNav();toast('Modo simple desactivado.');await go('home')}catch(err){if(button)button.disabled=false;toast(err.message,true)}
 }
 
 async function renderMembership(){

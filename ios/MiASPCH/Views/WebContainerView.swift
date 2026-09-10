@@ -20,8 +20,8 @@ struct WebContainerView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !model.navigation.primary.isEmpty {
                     NativeNavigationBar(model: model)
-                        .padding(.bottom, 8)
-                        .offset(y: 18)
+                        .padding(.bottom, 4)
+                        .offset(y: 22)
                 }
             }
             .background {

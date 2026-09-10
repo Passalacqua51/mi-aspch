@@ -363,7 +363,7 @@ enum WebNavigationBridge {
                 function add(button, list, action = false) {
                     const id = action ? 'action:' + button.id : button.dataset.view || button.dataset.accountView;
                     if (!id || targets.has(id) || button.disabled) return;
-                    if (simple && !action && !['home', 'parking', 'booking', 'profile', 'credential', 'contact'].includes(id)) return;
+                    if (simple && !action && !['home', 'parking', 'contact'].includes(id)) return;
                     if (list === secondary && excludedSecondary.has(id)) return;
                     const copy = button.cloneNode(true);
                     if (!action) copy.querySelector('span')?.remove();
@@ -377,9 +377,9 @@ enum WebNavigationBridge {
                     .forEach(b => add(b, secondary));
                 const adminModeSwitch = document.getElementById('admin-mode-switch');
                 if (visible(adminModeSwitch)) add(adminModeSwitch, secondary, true);
-                if (simple) {
-                    secondary.push({ id: 'action:exit-simple-mode', label: 'Salir del modo simple' });
-                }
+                // En modo simple no se publica "Salir del modo simple" como item
+                // nativo: la salida vive discretamente dentro de Inicio web para
+                // no convertirla en una pestaña principal.
                 const active = document.querySelector('#mobile-nav .active[data-view], #desktop-nav .active[data-view], #mobile-more-nav .active[data-view]');
                 let selected = active?.dataset.view || '';
                 // These existing child views belong to Reservas; go() doesn't
