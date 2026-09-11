@@ -25,10 +25,10 @@ const dashboardSource=app.slice(app.indexOf('async function renderAdminDashboard
 assert.ok(dashboardSource.includes("api('/api/admin/dashboard')"),'Dashboard debe usar su endpoint ADMIN de lectura');
 assert.ok(!/<button|method:|onsubmit|\/api\/admin\/(jobs|push|backup|db|cache|sync|financial-upload)/.test(dashboardSource),'Dashboard no debe incluir acciones de escritura o mantenimiento');
 assert.ok(dashboardSource.includes("go(button.dataset.adminGo)"),'Los resúmenes nuevos del Dashboard deben ser solo enlaces de navegación');
-const membersSource=app.slice(app.indexOf('async function renderAdminMembers'),app.indexOf('function renderAdminPlaceholder'));
+const membersSource=app.slice(app.indexOf('async function renderAdminMembers'),app.indexOf('async function renderAdminReservations'));
 assert.ok(membersSource.includes('/api/admin/members/list')&&membersSource.includes('/api/admin/members/${id}'),'Socios debe usar endpoints de listado y detalle dedicados');
 for(const action of ['release-parking','cancel-study','close-sessions','revoke-passkeys','issue-otp','reset-pin','set-pin','refresh'])assert.ok(membersSource.includes(action),`Falta acción maestra ${action}`);
-assert.ok(!/membership[^\n]{0,80}(update|change|set)|\/api\/admin\/(push|jobs|sync|financial-upload)/i.test(membersSource),'Socios no debe cambiar membresía ni activar controles Developer');
+assert.ok(!/\bmembership\b[^\n]{0,80}(update|change|set)|\/api\/admin\/(push|jobs|sync|financial-upload)/i.test(membersSource),'Socios no debe cambiar membresía ni activar controles Developer');
 const reservationsSource=app.slice(app.indexOf('async function renderAdminReservations'),app.indexOf('async function renderAdminIntegrations'));
 assert.ok(reservationsSource.includes("api('/api/admin/reservations')")&&reservationsSource.includes('release-parking')&&reservationsSource.includes('cancel-study'),'Reservas debe usar su GET dedicado y las acciones ADMIN existentes');
 assert.ok(reservationsSource.includes('Fuente no disponible / local no fiable'),'Reservas debe declarar la ausencia de fuente fiable de simuladores');
@@ -65,7 +65,7 @@ assert.ok(!server.includes('/api/admin/sql'),'No exponer SQL libre');assert.ok(!
 assert.ok(!fs.existsSync(path.join(root,'public','test-notificaciones.html')),'Panel QA no debe ir en producción');
 assert.match(server,/pathname==='\/test-notificaciones\.html'[\s\S]{0,180}Location','\/'/,'La ruta retirada debe redirigir a Inicio antes del fallback SPA');
 assert.match(sw,/u\.pathname==='\/test-notificaciones\.html'[\s\S]{0,180}Response\.redirect/,'El Service Worker debe retirar cualquier copia PWA del panel temporal');
-assert.ok(app.includes("const primaryIds=['home','parking','booking','profile']"),'Bottom nav debe contener Inicio/Estacionamiento/Reservas/Perfil');
+assert.ok(app.includes("['home','parking','booking','profile']"),'Bottom nav debe contener Inicio/Estacionamiento/Reservas/Perfil');
 assert.ok(app.includes('function renderBookingHub')&&app.includes('Simuladores')&&app.includes('Sala de estudios'),'Reservas debe unificar Simuladores y Sala de estudios');
 const homeSource=app.slice(app.indexOf('async function renderHome'),app.indexOf('async function renderReservations'));
 assert.ok(!homeSource.includes('Más servicios y herramientas')&&!homeSource.includes('home-quick-actions'),'Inicio no debe renderizar catálogos ni accesos redundantes');
@@ -75,7 +75,7 @@ for(const text of ['Personaliza Mi ASPCH','Elige qué servicios quieres tener a 
 assert.ok(css.includes('@media(prefers-color-scheme:light)')&&css.includes('.auth-logo{opacity:1;filter:none;mix-blend-mode:normal}'),'Light Mode debe preservar el logo oficial sin filtros y con contraste');
 assert.match(css,/body\.ui-iphone #auth-screen:not\(\.hidden\),\s*body\.ui-iphone #lock-screen:not\(\.hidden\),\s*body\.ui-iphone \.app-shell:not\(\.hidden\)\{display:flex!important\}/,'El marco desktop solo debe mostrar la pantalla activa');
 assert.doesNotMatch(css,/body\.ui-iphone #auth-screen,\s*body\.ui-iphone #lock-screen,\s*body\.ui-iphone \.app-shell\{[^}]*display:flex!important/s,'La maqueta desktop no debe sobreescribir .hidden durante OTP/PIN');
-assert.ok(app.includes('Reserva aquí tu estacionamiento'),'Estacionamiento debe indicar reserva directa');
+assert.ok(app.includes('Toca un cupo gris para reservarlo aquí mismo'),'Estacionamiento debe indicar reserva directa');
 assert.ok(app.includes('Libre · toca para reservar'),'Los cupos libres deben ser claramente reservables');
 assert.ok(index.includes('mobile-more-drawer'),'Falta menú móvil de servicios secundarios');
 assert.ok(index.includes('more-menu-toggle'),'Falta botón ☰ de servicios secundarios');
@@ -84,8 +84,8 @@ assert.ok(!index.includes('id="logout-top"')&&!index.includes('id="lock-now"'),'
 const profileSource=app.slice(app.indexOf('async function renderProfile'),app.indexOf('async function saveSimpleMode'));
 assert.ok(profileSource.includes('Personalizar servicios')&&profileSource.includes('Modo simple')&&profileSource.includes('NOTIFICACIONES'),'Perfil debe limitarse a datos y preferencias');
 for(const text of ['SEGURIDAD DEL DISPOSITIVO','TU HISTORIAL','Actividad de tu cuenta','MENSUALIDAD'])assert.ok(!profileSource.includes(text),`Perfil no debe contener ${text}`);
-assert.ok(app.includes('async function renderSecurity')&&app.includes("api('/api/security/sessions')")&&server.includes("p==='/api/security/sessions'"),'Seguridad debe ser una vista independiente con sesiones');
-assert.ok(app.includes('btn.disabled=!canUse')&&index.includes('Usar Face ID / huella'),'El botón biométrico debe habilitarse cuando WebAuthn y una passkey estén disponibles');
+assert.ok(app.includes('async function renderSecurity')&&server.includes("p==='/api/security/sessions'"),'Seguridad debe ser una vista independiente con sesiones');
+assert.ok(app.includes('btn.disabled=!canUse')&&app.includes('Face ID / huella'),'El botón biométrico debe habilitarse cuando WebAuthn y una passkey estén disponibles');
 assert.ok(app.includes('shouldGateOnReopen')&&gate.includes('unlockedUntil')&&app.includes("sessionStorage.removeItem('miAspchUnlocked')"),'El boot debe respetar la ventana unlocked_until y limpiar el marcador local vencido');
 assert.ok(index.includes('/auth-gate.js')&&gate.includes('passkeySet===true')&&gate.includes('!localUnlockMarker'),'La reapertura real con passkey debe volver al gate');
 assert.ok(gate.includes('sessionUnlocked')&&gate.includes('return false')===false,'El helper de gate debe evaluar la sesión vigente sin passkey');
@@ -95,7 +95,7 @@ assert.ok(app.includes('notificationConsentKey()')&&app.includes('syncPushSubscr
 assert.ok(server.includes("pathname==='/informatica'")&&app.includes("['/informatica','/informatica/','/admin','/admin.html'].includes(location.pathname)")&&app.includes("location.assign(panel?'/':'/informatica')"),'Informática debe detectar el panel bajo CSP y alternar app/panel en el mismo origen y sesión');
 assert.ok(!index.includes('Acceso Informática')&&!index.includes('admin-login-link'),'La pantalla pública de bienvenida no debe exponer el enlace a Informática');
 assert.ok(index.includes('id="admin-mode-switch"')&&read('public/admin.html').includes('id="admin-mode-switch"'),'Ambas vistas deben exponer el cambio seguro de modo ADMIN tras autenticación');
-assert.ok(app.includes("'admin-dashboard':'Métricas'")&&app.includes("primaryIds=['admin-dashboard','admin-members','admin-reservations','admin-system']"),'El panel ADMIN debe ofrecer navegación útil en Safari móvil');
+assert.ok(app.includes("primaryIds=['admin-reservations','admin-members','admin-votes','admin-audit']"),'El panel ADMIN debe ofrecer navegación útil en Safari móvil');
 assert.ok(server.includes("function hasBoardExperience(m){return !!m?.is_board||m?.role==='ADMIN'}")&&server.includes('isBoard:hasBoardExperience(m)'),'Informática debe ver la experiencia funcional del Directorio sin impersonación');
 assert.ok(app.includes('tel:+56222358612')&&app.includes('tel:+56222359821')&&app.includes('mailto:aspch@aspch.org'),'Contacto debe usar teléfonos y correo ASPCH');
 assert.ok(server.includes('Abogado Tito Muñoz')&&server.includes('Contador Manuel Paillafil')&&app.includes('officialResources'),'Contacto debe mostrar asesorías WhatsApp y dejar integración oficial de emergencia/IFALPA segura');

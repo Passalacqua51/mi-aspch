@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { openDb, setBoardMembersByRut } from '../lib/db.mjs';
-import { initV050, financialSummary, benefitAccess, reserveStudyRoom, cancelStudyRoom, studyRoomAvailability, createMarketplaceListing, publicMarketplace, moderateMarketplace, marketplaceOwnerEdit } from '../lib/v050.mjs';
+import { openDb, setBoardMembersByRut, validatePreferredName } from '../lib/db.mjs';
+import { initV050, financialSummary, benefitAccess, reserveStudyRoom, cancelStudyRoom, studyRoomAvailability, studyRoomScheduleFor, validateStudyRoomSchedule, createMarketplaceListing, publicMarketplace, moderateMarketplace, marketplaceOwnerEdit } from '../lib/v050.mjs';
+import { findProfilePhoto, profilePhotoFileName, saveProfilePhoto, decodeProfilePhoto } from '../lib/profile-photo.mjs';
 import { initV060, setModuleState, moduleStates, addStudyWaitlist, memberStudyWaitlist, reportMarketplace, marketplaceReports, resolveMarketplaceReport, upsertAgreement, agreements, upsertLibraryItem, libraryItems, toggleLibraryFavorite, setActivityRegistration, activityCenter, setCredentialRevoked, credentialStatus, audit, auditRows, createBackup, backupRuns, adminMemberSearch, createVote, updateVoteDraft, deleteVoteDraft, setVoteStatus, memberVotes, castVote, voteResults } from '../lib/v060.mjs';
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mi-aspch-v050-'));
@@ -42,9 +43,19 @@ const syncedBoard=db.prepare('SELECT active,is_board FROM members WHERE id=?').g
 assert.equal(syncedBoard.active,1,'Todo integrante vigente del Directorio debe quedar activo');
 assert.equal(syncedBoard.is_board,1,'La sincronización debe conservar la marca de Directorio');
 
-// Sala: 4h permitido, choque prohibido, múltiples bloques no superpuestos permitidos.
-const start=new Date(Date.now()+86400_000);start.setUTCMinutes(0,0,0);const end=new Date(start.getTime()+4*3600_000);const id1=reserveStudyRoom(db,{memberId:m1.id,start:start.toISOString(),end:end.toISOString()});assert.ok(id1>0);
-let clash=false;try{reserveStudyRoom(db,{memberId:m3.id,start:new Date(start.getTime()+3600_000).toISOString(),end:new Date(start.getTime()+2*3600_000).toISOString()})}catch{clash=true}assert.equal(clash,true);assert.equal(cancelStudyRoom(db,{memberId:m1.id,id:id1}),true);assert.equal(studyRoomAvailability(db,{from:start.toISOString(),to:new Date(end.getTime()+86400_000).toISOString(),memberId:m1.id}).reservations.length,0);
+// Sala: horarios oficiales en Chile, ownership de cancelación y liberación del bloque.
+const dates={monday:['2027-06-07T09:00:00-04:00','2027-06-07T10:00:00-04:00'],thursday:['2027-06-10T16:00:00-04:00','2027-06-10T17:00:00-04:00'],friday:['2027-06-11T15:00:00-04:00','2027-06-11T16:00:00-04:00']};
+assert.deepEqual(studyRoomScheduleFor(dates.monday[0]),{start:'09:00',end:'17:00'});assert.deepEqual(studyRoomScheduleFor(dates.friday[0]),{start:'09:00',end:'16:00'});assert.equal(studyRoomScheduleFor('2027-06-12T12:00:00-04:00'),null);assert.equal(studyRoomScheduleFor('2027-06-13T12:00:00-04:00'),null);
+for(const [start,end] of Object.values(dates))assert.doesNotThrow(()=>validateStudyRoomSchedule(start,end));
+for(const [start,end] of [['2027-06-11T16:00:00-04:00','2027-06-11T17:00:00-04:00'],['2027-06-12T09:00:00-04:00','2027-06-12T10:00:00-04:00'],['2027-06-13T09:00:00-04:00','2027-06-13T10:00:00-04:00'],['2027-06-07T08:59:00-04:00','2027-06-07T09:30:00-04:00'],['2027-06-11T15:30:00-04:00','2027-06-11T16:30:00-04:00']])assert.throws(()=>validateStudyRoomSchedule(start,end));
+const start=new Date(dates.monday[0]),end=new Date(dates.monday[1]),id1=reserveStudyRoom(db,{memberId:m1.id,start:start.toISOString(),end:end.toISOString()});assert.ok(id1>0);assert.equal(cancelStudyRoom(db,{memberId:m3.id,id:id1}),false);assert.equal(studyRoomAvailability(db,{from:new Date(start.getTime()-3600000).toISOString(),to:new Date(end.getTime()+3600000).toISOString(),memberId:m1.id}).reservations.length,1);assert.equal(cancelStudyRoom(db,{memberId:m1.id,id:id1}),true);assert.equal(studyRoomAvailability(db,{from:new Date(start.getTime()-3600000).toISOString(),to:new Date(end.getTime()+3600000).toISOString(),memberId:m1.id}).reservations.length,0);
+
+// Nombre de uso: capa backend sin alterar el nombre legal de members.name.
+for(const valid of ['Nicolás Passalacqua','María José','Jean-Pierre',"O'Connor"])assert.equal(validatePreferredName(valid).ok,true);
+for(const invalid of ['tula larga','T U L A','<script>alert(1)</script>','https://ejemplo.cl','123456789','A'.repeat(41)])assert.equal(validatePreferredName(invalid).ok,false,invalid);
+
+// Foto: MIME real, tamaño, persistencia y nombre generado sin path traversal.
+const photoDir=path.join(data,'profile-fotos'),jpeg='data:image/jpeg;base64,/9j/AA==';assert.throws(()=>decodeProfilePhoto('data:image/png;base64,/9j/AA==',100));assert.throws(()=>decodeProfilePhoto(jpeg,2),e=>e.statusCode===413);assert.equal(profilePhotoFileName(7), 'member-7.jpg');assert.ok(!profilePhotoFileName(7).includes('..'));saveProfilePhoto(photoDir,7,jpeg,1024);assert.ok(findProfilePhoto(photoDir,7));
 
 // Mercado: nace PENDING, admin aprueba, edición vuelve a PENDING.
 const marketDir=path.join(data,'marketplace');fs.mkdirSync(marketDir,{recursive:true});const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';

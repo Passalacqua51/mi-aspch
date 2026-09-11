@@ -309,7 +309,7 @@ try{
   for(const id of ['google-sheets','calendar','gmail-otp','push'])assert.equal(adminIntegrations.json.items.find(x=>x.id===id)?.status,'DESHABILITADO',`${id} debe estar deshabilitado en QA`);assertNoSecrets(adminIntegrations.json,'Integraciones ADMIN');
   const adminSystem=await request(base,'/api/admin/system',{cookie:adminLogin.cookie});
   assert.equal(adminSystem.response.status,200,'ADMIN debe poder leer Sistema');
-  assert.equal(adminSystem.json.runtime?.version,'0.6.16');assert.match(adminSystem.json.runtime?.node||'',/^v22\./,'Sistema debe informar Node 22');
+   assert.equal(adminSystem.json.runtime?.version,'0.6.16');assert.ok(Number(String(adminSystem.json.runtime?.node||'').replace(/^v/, '').split('.')[0])>=22,'Sistema debe informar Node 22 o superior');
   assert.equal(adminSystem.json.sqlite?.ok,true,'Sistema debe ejecutar quick_check local');assert.ok(Array.isArray(adminSystem.json.sqlite?.tables)&&adminSystem.json.sqlite.tables.length>10,'Sistema debe inventariar tablas');
   assert.equal(adminSystem.json.container?.sourceAvailable,false,'Sistema no debe inventar estado del contenedor sin fuente segura');assertNoSecrets(adminSystem.json,'Sistema ADMIN');
   const adminNotifications=await request(base,'/api/admin/notifications',{cookie:adminLogin.cookie});

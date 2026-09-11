@@ -13,6 +13,7 @@ import { pushEnabled, vapidPublicKey, upsertPushSubscription, removePushSubscrip
 import { initV060, audit, auditRows, moduleStates, moduleEnabled, setModuleState, memberUiPreferences, setMemberUiPreferences, addStudyWaitlist, cancelStudyWaitlist, memberStudyWaitlist, matchingStudyWaitlist, markStudyWaitlistNotified, reportMarketplace, marketplaceReports, resolveMarketplaceReport, agreements, upsertAgreement, setAgreementStatus, libraryItems, toggleLibraryFavorite, upsertLibraryItem, activityCenter, setActivityRegistration, credentialStatus, setCredentialRevoked, memberHistory, systemMetrics, adminMasterSnapshot, adminReservationsSnapshot, adminNotificationsSnapshot, adminSecuritySnapshot, adminAuditSnapshot, dbStats, createBackup, backupRuns, invalidateOtherSessions, invalidateMemberSessions, memberAccessBlock, setMemberAccessBlocked, adminMemberSearch, adminMembersList, adminMemberDetail, diagnostics, toIcs, createVote, updateVoteDraft, deleteVoteDraft, setVoteStatus, voteResults, voteParticipants, adminVotes, memberVotes, castVote } from './lib/v060.mjs';
 import { inspectRut, readFinancialWorkbook } from './lib/financial-reader.mjs';
 import { buildFinancialSyncPlan } from './lib/financial-sync.mjs';
+import { findProfilePhoto, removeProfilePhoto, saveProfilePhoto } from './lib/profile-photo.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 loadEnv(path.join(__dirname, '.env'));
@@ -447,7 +448,10 @@ async function routeApi(req, res, url) {
       const messages = {
         empty:'Escribe cómo quieres que te llamemos.',
         too_long:'Usa un nombre de hasta 40 caracteres.',
-        invalid_chars:'El nombre puede contener letras, espacios, punto, guion o apóstrofe.'
+        invalid_chars:'El nombre puede contener letras, espacios, punto, guion o apóstrofe.',
+        contact_or_url:'No uses URLs, correos ni teléfonos como nombre.',
+        offensive:'Ese nombre de uso no es apropiado.',
+        nonsense:'Escribe un nombre de uso razonable.'
       };
       return json(res, 400, { error: messages[result.reason] || 'No fue posible guardar el nombre de uso.' });
     }
@@ -701,7 +705,7 @@ async function routeApi(req, res, url) {
 
   if (req.method === 'GET' && p === '/api/credential') {
     const code = credentialCode(member.id);
-    const profilePhoto = findProfilePhoto(member.id);
+    const profilePhoto = findProfilePhoto(PROFILE_PHOTOS_DIR,member.id);
     const sipaPhoto = findSipaPhoto(member.rut);
     const appleWalletConfigured = bool(process.env.APPLE_WALLET_ENABLED,false) && !!process.env.APPLE_WALLET_PASS_TYPE_ID && !!process.env.APPLE_WALLET_TEAM_ID;
     const credState=credentialStatus(db,member.id);
@@ -720,12 +724,12 @@ async function routeApi(req, res, url) {
 
   if (req.method === 'POST' && p === '/api/credential/photo') {
     const body = await readJson(req, Math.ceil(MAX_PROFILE_PHOTO_BYTES * 1.55));
-    const saved = saveProfilePhoto(member.id, body.dataUrl);
+    const saved = saveProfilePhoto(PROFILE_PHOTOS_DIR,member.id,body.dataUrl,MAX_PROFILE_PHOTO_BYTES);
     return json(res, 200, { ok:true, source:'PROFILE', bytes:saved.bytes });
   }
 
   if (req.method === 'DELETE' && p === '/api/credential/photo') {
-    removeProfilePhoto(member.id);
+    removeProfilePhoto(PROFILE_PHOTOS_DIR,member.id);
     return json(res, 200, { ok:true, source:findSipaPhoto(member.rut)?'SIPA':'NONE' });
   }
 
@@ -758,18 +762,21 @@ async function routeApi(req, res, url) {
   if(req.method==='GET'&&p==='/api/study-room'){
     const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:membershipRestrictionMessage(access,'La Sala de estudios'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const from=url.searchParams.get('from')||new Date().toISOString(),to=url.searchParams.get('to')||new Date(Date.now()+14*86400_000).toISOString();
-    return json(res,200,{...studyRoomAvailability(db,{from,to,memberId:member.id}),maxHours:4});
+    return json(res,200,{...studyRoomAvailability(db,{from,to,memberId:member.id}),maxHours:4,timeZone:'America/Santiago'});
   }
   if(req.method==='POST'&&p==='/api/study-room/reserve'){
     const access=benefitAccess(db,member);if(!access.studyRoom)return json(res,403,{error:membershipRestrictionMessage(access,'La Sala de estudios'),code:'MEMBERSHIP_RESTRICTED',reason:access.reason});
     const body=await readJson(req);const start=body.date&&body.startTime?chileLocalIso(body.date,body.startTime):body.start;const end=body.date&&body.endTime?chileLocalIso(body.date,body.endTime):body.end;const id=reserveStudyRoom(db,{memberId:member.id,start,end});audit(db,{actorId:member.id,subjectId:member.id,action:'STUDY_RESERVED',entityType:'study_reservation',entityId:id,details:{start,end}});return json(res,201,{ok:true,id});
   }
   if(req.method==='DELETE'&&p==='/api/study-room/reserve'){
-    const body=await readJson(req);const rid=Number(body.id);const prior=db.prepare("SELECT * FROM study_room_reservations WHERE id=? AND member_id=? AND status='ACTIVE'").get(rid,member.id);
-    if(!cancelStudyRoom(db,{memberId:member.id,id:rid}))return json(res,404,{error:'Reserva no encontrada.'});
-    audit(db,{actorId:member.id,subjectId:member.id,action:'STUDY_RESERVATION_CANCELLED',entityType:'study_reservation',entityId:rid,details:prior||{}});
-    if(prior)await notifyStudyWaitlistReleased(prior);
-    return json(res,200,{ok:true});
+    const body=await readJson(req),rid=Number(body.id);
+    if(!Number.isSafeInteger(rid)||rid<=0)return json(res,400,{error:'Reserva inválida.'});
+    const prior=db.prepare("SELECT * FROM study_room_reservations WHERE id=? AND member_id=? AND status='ACTIVE'").get(rid,member.id);
+    if(!prior)return json(res,404,{error:'Reserva no encontrada o no pertenece a tu cuenta.'});
+    if(!cancelStudyRoom(db,{memberId:member.id,id:rid}))return json(res,409,{error:'La reserva cambió antes de cancelarse. Actualiza la sala e inténtalo nuevamente.'});
+    audit(db,{actorId:member.id,subjectId:member.id,action:'STUDY_RESERVATION_CANCELLED',entityType:'study_reservation',entityId:rid,details:{start:prior.start_at,end:prior.end_at}});
+    await notifyStudyWaitlistReleased(prior);
+    return json(res,200,{ok:true,id:rid,status:'CANCELLED'});
   }
   if(req.method==='GET'&&p==='/api/study-room/waitlist')return json(res,200,{waitlist:memberStudyWaitlist(db,member.id)});
   if(req.method==='POST'&&p==='/api/study-room/waitlist'){
@@ -2197,23 +2204,7 @@ function credentialVerifyUrl(req, code) {
   if(!origin)origin=effectiveRequestOrigin(req)||APP_ORIGIN;
   return `${origin}/verify/${encodeURIComponent(code)}`;
 }
-function findProfilePhoto(memberId) {
-  for(const ext of ['.jpg','.jpeg','.png','.webp']){const f=path.join(PROFILE_PHOTOS_DIR,`member-${Number(memberId)}${ext}`);if(fs.existsSync(f)&&fs.statSync(f).isFile())return f}
-  return null;
-}
-function findCredentialPhoto(member){return findProfilePhoto(member.id)||findSipaPhoto(member.rut)}
-function removeProfilePhoto(memberId){
-  for(const ext of ['.jpg','.jpeg','.png','.webp']){const f=path.join(PROFILE_PHOTOS_DIR,`member-${Number(memberId)}${ext}`);try{fs.unlinkSync(f)}catch{}}
-}
-function saveProfilePhoto(memberId,dataUrl){
-  const m=String(dataUrl||'').match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i);
-  if(!m){const e=new Error('Formato de imagen no permitido. Usa JPG, PNG o WebP.');e.statusCode=400;e.expose=true;throw e}
-  const type=m[1].toLowerCase()==='jpg'?'jpeg':m[1].toLowerCase();const buf=Buffer.from(m[2].replace(/\s/g,''),'base64');
-  if(!buf.length||buf.length>MAX_PROFILE_PHOTO_BYTES){const e=new Error('La foto es demasiado grande.');e.statusCode=413;e.expose=true;throw e}
-  const valid=(type==='jpeg'&&buf[0]===0xff&&buf[1]===0xd8&&buf[2]===0xff)||(type==='png'&&buf.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])))||(type==='webp'&&buf.subarray(0,4).toString()==='RIFF'&&buf.subarray(8,12).toString()==='WEBP');
-  if(!valid){const e=new Error('El archivo no parece ser una imagen válida.');e.statusCode=400;e.expose=true;throw e}
-  removeProfilePhoto(memberId);const ext=type==='jpeg'?'.jpg':`.${type}`;const target=path.join(PROFILE_PHOTOS_DIR,`member-${Number(memberId)}${ext}`);const temp=`${target}.tmp-${process.pid}-${Date.now()}`;fs.writeFileSync(temp,buf,{mode:0o600});fs.renameSync(temp,target);return{file:target,bytes:buf.length};
-}
+function findCredentialPhoto(member){return findProfilePhoto(PROFILE_PHOTOS_DIR,member.id)||findSipaPhoto(member.rut)}
 function findMemberByCredentialCode(code){
   const normalized=String(code||'').trim().toUpperCase();if(!/^[A-Z0-9_-]{12,32}$/.test(normalized))return null;
   const members=db.prepare('SELECT id,name,category,position,active FROM members WHERE active=1').all();

@@ -1,5 +1,13 @@
 # Registro de decisiones
 
+## 2026-09-11 — Sala, fotos y nombres seguros
+
+El horario de Sala se define en backend con `America/Santiago` y se expone a la UI; toda mutación valida fecha local, cierre y cruce de día. La cancelación de socio exige reserva activa propia. `preferred_name` sigue siendo el alias editable y `members.name` no se edita desde Perfil. El upload mantiene validación de magic bytes/tamaño, nombres generados y PHPicker sin permisos adicionales; HEIC se convierte a JPEG.
+
+### Estado
+
+Activa en código fuente; self-checks Node, staticcheck y build iOS Debug aprobados.
+
 ## 2026-09-09 — OLED Dark exclusivo del Panel Informática
 
 ### Decisión

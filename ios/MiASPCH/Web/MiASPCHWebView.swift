@@ -1,6 +1,9 @@
 import SwiftUI
 import WebKit
 import OSLog
+import PhotosUI
+import UniformTypeIdentifiers
+import UIKit
 
 struct MiASPCHWebView: UIViewRepresentable {
     let environment: AppEnvironment
@@ -70,11 +73,12 @@ struct MiASPCHWebView: UIViewRepresentable {
         Coordinator(environment: environment, model: model)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, PHPickerViewControllerDelegate {
         let environment: AppEnvironment
         let model: WebViewModel
         let refreshControl = UIRefreshControl()
         weak var webView: WKWebView?
+        private var filePanelCompletion: (([URL]?) -> Void)?
 
         init(environment: AppEnvironment, model: WebViewModel) {
             self.environment = environment
@@ -172,6 +176,63 @@ struct MiASPCHWebView: UIViewRepresentable {
             }
 
             decisionHandler(.allow)
+        }
+
+        // WKWebView does not present the iOS photo picker for file inputs by itself.
+        // PHPicker needs no photo-library permission and converts HEIC to JPEG before
+        // returning the file URL consumed by the existing web upload flow.
+        @available(iOS 18.4, *)
+        func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
+                     initiatedByFrame frame: WKFrameInfo,
+                     completionHandler: @escaping ([URL]?) -> Void) {
+            guard let root = webView.window?.rootViewController else {
+                completionHandler(nil)
+                return
+            }
+            let presenter = topViewController(root)
+            filePanelCompletion = completionHandler
+            var configuration = PHPickerConfiguration(photoLibrary: .shared())
+            configuration.filter = .images
+            configuration.selectionLimit = parameters.allowsMultipleSelection ? 0 : 1
+            let picker = PHPickerViewController(configuration: configuration)
+            picker.delegate = self
+            presenter.present(picker, animated: true)
+        }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            picker.dismiss(animated: true)
+            guard let completion = filePanelCompletion else { return }
+            filePanelCompletion = nil
+            guard let result = results.first else {
+                completion(nil)
+                return
+            }
+            result.itemProvider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                let url: URL?
+                if let data, let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.9) {
+                    let target = FileManager.default.temporaryDirectory.appendingPathComponent("mi-aspch-photo-\(UUID().uuidString).jpg")
+                    do {
+                        try jpeg.write(to: target, options: .atomic)
+                        url = target
+                    } catch {
+                        url = nil
+                    }
+                } else {
+                    url = nil
+                }
+                DispatchQueue.main.async { completion(url.map { [$0] }) }
+            }
+        }
+
+        private func topViewController(_ root: UIViewController) -> UIViewController {
+            if let presented = root.presentedViewController { return topViewController(presented) }
+            if let navigation = root as? UINavigationController, let visible = navigation.visibleViewController {
+                return topViewController(visible)
+            }
+            if let tab = root as? UITabBarController, let selected = tab.selectedViewController {
+                return topViewController(selected)
+            }
+            return root
         }
 
         private func shouldOpenExternally(_ url: URL, navigationType: WKNavigationType) -> Bool {

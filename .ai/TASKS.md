@@ -1,5 +1,7 @@
 # Pendientes
 
+- [x] Corregir cancelación y horario de Sala, foto iPhone/WKWebView y validación backend de nombre de uso; self-checks pasan el 2026-09-11.
+
 - [ ] Completar las vistas dedicadas Finanzas y Contenido del Panel Informática
       con fuentes reales, acciones auditadas y validación responsive iPhone/web.
 - [ ] Implementar registro persistente de tokens y entrega backend APNs con

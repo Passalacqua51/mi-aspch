@@ -1,5 +1,9 @@
 # Notas de Codex para ChatGPT
 
+## 2026-09-11 — Sala, fotos y nombres
+
+Se implementaron horario chileno y cancelación propia segura de Sala, upload de foto con MIME/magic bytes/tamaño/nombre seguro, picker PHPicker para WKWebView y validación por capas de `preferred_name`. Se mantienen SIPA legacy desactivadas, auth intacta y nombre oficial separado. Pasan `npm run selfcheck`, `corecheck`, `staticcheck`, `auth-gate:test`, `admin:test`, `git diff --check` y build iOS Debug. No se tocó producción.
+
 ## 2026-09-09 — OLED Dark exclusivo del Panel Informática
 
 Se implementó un tema OLED negro exclusivo para `/informatica` sin tocar la app

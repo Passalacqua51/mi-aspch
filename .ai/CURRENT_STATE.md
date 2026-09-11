@@ -1,5 +1,12 @@
 # Estado actual
 
+## Sala, fotos y nombres — 2026-09-11
+
+- Sala de estudios valida en backend el horario local `America/Santiago`: lunes a jueves 09:00–17:00, viernes 09:00–16:00 y fin de semana cerrado. La UI consume el mismo mapa.
+- La cancelación de socio exige que la reserva activa pertenezca al `member.id` autenticado; persiste `CANCELLED`, libera el bloque y refresca.
+- Fotos de perfil validan magic bytes/tamaño, usan nombres generados y mantienen `ALLOW_LEGACY_SIPA_PHOTOS=false`. WKWebView usa PHPicker y convierte a JPEG.
+- `preferred_name` es el único campo editable por el socio; `members.name` es el nombre oficial de BD SOCIOS y queda separado en ADMIN.
+
 ## OLED Dark exclusivo del Panel Informática — 2026-09-09
 
 - Detección sin cambios: `IS_ADMIN_PANEL` y el servidor siguen resolviendo

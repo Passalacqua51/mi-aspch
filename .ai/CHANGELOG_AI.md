@@ -1,3 +1,10 @@
+# Sala, fotos y nombres — 2026-09-11
+
+- Sala de estudios: horario oficial chileno, validación backend y cancelación propia con refresco real.
+- Perfil/credencial: picker nativo de fotos para WKWebView, conversión HEIC a JPEG y persistencia segura.
+- Nombres: validación por capas y separación explícita del nombre oficial BD SOCIOS.
+- Cache-busting actualizado y Service Worker rotado una sola vez.
+
 # OLED Dark exclusivo del Panel Informática — 2026-09-09
 
 - Tema OLED negro (bg `#000000`) aplicado solo a `/informatica`, `/informatica/`,
