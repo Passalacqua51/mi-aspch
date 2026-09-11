@@ -1,4 +1,4 @@
-const CACHE='mi-aspch-v0.6.16-pwa-16';
+const CACHE='mi-aspch-v0.6.16-pwa-17';
 const STATIC=['/','/informatica','/index.html','/admin.html','/styles.css','/auth-gate.js','/app.js','/manifest.json','/manifest.webmanifest','/logo-aspch-original.png','/icon-192.png','/icon-512.png','/apple-touch-icon.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
